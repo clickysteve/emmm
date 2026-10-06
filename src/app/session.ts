@@ -151,9 +151,22 @@ export class Session {
     }
   }
 
+  /** Scheduling diagnostics: how far ahead of their timestamps notes are handed to MIDI. */
+  timing = { events: 0, late: 0, maxLateMs: 0, minLeadMs: Infinity };
+
   private dispatch(evs: EngineEvent[], toMs: (t: number) => number): void {
+    const now = performance.now();
     for (const ev of evs) {
       const ms = toMs(ev.tick);
+      if (ev.kind === 'on' && this.playing) {
+        const lead = ms - now;
+        this.timing.events++;
+        this.timing.minLeadMs = Math.min(this.timing.minLeadMs, lead);
+        if (lead < -1) {
+          this.timing.late++;
+          this.timing.maxLateMs = Math.max(this.timing.maxLateMs, -lead);
+        }
+      }
       switch (ev.kind) {
         case 'on':
           this.send(ev.channel, msg.noteOn(ev.channel, ev.pitch, ev.velocity), ms);

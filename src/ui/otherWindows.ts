@@ -180,6 +180,7 @@ export class MonitorWindow {
   private log: HTMLDivElement;
   private lines: string[] = [];
   private vu: HTMLDivElement[] = [];
+  private timing: HTMLDivElement;
   constructor(private ctx: UiContext, parent: HTMLElement) {
     this.win = new MWindow(parent, { id: 'monitor', title: 'Monitor', x: 380, y: 150, w: 228, h: 210, closable: true });
     const b = this.win.body;
@@ -189,8 +190,9 @@ export class MonitorWindow {
       d.style.fontSize = '9px';
       this.vu.push(d);
     }
-    label(b, 4, 62, 'event log (out ▸ / in ◂)', 'tiny');
-    this.log = el('div', 'monitor-log', b, [4, 72, 220, 116]);
+    this.timing = el('div', 'label tiny', b, [4, 60, 220, 8]);
+    label(b, 4, 70, 'event log (out ▸ / in ◂)', 'tiny');
+    this.log = el('div', 'monitor-log', b, [4, 80, 220, 110]);
   }
 
   /** Called by the UI loop with events whose time has come. */
@@ -207,6 +209,9 @@ export class MonitorWindow {
       const t = st ? `${v + 1}: ${st.stepIndex >= 0 ? 'step ' + (st.stepIndex + 1) : '—'} ${st.played ? st.pitches.map(noteName).join(' ') + ' v' + st.velocity : st.stepIndex >= 0 ? '(rest)' : ''} ${st.scheme !== 'original' && st.scheme !== 'none' ? '[' + st.scheme + ']' : ''}` : `${v + 1}: —`;
       if (this.vu[v].textContent !== t) this.vu[v].textContent = t;
     }
+    const t = s.timing;
+    const tt = `notes ${t.events}  late ${t.late}${t.late ? ' (max ' + t.maxLateMs.toFixed(1) + 'ms)' : ''}  min lead ${Number.isFinite(t.minLeadMs) ? t.minLeadMs.toFixed(1) : '-'}ms`;
+    if (this.timing.textContent !== tt) this.timing.textContent = tt;
     const txt = this.lines.join('\n');
     if (this.log.textContent !== txt) this.log.textContent = txt;
   }
