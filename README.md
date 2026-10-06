@@ -5,6 +5,11 @@ performing system by David Zicarelli, Joel Chadabe, John Offenhartz and Antony W
 (Intelligent Music, 1986–87). It runs in the browser and plays external MIDI hardware
 through Web MIDI.
 
+> **New to emmm or M? Start with the [Quick Start guide](docs/QUICK-START.md)** — from
+> opening emmm to performing with it, step by step.
+
+![The emmm main screen](docs/images/qs-screen.png)
+
 It is not a generic generative sequencer: it reproduces M's model — four Patterns of notes,
 transformed into Voices by Variables with six Positions each, performed by switching
 Positions, conducting, Snapshots and Slideshows — and M's 1-bit, control-panel look.
@@ -87,6 +92,7 @@ Not yet: verification against the original program in an emulator
 
 ## Documentation
 
+* [docs/QUICK-START.md](docs/QUICK-START.md) — **start here**: learn to make music with emmm
 * [docs/RESEARCH.md](docs/RESEARCH.md) — what we learnt about M, and from where
 * [docs/M-BEHAVIOUR.md](docs/M-BEHAVIOUR.md) — the reconstructed behavioural specification
 * [docs/EXAMPLES.md](docs/EXAMPLES.md) — worked input → output examples (also tests)
