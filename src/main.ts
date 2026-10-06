@@ -126,7 +126,14 @@ function openEditor(name: EditorName, opts: { position?: number; variable?: Vari
   session.changed('window');
 }
 
-(window as unknown as { emmmUi: unknown }).emmmUi = { openEditor };
+(window as unknown as { emmmUi: unknown }).emmmUi = {
+  openEditor,
+  /** redraw everything once (used by automated checks) */
+  updateAll: () => {
+    for (const m of main) m.update();
+    for (const f of floating) if (f.win.open) f.update();
+  },
+};
 
 // ------------------------------------------------------------------ menus
 interface MenuItem {
@@ -441,6 +448,8 @@ function consumeVisual(now: number): boolean {
   return changed;
 }
 
+const perf = { frames: 0, total: 0, max: 0 };
+(window as unknown as { emmmPerf: unknown }).emmmPerf = perf;
 let lastStatus = '';
 function frame(): void {
   const now = performance.now();
@@ -451,9 +460,14 @@ function frame(): void {
   const vis = consumeVisual(now);
   const flashing = flash.pattern.some((t) => t > now - 50) || flash.notes.some((n) => n.until > now - 50);
   if (session.dirty || vis || flashing || session.playing) {
+    const t0 = performance.now();
     session.dirty = false;
     for (const m of main) m.update();
     for (const f of floating) if (f.win.open) f.update();
+    const dt = performance.now() - t0;
+    perf.frames++;
+    perf.total += dt;
+    perf.max = Math.max(perf.max, dt);
   }
   const st = `${session.playing ? '▶' : session.engine.state === 'paused' ? '❚❚' : '■'}  ${session.hold ? 'HOLD' : ''}`;
   if (st !== lastStatus) {

@@ -364,10 +364,15 @@ export class PatternEditor {
     }
   }
 
+  private drawnKey = '';
   draw(): void {
     const s = this.ctx.s;
     const p = this.pattern;
     const len = p.steps.length;
+    const playingNow = s.engine.state !== 'stopped' && this.ctx.flash.notes[this.voice].until > this.ctx.now() ? this.ctx.flash.notes[this.voice].step : -1;
+    const key = [s.rev, playingNow, this.hover?.step, this.hover?.pitch, this.low, this.scroll, this.voice, this.ghost, this.region?.join(), s.recorders[this.voice].counter, this.tool].join('|');
+    if (key === this.drawnKey) return;
+    this.drawnKey = key;
     let g = '';
     // grid lines: black within the pattern, grey beyond its end
     for (let c = 0; c <= COLS; c++) {

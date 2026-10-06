@@ -119,8 +119,11 @@ export class Session {
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);
   }
+  /** Incremented on every change, so views can cache what they drew. */
+  rev = 0;
   changed(what = 'state'): void {
     this.dirty = true;
+    this.rev++;
     this.listeners.forEach((f) => f(what));
   }
 

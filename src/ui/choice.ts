@@ -13,6 +13,8 @@ export class VariableChoice {
   cells: HTMLDivElement[] = [];
   private svgs: SVGSVGElement[] = [];
   private lastClick = { t: 0, i: -1 };
+  private drawn: string[] = [];
+  private flashEls: HTMLDivElement[][] = [];
 
   constructor(
     private ctx: UiContext,
@@ -35,6 +37,17 @@ export class VariableChoice {
       this.svgs.push(s);
       this.cells.push(c);
       c.addEventListener('pointerdown', (ev) => this.down(ev, i));
+      // cycle-restart blink marks, one per voice row (cheap to toggle every frame)
+      const fl: HTMLDivElement[] = [];
+      for (let v = 0; v < 4; v++) {
+        const f = el('div', '', c, [0, Math.round(1 + v * ((ch - 4) / 4)), 5, Math.max(2, Math.round((ch - 4) / 4))]);
+        f.style.position = 'absolute';
+        f.style.background = '#fff';
+        f.style.mixBlendMode = 'difference';
+        f.style.display = 'none';
+        fl.push(f);
+      }
+      this.flashEls.push(fl);
     }
   }
 
@@ -84,6 +97,7 @@ export class VariableChoice {
     const active = (comp[this.variable] as { active: number }).active;
     const pending = s.hold?.pending.positions[this.variable];
     const flashNow = this.ctx.now();
+    const isCyc = this.variable === 'accent' || this.variable === 'legato' || this.variable === 'rhythm';
     for (let i = 0; i < NUM_POSITIONS; i++) {
       const on = i === active;
       const c = on ? '#fff' : '#000';
@@ -91,17 +105,21 @@ export class VariableChoice {
       this.cells[i].classList.toggle('blink', pending === i);
       let flash: boolean[] = [];
       if (this.variable === 'patternGroup' && on) flash = this.ctx.flash.pattern.map((t) => t > flashNow);
-      let inner = miniFor(comp, this.variable, i, this.cw - 2, this.ch - 2, c, flash);
-      if ((this.variable === 'accent' || this.variable === 'legato' || this.variable === 'rhythm') && on && !comp.options.noCyclicBlinking) {
-        // the first step of each restarting cycle blinks
-        const rh = (this.ch - 4) / 4;
-        this.ctx.flash.cycle[this.variable].forEach((t, v) => {
-          if (t > flashNow) inner += `<rect x="0" y="${Math.round(1 + v * rh)}" width="5" height="${Math.max(2, Math.round(rh))}" fill="${on ? '#fff' : '#000'}"/>`;
-        });
+      const key = `${s.rev}|${on}|${flash.join()}`;
+      if (this.drawn[i] !== key) {
+        this.drawn[i] = key;
+        let inner = miniFor(comp, this.variable, i, this.cw - 2, this.ch - 2, c, flash);
+        const marked = (comp[this.variable] as { marked?: boolean[] }).marked?.[i];
+        if (marked) inner += `<text x="${this.cw - 4}" y="7" font-size="8" text-anchor="end" fill="${c}">*</text>`;
+        setSvg(this.svgs[i], inner);
       }
-      const marked = (comp[this.variable] as { marked?: boolean[] }).marked?.[i];
-      if (marked) inner += `<text x="${this.cw - 4}" y="7" font-size="8" text-anchor="end" fill="${c}">*</text>`;
-      setSvg(this.svgs[i], inner);
+      // the first step of each restarting cycle blinks (S1 ch.7 "Cyclic Variables Blink")
+      const fl = this.flashEls[i];
+      for (let v = 0; v < 4; v++) {
+        const show = isCyc && on && !comp.options.noCyclicBlinking && this.ctx.flash.cycle[this.variable as 'accent'][v] > flashNow;
+        const d = show ? '' : 'none';
+        if (fl[v].style.display !== d) fl[v].style.display = d;
+      }
     }
   }
 }

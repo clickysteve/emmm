@@ -151,10 +151,14 @@ export class CyclicEditor {
     });
   }
 
+  private drawnKey = '';
   private drawAll(): void {
     const s = this.ctx.s;
     const cycles = this.cycles();
     const flashNow = this.ctx.now();
+    const key = [s.rev, this.which, this.editPos, s.engine.state, ...s.engine.voices.map((v) => v.cycle[this.which]), ...this.ctx.flash.cycle[this.which].map((t) => t > flashNow)].join('|');
+    if (key === this.drawnKey) return;
+    this.drawnKey = key;
     const isActive = s.comp[this.which].active === this.editPos;
     cycles.forEach((cyc, v) => {
       let inner = '';
