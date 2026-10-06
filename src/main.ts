@@ -15,7 +15,7 @@ import type { EditorName, FlashState, UiContext } from './ui/context';
 import { CyclicEditor } from './ui/cyclicEditor';
 import { el, view } from './ui/dom';
 import { ConductingWindow, CyclicWindow, MidiWindow, PatternsWindow, SnapshotWindow, VariablesWindow, type Updatable } from './ui/mainWindows';
-import { AboutWindow, ImportWindow, LibraryWindow, MidiAssignmentWindow, MonitorWindow } from './ui/otherWindows';
+import { AboutWindow, HelpWindow, ImportWindow, LibraryWindow, MidiAssignmentWindow, MonitorWindow } from './ui/otherWindows';
 import { ExtendedWindow } from './ui/extendedWindow';
 import { PatternEditor } from './ui/patternEditor';
 import { NoteDensityEditor, NoteOrderEditor, OrchestrationEditor, TimeDistortionEditor, TranspositionEditor, VarEditor, VelocityRangeEditor } from './ui/varEditors';
@@ -112,10 +112,43 @@ const about = new AboutWindow(ctx, desktop);
 const importWin = new ImportWindow(ctx, desktop);
 const library = new LibraryWindow(ctx, desktop);
 const extendedWin = new ExtendedWindow(ctx, desktop);
-const floating = [...Object.values(editors), cyclic, patternEditor, midiAssign, monitorWin, about, importWin, library, extendedWin];
+const helpWin = new HelpWindow(ctx, desktop);
+const floating = [...Object.values(editors), cyclic, patternEditor, midiAssign, monitorWin, about, importWin, library, extendedWin, helpWin];
 floating.forEach((f) => f.win.el.classList.add('hidden'));
 
-function openEditor(name: EditorName, opts: { position?: number; variable?: VariableName; voice?: number } = {}): void {
+/** The Macintosh "zoom rects": dotted rectangles growing from the click to the window. */
+function zoomRects(from: Element | undefined, to: HTMLElement): void {
+  if (session.comp.options.noZoomRects || !from) return;
+  const sr = screen.getBoundingClientRect();
+  const k = view.scale;
+  const a = from.getBoundingClientRect();
+  const b = to.getBoundingClientRect();
+  const r0 = [(a.left - sr.left) / k, (a.top - sr.top) / k, a.width / k, a.height / k];
+  const r1 = [(b.left - sr.left) / k, (b.top - sr.top) / k, b.width / k, b.height / k];
+  const N = 8;
+  for (let i = 1; i <= N; i++) {
+    setTimeout(() => {
+      const t = i / N;
+      const r = r0.map((v, j) => v + (r1[j] - v) * t);
+      const z = el('div', '', screen, [r[0], r[1], r[2], r[3]]);
+      z.style.position = 'absolute';
+      z.style.border = '1px dotted #fff';
+      z.style.outline = '1px dotted #000';
+      z.style.zIndex = '25000';
+      z.style.pointerEvents = 'none';
+      setTimeout(() => z.remove(), 60);
+    }, i * 14);
+  }
+}
+
+function openEditor(name: EditorName, opts: { position?: number; variable?: VariableName; voice?: number; from?: Element } = {}): void {
+  const target =
+    name in editors ? editors[name].win : name === 'cyclic' ? cyclic.win : name === 'patternEditor' ? patternEditor.win : null;
+  if (target && !target.open) {
+    target.el.classList.remove('hidden');
+    zoomRects(opts.from, target.el);
+    target.el.classList.add('hidden');
+  }
   if (name in editors) {
     const e = editors[name];
     e.openAt(opts.position ?? session.comp[e.variable].active);
@@ -196,6 +229,7 @@ const MENUS: { title: string; cls?: string; items: MenuItem[] }[] = [
     cls: 'logo',
     items: [
       { label: 'About emmm…', action: () => openEditor('about') },
+      { label: 'Help…', action: () => helpWin.win.show() },
       { label: 'Monitor', action: () => openEditor('monitor') },
       { sep: true, label: '' },
       { label: 'New random seed', action: () => session.setSeed(freshSeed()) },
@@ -301,6 +335,7 @@ const MENUS: { title: string; cls?: string; items: MenuItem[] }[] = [
       opt('noCyclicBlinking', 'No Cyclic Blinking'),
       opt('editorSoundWhilePlaying', 'Editor Sound While Playing'),
       opt('lockMarkedVariables', 'Locked Marked Variables', '⌘L'),
+      opt('noZoomRects', 'No Zoom Rects'),
       { sep: true, label: '' },
       { label: 'Extended…  (not Classic M)', checked: () => session.comp.extended.enabled, action: () => extendedWin.win.show() },
       { label: 'Monitor All Output (internal)', checked: () => session.monitorAll, action: () => ((session.monitorAll = !session.monitorAll), session.monitor.unlock(), session.changed('midi')) },

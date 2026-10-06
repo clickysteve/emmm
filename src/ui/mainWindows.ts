@@ -224,7 +224,7 @@ export class PatternsWindow implements Updatable {
         if (ev.defaultPrevented) return;
         const now = performance.now();
         if (now - lastSel < 350) {
-          ctx.openEditor('patternEditor', { voice: v });
+          ctx.openEditor('patternEditor', { voice: v, from: select });
           lastSel = 0;
           return;
         }

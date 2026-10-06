@@ -177,6 +177,7 @@ export interface Options {
   syncRestartsSequence: boolean;
   editorSoundWhilePlaying: boolean;
   lockMarkedVariables: boolean;
+  noZoomRects: boolean;
 }
 
 export interface MidiPortAssignment {

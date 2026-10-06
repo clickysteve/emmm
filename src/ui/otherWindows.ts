@@ -444,3 +444,55 @@ export class LibraryWindow {
 
   update(): void {}
 }
+
+// ---------------------------------------------------------------------------- Help (emmm)
+
+const HELP = `
+<b>emmm in one minute</b><br>
+Four <b>Patterns</b> hold notes and chords (no rhythm). Each becomes a <b>Voice</b> through the
+<b>Variables</b>. Every Variable has six <b>Positions</b> (Sound Choice: sixteen); one is active
+(inverted). Perform by switching Positions while the music runs.<br><br>
+<b>Variables</b> — Pattern Group (which four Patterns) · Note Density (chance a note sounds) ·
+Vel Range (velocities) · Note Order (Original / Cyclic Random / Utterly Random) · Transposition ·
+Time Distort (swing / rubato maps).<br>
+<b>Cyclic Variables</b> — Rhythm (time to the next note, × the Time Base), Legato (note length as %
+of that time), Accent (level 1–4 within Vel Range; 0 = rest). Cycles are 1–16 steps; a step can be
+a range of levels, picked at random each time.<br>
+<b>Midi</b> — Orchestration sends each voice to any of 16 output channels; Sound Choice sends
+program changes.<br><br>
+<b>Mouse</b> — click a Position to choose it · double-click to edit it · drag onto another to swap
+(Alt: copy) · Shift-click: wait for the quantization point.<br>
+Numericals: press the top half to increase, bottom half to decrease, or drag up/down outside the box.
+Range bars: drag out a range; click for one value. Conducting arrows: click to enable, hold to
+rotate, or drag around them; then move the Baton in the Conducting Grid.<br><br>
+<b>Patterns window</b> — Src (input channel) · Use (– off, R record, C Input Control, ♯♭ keyboard
+transpose, Echo Map) · speaker = Play-Enable · ✓ = Echo-Thru-Orchestration · ◆ = Mouse Advance ·
+Select (double-click: Pattern Editor; Alt-click an icon: record modes) · Output Length (Alt: add
+rests) · Time Base (n | d; sa = step advance) · Phase (ticks; 96 = a quarter note).<br><br>
+<b>Snapshots</b> — Hold/Do (camera, Backspace): click controls, then Hold/Do again to do them all at
+once, or click a Snapshot box to store them. Letters A–Z recall. Globe = Blink Everything ·
+pencil = Edit Snapshot · frames = Restore. <b>Slideshows</b> 1–9: Alt-click to record, click to play,
+0 stops, \\ loops.<br><br>
+<b>Keys</b> — Space Start/Sync · Return Stop · Tab Pause · Caps Lock or ⌘⌥ + moving the mouse =
+Mouse Advance · ⌘. All Notes Off · ⌘S Save · ⌘O Open.<br><br>
+<b>MIDI</b> — File ▸ Midi Assignment… maps M Output Channels to devices (or the internal monitor).
+Set a voice's Use to <b>C</b> to drive emmm from a MIDI keyboard: middle C (C3) Start, B2 Stop,
+B3 Hold/Do, F3 Sync, black keys + white keys select Positions.<br><br>
+<b>Seed</b> — emmm's randomness is seeded (Conducting window). Same document + seed + gestures =
+same music from Start.`;
+
+export class HelpWindow {
+  win: MWindow;
+  constructor(ctx: UiContext, parent: HTMLElement) {
+    void ctx;
+    this.win = new MWindow(parent, { id: 'help', title: 'Help', x: 120, y: 24, w: 420, h: 436, closable: true });
+    const t = el('div', 'label', this.win.body, [8, 6, 404, 410]);
+    t.style.whiteSpace = 'normal';
+    t.style.lineHeight = '11px';
+    t.style.fontSize = '9px';
+    t.style.overflowY = 'auto';
+    t.style.pointerEvents = 'auto';
+    t.innerHTML = HELP;
+  }
+  update(): void {}
+}

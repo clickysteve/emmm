@@ -59,7 +59,7 @@ export class VariableChoice {
     this.lastClick = { t: now, i };
     if (dbl) {
       const ed = EDITOR_FOR[this.variable];
-      if (ed) this.ctx.openEditor(ed, { position: i, variable: this.variable });
+      if (ed) this.ctx.openEditor(ed, { position: i, variable: this.variable, from: this.cells[i] });
       return;
     }
     const shift = ev.shiftKey;

@@ -29,7 +29,7 @@ export interface UiContext {
   s: Session;
   screen: HTMLElement;
   flash: FlashState;
-  openEditor(name: EditorName, opts?: { position?: number; variable?: VariableName; voice?: number }): void;
+  openEditor(name: EditorName, opts?: { position?: number; variable?: VariableName; voice?: number; from?: Element }): void;
   /** Variables whose position cells should blink (Hold/Do pending) */
   now(): number;
   alert(text: string): void;

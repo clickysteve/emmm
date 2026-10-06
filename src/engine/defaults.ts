@@ -187,6 +187,7 @@ export function defaultComposition(seed = 38291): Composition {
       syncRestartsSequence: true,
       editorSoundWhilePlaying: false,
       lockMarkedVariables: false,
+      noZoomRects: false,
     },
     midi: {
       outputs: Array.from({ length: NUM_CHANNELS }, (_, i) => ({ port: '', channel: i + 1 })),
