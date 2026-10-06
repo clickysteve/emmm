@@ -16,7 +16,8 @@
   Machine mode, Sustain Enters Rests), Keyboard Transpose, Input Control System, Echo-Thru-
   Orchestration, Echo Map, Tap Tempo / Tap Conduct / Freeze / Accel / Decel, Step Advance.
 * Pattern Editor with tools; Pattern and Edit menu operations.
-* Movies → Standard MIDI File; MIDI File → Patterns.
+* Movies → Standard MIDI File; MIDI File → Patterns, or → a play-along Sequence (Sequence
+  Play-Enable mute, Sync Restarts Sequence, snapshot item, Input Control key).
 * Web MIDI output with timestamps, Midi Assignment (16 output / input channel maps, first
   program number, latency, MIDI messages, All Notes Off, Panic, MIDI clock out), internal
   monitor and metronome.
@@ -27,8 +28,8 @@
 1. **Verify against the original** in an emulator (Mini vMac / Basilisk II with M 2.x, or
    Hatari with the Atari 1.25 freeware) — work through UNCERTAINTIES.md, turning [INF]/[UNK]
    into [OBS] and adding regression tests from captured MIDI.
-2. **Sequence** (MIDI File imported as a play-along sequence, Sequence Play-Enable, Sync
-   Restarts Sequence, snapshot item).
+2. Sequence details: looping behaviour, file tempo maps, recording a Movie into a Pattern
+   directly ("regurgitated back into a pattern", S2).
 3. Modified-mouse details still missing: Shift-Option quantized active-Position choice from
    edit windows is wired; check every documented modifier against Appendix A.
 4. Pattern Editor polish: right-hand reference keyboard, MIDI-edit while viewing two patterns,

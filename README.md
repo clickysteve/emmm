@@ -74,10 +74,10 @@ URL options: `?demo` loads the demo, `?new` an empty document, `?seed=12345` set
 The Classic engine and interface are functional: all of M's Variables, cyclic variables, Time
 Distortion, conducting (incl. continuous and robot), Hold/Do, Snapshots, Slideshows, the Input
 Control System, recording modes, Pattern Editor and menus, Movies (MIDI file export), MIDI
-file import, Web MIDI I/O with timestamped scheduling, save/load and seeded randomness.
+file import (into Patterns or as a play-along Sequence), Web MIDI I/O with timestamped scheduling, save/load and seeded randomness.
 ~100 automated tests cover the engine, timing maths, persistence and session logic.
 
-Not yet: play-along Sequences, verification against the original program in an emulator
+Not yet: verification against the original program in an emulator
 (several behaviours are reasoned from documentation — see
 [docs/UNCERTAINTIES.md](docs/UNCERTAINTIES.md)), and the Extended mode.
 

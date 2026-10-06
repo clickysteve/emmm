@@ -195,6 +195,22 @@ export interface MidiConfig {
   clockPort: string;
 }
 
+/** An imported MIDI file played along with the four voices (M-BEHAVIOUR §17). */
+export interface SequenceNote {
+  /** onset in ticks (96 per quarter) from the start of the sequence */
+  tick: number;
+  dur: number;
+  /** MIDI channel in the file = M Output Channel it plays on (1..16) */
+  channel: number;
+  pitch: number;
+  velocity: number;
+}
+export interface SequenceData {
+  name: string;
+  notes: SequenceNote[];
+  lengthTicks: number;
+}
+
 export interface Composition {
   name: string;
   seed: number;
@@ -225,4 +241,7 @@ export interface Composition {
   slideshows: (Slideshow | null)[];
   options: Options;
   midi: MidiConfig;
+  sequence: SequenceData | null;
+  /** Sequence Play-Enable: a mute switch — the sequence keeps running when disabled. */
+  sequenceEnable: boolean;
 }

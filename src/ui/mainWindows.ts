@@ -379,7 +379,10 @@ export class ConductingWindow implements Updatable {
     mk('pause', 80, 2, 40, iconSvg('pause'), 'Pause (Tab)', () => s.pause());
     mk('sync', 2, 22, 40, '<span style="font-size:10px">Sync</span>', 'Sync', (ev) => (ev.shiftKey ? s.sync() : s.sync()));
     mk('movie', 41, 22, 40, iconSvg('film', 18, 12), 'Movie: capture the performance', () => s.toggleMovie());
-    mk('seq', 80, 22, 40, iconSvg('seq', 12, 12), 'Sequence Play-Enable (no Sequence loaded)', () => ctx.alert('Imported play-along Sequences are not implemented yet. Use File ▸ Open Midi File… to read a MIDI file into a Pattern.'));
+    mk('seq', 80, 22, 40, iconSvg('seq', 12, 12), 'Sequence Play-Enable', () => {
+      if (!s.comp.sequence && !s.hold) ctx.alert('No Sequence loaded. Use File ▸ Open Midi File… and choose “Import as Sequence”.');
+      else s.toggleSequence();
+    });
     // tempo
     this.tempoArrow = arrowFor(ctx, b, 2, 46, 'tempo');
     this.tempoBar = new RangeBar(b, 18, 47, 100, 11, {
@@ -513,6 +516,10 @@ export class ConductingWindow implements Updatable {
     this.btn.movie.classList.toggle('on', s.movieArmed || s.movieRecording);
     this.btn.movie.classList.toggle('blink', s.movieRecording);
     this.btn.sync.classList.toggle('blink', !!s.hold?.pending.sync);
+    this.btn.seq.classList.toggle('on', s.comp.sequenceEnable && !!s.comp.sequence);
+    this.btn.seq.classList.toggle('blink', s.hold?.pending.sequenceEnable !== undefined && !!s.hold);
+    this.btn.seq.style.opacity = s.comp.sequence ? '1' : '0.45';
+    this.btn.seq.title = s.comp.sequence ? `Sequence Play-Enable: ${s.comp.sequence.name}` : 'Sequence Play-Enable (no Sequence loaded)';
     const filmC = s.movieArmed || s.movieRecording ? '#fff' : '#000';
     const key = 'film' + filmC;
     if (this.btn.movie.dataset.v !== key) {

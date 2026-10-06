@@ -247,21 +247,32 @@ export class ImportWindow {
   private chord: ('single' | 'chord')[] = ['chord', 'chord', 'chord', 'chord'];
   private rests: ('none' | 'dur')[] = ['none', 'none', 'none', 'none'];
   private quant = [8, 8, 8, 8];
+  private asSequence = false;
   private cells: HTMLDivElement[][] = [];
   private parts: { update(): void }[] = [];
   constructor(private ctx: UiContext, parent: HTMLElement) {
     this.win = new MWindow(parent, { id: 'import', title: 'Import MIDI File', x: 100, y: 120, w: 360, h: 132, closable: true });
     const b = this.win.body;
-    const s = ctx.s;
     const btn = (x: number, t: string, f: () => void) => {
       const d = el('div', 'btn', b, [x, 2, 56, 14], t);
       d.style.fontSize = '9px';
       d.addEventListener('pointerdown', (e) => (e.preventDefault(), f()));
     };
+    const seqT = el('div', 'num', b, [150, 2, 86, 14]);
+    seqT.style.fontSize = '8px';
+    seqT.title = 'Import as Sequence: keep the timing and play the file along with the four voices (channels from row 1)';
+    seqT.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      this.asSequence = !this.asSequence;
+      if (this.asSequence) this.chans[0] = this.chans[0].map(() => true);
+      this.update();
+    });
+    this.parts.push({ update: () => ((seqT.textContent = (this.asSequence ? '☒' : '☐') + ' as Sequence'), seqT.classList.toggle('inv', this.asSequence)) });
     btn(240, 'Import', () => this.doImport());
     btn(298, 'Cancel', () => this.win.close());
-    const nameEl = el('div', 'label', b, [4, 5, 230, 10]);
-    this.parts.push({ update: () => (nameEl.textContent = this.name ? `${this.name}: ${this.file?.notes.length ?? 0} notes → Patterns ${'abcdef'[s.comp.patternGroup.active]}` : '') });
+    const nameEl = el('div', 'label', b, [4, 5, 144, 10]);
+    nameEl.style.overflow = 'hidden';
+    this.parts.push({ update: () => (nameEl.textContent = this.name ? `${this.name} (${this.file?.notes.length ?? 0})` : '') });
     label(b, 4, 22, 'Chord', 'tiny');
     label(b, 30, 22, 'Rests', 'tiny');
     label(b, 58, 22, 'Quant', 'tiny');
@@ -324,6 +335,17 @@ export class ImportWindow {
   private doImport(): void {
     const s: Session = this.ctx.s;
     if (!this.file) return;
+    if (this.asSequence) {
+      const channels = new Set(this.chans[0].map((on, i) => (on ? i + 1 : 0)).filter(Boolean));
+      const notes = this.file.notes
+        .filter((n) => channels.has(n.channel))
+        .map((n) => ({ tick: n.beat * 96, dur: n.durBeats * 96, channel: n.channel, pitch: n.pitch, velocity: n.velocity }));
+      s.comp.sequence = { name: this.name, notes, lengthTicks: notes.reduce((m, n) => Math.max(m, n.tick + n.dur), 0) };
+      s.comp.sequenceEnable = false; // as in M: enable it with the Sequence Play-Enable toggle
+      this.win.close();
+      s.changed('sequence');
+      return;
+    }
     const g = s.comp.patternGroups[s.comp.patternGroup.active];
     for (let v = 0; v < 4; v++) {
       const channels = this.chans[v].map((on, i) => (on ? i + 1 : 0)).filter(Boolean);

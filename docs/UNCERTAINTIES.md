@@ -26,11 +26,14 @@ conservative choice in emmm, isolated so it can be corrected. Search the code fo
 | U18 | Default contents of the six Positions at startup ("New"). | emmm's own musically useful presets; Position 1 neutral. | `src/engine/defaults.ts` | Emulator. |
 | U19 | Rounding of fractional time bases (5, 7, 9, 11, 13, 15) — integer ticks with error diffusion, or something else? | Exact fractional ticks. | engine | Emulator + MIDI timing capture. |
 | U20 | Atari ST/early "Direction" variable (backwards playback probability). | Not implemented (not in the 2.x manual). | — | Atari ST 1.x emulator. |
+| U21 | Does an imported Sequence loop at its end? Which output does a file channel play on? | Plays once per Start (or Sync, with *Sync Restarts Sequence*); file channel *n* plays on M Output Channel *n*; tempo follows M's tempo (file tempo map ignored). | `MEngine.restartSequence`, `ImportWindow` | Emulator. |
 
 ## Known simplifications (not uncertainties about M)
 
-* Imported MIDI files can be read into Patterns; the separate play-along *Sequence* is not
-  yet implemented (button present, shows a notice).
+* Tempo maps inside imported MIDI files are ignored (notes are placed in beats).
+* Long main-thread stalls (> ~60 ms) can make notes late by the excess; raise *Latency* in
+  Midi Assignment to absorb this (all output is then delayed by that amount). The Monitor
+  window shows a running count of late notes.
 * MIDI clock *input* (External Clock) is not implemented — the 2.7 manual also lists it as
   "no longer available".
 * Look-ahead: gestures take effect from the scheduler's render frontier, i.e. up to ~60 ms

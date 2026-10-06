@@ -120,6 +120,9 @@ export class MEngine {
   mouseAdvanceVelocity = 0;
   /** Tap-Affects-Velocity global offset. */
   globalVelocityOffset = 0;
+  /** Sequence playback: origin tick and next note index (onsets) */
+  private seqOrigin = 0;
+  private seqIndex = 0;
   /** Robot conductor */
   private robotRng: Rng;
   private robotNext = 0;
@@ -202,7 +205,20 @@ export class MEngine {
     this.robotRng.reseed(this.comp.seed, 1000);
     this.robotNext = 0;
     this.resetVoices(0);
+    this.restartSequence(0);
     return [];
+  }
+
+  /** Restart the play-along Sequence at `at` (Start, and Sync with Sync Restarts Sequence). */
+  restartSequence(at: number): void {
+    this.seqOrigin = at;
+    this.seqIndex = 0;
+  }
+
+  private seqNextTick(): number {
+    const sq = this.comp.sequence;
+    if (!sq || this.seqIndex >= sq.notes.length) return Infinity;
+    return this.seqOrigin + sq.notes[this.seqIndex].tick;
   }
 
   /** Stop (§11): all sounding notes off, generation halts. */
@@ -242,6 +258,7 @@ export class MEngine {
   /** Sync (§11): all voices back to step 1 / cycle step 1 at `at`. */
   sync(at: number): EngineEvent[] {
     this.resetVoices(at);
+    if (this.comp.options.syncRestartsSequence) this.restartSequence(at);
     return [{ kind: 'change', tick: at, what: 'sync' }];
   }
 
@@ -324,6 +341,7 @@ export class MEngine {
       if (vi.tbDen !== undefined) this.setTimeBaseDen(v, vi.tbDen, tick);
       if (vi.phase !== undefined) p.phase = vi.phase;
     });
+    if (s.sequenceEnable !== undefined) this.comp.sequenceEnable = s.sequenceEnable;
     if ((s.sync || forceSync) && this.state !== 'stopped') out.push(...this.sync(tick));
     out.push({ kind: 'change', tick, what: 'snapshot' });
     return out;
@@ -356,6 +374,7 @@ export class MEngine {
       const offT = this.offs.length ? this.offs[0].tick : Infinity;
       const actT = this.actions.length ? this.actions[0].tick : Infinity;
       const robT = this.comp.conducting.robot.enabled ? this.robotNext : Infinity;
+      const seqT = this.seqNextTick();
       let vT = Infinity;
       let vIdx = -1;
       for (let v = 0; v < NUM_VOICES; v++) {
@@ -366,7 +385,7 @@ export class MEngine {
           vIdx = v;
         }
       }
-      const t = Math.min(offT, actT, robT, vT);
+      const t = Math.min(offT, actT, robT, seqT, vT);
       if (t > toTick || t === Infinity) break;
       if (offT === t) {
         const o = this.offs.shift()!;
@@ -385,6 +404,12 @@ export class MEngine {
       }
       if (robT === t) {
         out.push(...this.robotStep(t));
+        continue;
+      }
+      if (seqT === t) {
+        const n = this.comp.sequence!.notes[this.seqIndex++];
+        // Sequence Play-Enable is a mute: the sequence runs on, silently (S1 ch.12)
+        if (this.comp.sequenceEnable) out.push(...this.noteOn(-1, n.channel, n.pitch, n.velocity, t, t + Math.max(1, n.dur)));
         continue;
       }
       out.push(...this.voiceEvent(vIdx, Math.max(t, this.tick)));

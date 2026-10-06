@@ -196,6 +196,8 @@ export function defaultComposition(seed = 38291): Composition {
       conductCtrlY: 2,
       clockPort: '',
     },
+    sequence: null,
+    sequenceEnable: false,
   };
   return comp;
 }

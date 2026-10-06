@@ -277,6 +277,20 @@ export class Session {
     this.changed('sync');
   }
 
+  /** Sequence Play-Enable toggle (or collect it while holding). */
+  toggleSequence(): void {
+    if (this.hold) {
+      const p = this.hold.pending;
+      if (p.sequenceEnable !== undefined) delete p.sequenceEnable;
+      else p.sequenceEnable = !this.comp.sequenceEnable;
+      this.changed('hold');
+      return;
+    }
+    if (!this.comp.sequence) return;
+    this.comp.sequenceEnable = !this.comp.sequenceEnable;
+    this.changed('sequence');
+  }
+
   toggleMovie(): void {
     if (this.movieRecording) return;
     this.movieArmed = !this.movieArmed;
@@ -912,7 +926,8 @@ export class Session {
         this.stopSlideshow();
         break;
       case 'sequenceToggle':
-        break; // Sequences (imported MIDI files) are not implemented yet — see ROADMAP
+        this.toggleSequence();
+        break;
       case 'tapConduct':
         this.tapConductKey(velocity);
         break;

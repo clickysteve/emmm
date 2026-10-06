@@ -57,6 +57,7 @@ export function captureAll(comp: Composition): Snapshot {
   for (const t of CONDUCT_TARGETS) s.arrows[t] = { ...comp.conducting.arrows[t] };
   for (let v = 0; v < NUM_VOICES; v++) for (const k of VOICE_ITEMS) (s.voices[v] as Record<string, unknown>)[k] = currentVoiceItem(comp, v, k);
   s.sync = true;
+  if (comp.sequence) s.sequenceEnable = comp.sequenceEnable;
   return s;
 }
 
@@ -69,11 +70,12 @@ export function captureLike(comp: Composition, snap: Snapshot): Snapshot {
     for (const k of Object.keys(vi ?? {}) as (keyof SnapshotVoiceItems)[]) (s.voices[v] as Record<string, unknown>)[k] = currentVoiceItem(comp, v, k);
   });
   s.sync = false;
+  if (snap.sequenceEnable !== undefined) s.sequenceEnable = comp.sequenceEnable;
   return s;
 }
 
 export function snapshotSize(s: Snapshot): number {
-  return Object.keys(s.positions).length + Object.keys(s.arrows).length + s.voices.reduce((n, v) => n + Object.keys(v ?? {}).length, 0) + (s.sync ? 1 : 0);
+  return Object.keys(s.positions).length + Object.keys(s.arrows).length + s.voices.reduce((n, v) => n + Object.keys(v ?? {}).length, 0) + (s.sync ? 1 : 0) + (s.sequenceEnable !== undefined ? 1 : 0);
 }
 
 export const SNAPSHOT_LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';

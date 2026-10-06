@@ -263,3 +263,39 @@ describe('Movie', () => {
     expect(s.movie.filter((m) => (m.data[0] & 0xf0) === 0x90).length).toBeGreaterThan(3);
   });
 });
+
+describe('Sequence (§17)', () => {
+  const seq = { name: 't', lengthTicks: 400, notes: [{ tick: 0, dur: 48, channel: 5, pitch: 70, velocity: 90 }, { tick: 192, dur: 48, channel: 5, pitch: 72, velocity: 90 }] };
+  it('plays along when enabled, keeps running silently when muted', () => {
+    const s = mk();
+    s.comp.voices.forEach((v) => (v.playEnable = false));
+    s.comp.sequence = structuredClone(seq);
+    s.start();
+    let ev = s.engine.render(100);
+    expect(ev.filter((e) => e.kind === 'on')).toHaveLength(0); // not enabled yet
+    s.toggleSequence();
+    ev = s.engine.render(300);
+    expect(ev.filter((e) => e.kind === 'on').map((e) => (e as { pitch: number }).pitch)).toEqual([72]);
+  });
+  it('Sync restarts it when Sync Restarts Sequence is on', () => {
+    const s = mk();
+    s.comp.voices.forEach((v) => (v.playEnable = false));
+    s.comp.sequence = structuredClone(seq);
+    s.comp.sequenceEnable = true;
+    s.start();
+    s.engine.render(250);
+    s.engine.sync(250);
+    const ev = s.engine.render(260);
+    expect(ev.filter((e) => e.kind === 'on').map((e) => (e as { pitch: number }).pitch)).toEqual([70]);
+  });
+  it('a snapshot can store the Sequence enable', () => {
+    const s = mk();
+    s.comp.sequence = structuredClone(seq);
+    s.holdDo();
+    s.toggleSequence();
+    s.clickSnapshot(3);
+    expect(s.comp.snapshots[3]?.sequenceEnable).toBe(true);
+    s.executeSnapshot(3);
+    expect(s.comp.sequenceEnable).toBe(true);
+  });
+});
