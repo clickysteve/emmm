@@ -269,7 +269,7 @@ const MENUS: { title: string; cls?: string; items: MenuItem[] }[] = [
       { label: 'Clear', enabled: anySelected, action: editOp('clear') },
       { sep: true, label: '' },
       { label: 'Paste Notes', enabled: () => anySelected() && !!session.clipboard, action: editOp('pasteNotes') },
-      { label: 'Change to Rests', enabled: anySelected, action: editOp('changeToRests') },
+      { label: 'Change to Rests', key: '⌘K', enabled: anySelected, action: editOp('changeToRests') },
       { label: 'Fill With Rests', enabled: anySelected, action: editOp('fillWithRests') },
       { label: 'Paste at End / Insert Paste', enabled: () => anySelected() && !!session.clipboard, action: editOp('pasteAtEnd') },
       { sep: true, label: '' },
@@ -296,15 +296,15 @@ const MENUS: { title: string; cls?: string; items: MenuItem[] }[] = [
     items: [
       { label: 'Edit…', action: () => openEditor('patternEditor', { voice: Math.max(0, session.selected.findIndex(Boolean)) }) },
       { sep: true, label: '' },
-      { label: 'Transpose Up Half-Step', enabled: anySelected, action: patOp('transposeUp') },
+      { label: 'Transpose Up Half-Step', key: "⌘U", enabled: anySelected, action: patOp('transposeUp') },
       { label: 'Transpose Up Octave', enabled: anySelected, action: patOp('octaveUp') },
-      { label: 'Transpose Down Half-Step', enabled: anySelected, action: patOp('transposeDown') },
+      { label: 'Transpose Down Half-Step', key: "⌘D", enabled: anySelected, action: patOp('transposeDown') },
       { label: 'Transpose Down Octave', enabled: anySelected, action: patOp('octaveDown') },
-      { label: 'ReScramble', enabled: anySelected, action: patOp('rescramble') },
+      { label: 'ReScramble', key: "⌘'", enabled: anySelected, action: patOp('rescramble') },
       { label: 'Original -> Scrambled', enabled: anySelected, action: patOp('originalToScrambled') },
       { label: 'Swap Scrambled and Original', enabled: anySelected, action: patOp('swapScrambled') },
-      { label: 'Rotate Forward', enabled: anySelected, action: patOp('rotateForward') },
-      { label: 'Rotate Backward', enabled: anySelected, action: patOp('rotateBackward') },
+      { label: 'Rotate Forward', key: "⌘]", enabled: anySelected, action: patOp('rotateForward') },
+      { label: 'Rotate Backward', key: "⌘[", enabled: anySelected, action: patOp('rotateBackward') },
       { label: 'Reverse Order', enabled: anySelected, action: patOp('reverse') },
       { label: 'Double with Rests', enabled: anySelected, action: patOp('double') },
       { label: 'Triple with Rests', enabled: anySelected, action: patOp('triple') },
@@ -410,6 +410,12 @@ window.addEventListener('keydown', (e) => {
     else if (k === '0') floating.forEach((f) => f.win.open && f.win.close());
     else if (k === 'm') MENUS[6].items[0].action?.();
     else if (k === 'l') MENUS[6].items[10].action?.();
+    else if (k === 'u' && anySelected()) patOp('transposeUp')();
+    else if (k === 'd' && anySelected()) patOp('transposeDown')();
+    else if (k === "'" && anySelected()) patOp('rescramble')();
+    else if (k === ']' && anySelected()) patOp('rotateForward')();
+    else if (k === '[' && anySelected()) patOp('rotateBackward')();
+    else if (k === 'k' && anySelected()) editOp('changeToRests')();
     else return;
     e.preventDefault();
     return;
