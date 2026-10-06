@@ -21,7 +21,10 @@
 * Web MIDI output with timestamps, Midi Assignment (16 output / input channel maps, first
   program number, latency, MIDI messages, All Notes Off, Panic, MIDI clock out), internal
   monitor and metronome.
-* Save/load (versioned JSON), autosave, browser library; seeded randomness.
+* Save/load (versioned JSON), autosave, browser library, Save State As Startup; seeded
+  randomness.
+* Interface details: zoom rects, slanted transport strips, snapshot "sun" pictures, baton
+  cursor, Pattern Editor audition keys (` and ,), Pattern-menu key equivalents, Help window.
 
 ## Classic — remaining
 
@@ -32,12 +35,11 @@
    directly ("regurgitated back into a pattern", S2).
 3. Modified-mouse details still missing: Shift-Option quantized active-Position choice from
    edit windows is wired; check every documented modifier against Appendix A.
-4. Pattern Editor polish: right-hand reference keyboard, MIDI-edit while viewing two patterns,
-   the "~" and "," audition keys.
-5. "Save State As Startup" (a user-defined New document).
-6. Voice colours (M 2.x colour option) — deliberately left monochrome for now.
-7. Undo (M had none; a modern addition would be welcome but is not Classic).
-8. Accessibility: keyboard focus for controls, screen-reader labels.
+4. Pattern Editor polish: right-hand reference keyboard, MIDI-edit while viewing two patterns.
+5. Voice colours (M 2.x colour option) — deliberately left monochrome for now.
+6. Undo (M had none; a modern addition would be welcome but is not Classic).
+7. Accessibility: keyboard focus for controls, screen-reader labels.
+8. Pattern-menu key equivalents that browsers reserve (⌘W, ⌘R, ⌘H, ⌘F) have no shortcut.
 
 ## Extended — started (Options ▸ Extended…, off by default)
 
