@@ -495,7 +495,35 @@ select.mselect {
 
 /* cursors */
 .c-baton {
-  cursor: crosshair;
+  /* the Baton: a conductor's stick with its tip at the hot spot */
+  cursor:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' shape-rendering='crispEdges'%3E%3Cpath d='M3 3 L17 17' stroke='%23fff' stroke-width='4'/%3E%3Cpath d='M3 3 L17 17' stroke='%23000' stroke-width='2'/%3E%3Crect x='15' y='15' width='7' height='7' fill='%23000' stroke='%23fff'/%3E%3Ccircle cx='3' cy='3' r='2' fill='%23000' stroke='%23fff'/%3E%3C/svg%3E")
+      2 2,
+    crosshair;
+}
+.transport {
+  position: absolute;
+  border: 1px solid var(--ink);
+  background: var(--paper);
+}
+.transport > svg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.transport .seg {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 10px;
+}
+.transport .seg.on {
+  background: var(--ink);
+  color: var(--paper);
 }
 body.dragging,
 body.dragging * {

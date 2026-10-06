@@ -364,25 +364,53 @@ export class ConductingWindow implements Updatable {
     const s = ctx.s;
     this.win = new MWindow(parent, { id: 'conducting', title: 'Untitled', x: 282, y: 22, w: 330, h: 112 });
     const b = this.win.body;
-    const mk = (name: string, x: number, y: number, w: number, icon: string, title: string, fn: (ev: PointerEvent) => void) => {
-      const d = el('div', 'btn', b, [x, y, w, 19]);
-      d.innerHTML = icon;
-      d.title = title;
-      d.addEventListener('pointerdown', (ev) => {
-        ev.preventDefault();
-        fn(ev);
+    // Two transport strips with slanted separators, as on M's Conducting window.
+    const strip = (y: number, items: [string, string, string, (ev: PointerEvent) => void][]) => {
+      const W = 118;
+      const H = 19;
+      const box = el('div', 'transport', b, [2, y, W, H]);
+      const cuts = [0, 40, 80, W];
+      const sl = 5;
+      items.forEach(([name, icon, title, fn], i) => {
+        const L = cuts[i];
+        const R = cuts[i + 1];
+        const x0 = Math.max(0, L - sl);
+        const x1 = Math.min(W, R + sl);
+        const seg = el('div', 'seg', box, [x0, 0, x1 - x0]);
+        const pt = (x: number, yy: number) => `${x - x0}px ${yy}px`;
+        const lt = i === 0 ? pt(0, 0) : pt(L + sl, 0);
+        const lb = i === 0 ? pt(0, H) : pt(L - sl, H);
+        const rt = i === items.length - 1 ? pt(W, 0) : pt(R + sl, 0);
+        const rb = i === items.length - 1 ? pt(W, H) : pt(R - sl, H);
+        seg.style.clipPath = `polygon(${lt}, ${rt}, ${rb}, ${lb})`;
+        seg.innerHTML = icon;
+        seg.title = title;
+        seg.addEventListener('pointerdown', (ev) => {
+          ev.preventDefault();
+          fn(ev);
+        });
+        this.btn[name] = seg;
       });
-      this.btn[name] = d;
+      box.appendChild(svgEl(W, H, [40, 80].map((c) => `<line x1="${c + sl + 0.5}" y1="0" x2="${c - sl + 0.5}" y2="${H}" stroke="#000" stroke-width="1.2" shape-rendering="geometricPrecision"/>`).join('')));
     };
-    mk('start', 2, 2, 40, iconSvg('play'), 'Start (Space)', () => s.start());
-    mk('stop', 41, 2, 40, iconSvg('stop'), 'Stop (Return)', () => s.stop());
-    mk('pause', 80, 2, 40, iconSvg('pause'), 'Pause (Tab)', () => s.pause());
-    mk('sync', 2, 22, 40, '<span style="font-size:10px">Sync</span>', 'Sync', (ev) => (ev.shiftKey ? s.sync() : s.sync()));
-    mk('movie', 41, 22, 40, iconSvg('film', 18, 12), 'Movie: capture the performance', () => s.toggleMovie());
-    mk('seq', 80, 22, 40, iconSvg('seq', 12, 12), 'Sequence Play-Enable', () => {
-      if (!s.comp.sequence && !s.hold) ctx.alert('No Sequence loaded. Use File ▸ Open Midi File… and choose “Import as Sequence”.');
-      else s.toggleSequence();
-    });
+    strip(2, [
+      ['start', iconSvg('play'), 'Start (Space)', () => s.start()],
+      ['stop', iconSvg('stop'), 'Stop (Return)', () => s.stop()],
+      ['pause', iconSvg('pause'), 'Pause (Tab)', () => s.pause()],
+    ]);
+    strip(22, [
+      ['sync', '<span style="font-size:10px">Sync</span>', 'Sync (Shift-click in Snapshots also syncs)', () => s.sync()],
+      ['movie', iconSvg('film', 18, 12), 'Movie: capture the performance', () => s.toggleMovie()],
+      [
+        'seq',
+        iconSvg('seq', 12, 12),
+        'Sequence Play-Enable',
+        () => {
+          if (!s.comp.sequence && !s.hold) ctx.alert('No Sequence loaded. Use File ▸ Open Midi File… and choose “Import as Sequence”.');
+          else s.toggleSequence();
+        },
+      ],
+    ]);
     // tempo
     this.tempoArrow = arrowFor(ctx, b, 2, 46, 'tempo');
     this.tempoBar = new RangeBar(b, 18, 47, 100, 11, {
@@ -778,11 +806,20 @@ export class SnapshotWindow implements Updatable {
       const cur = s.currentSnapshot === i;
       const key = `${has}${cur}`;
       if (c.dataset.v !== key) {
-        c.innerHTML = has ? `<span style="font-size:11px">${SNAPSHOT_LETTERS[i]}</span>${cur ? '<span style="position:absolute;right:2px;top:2px;width:4px;height:4px;background:currentColor;border-radius:50%"></span>' : ''}` : '';
+        // "a picture of the letter posing in the sun"; the current snapshot has a mark in its sun
+        const rays = [0, 45, 90, 135, 180, 225, 270, 315]
+          .map((a) => {
+            const r = (a * Math.PI) / 180;
+            return `<line x1="${21 + Math.cos(r) * 5}" y1="${6 + Math.sin(r) * 5}" x2="${21 + Math.cos(r) * 7}" y2="${6 + Math.sin(r) * 7}" stroke="#000"/>`;
+          })
+          .join('');
+        c.innerHTML = has
+          ? `<svg width="28" height="21" viewBox="0 0 28 21" shape-rendering="crispEdges">${rays}<circle cx="21" cy="6" r="3.5" fill="${cur ? '#000' : '#fff'}" stroke="#000"/><rect x="0" y="18" width="28" height="3" fill="url(#snapg)"/><text x="3" y="16" font-size="13" font-weight="700" font-family="Tiny5, sans-serif" fill="#000">${SNAPSHOT_LETTERS[i]}</text><defs><pattern id="snapg" width="2" height="2" patternUnits="userSpaceOnUse"><rect width="1" height="1"/><rect x="1" y="1" width="1" height="1"/></pattern></defs></svg>`
+          : '';
         c.dataset.v = key;
       }
       c.style.position = 'absolute';
-      c.classList.toggle('inv', has);
+      c.classList.toggle('blink', !!s.hold && s.hold.mode === 'edit' && s.currentSnapshot === i);
     });
     this.shows.forEach((c, i) => {
       const show = s.comp.slideshows[i];

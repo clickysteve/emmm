@@ -469,7 +469,18 @@ export class MWindow {
     this.body = el('div', 'body', this.el);
     this.body.style.height = o.h - 18 + 'px';
     tb.addEventListener('pointerdown', (ev) => this.dragStart(ev));
-    this.el.addEventListener('pointerdown', () => this.front(), true);
+    this.el.addEventListener(
+      'pointerdown',
+      (ev) => {
+        this.front();
+        // Cmd-click brings a window to the front without acting (S1 Appendix A)
+        if (ev.metaKey && !ev.altKey) {
+          ev.stopPropagation();
+          ev.preventDefault();
+        }
+      },
+      true,
+    );
     this.updatePositions();
   }
 
