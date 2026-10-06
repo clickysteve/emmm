@@ -101,5 +101,5 @@ describe('engine fuzz', () => {
       }
       expect([...open.keys()]).toEqual([]); // every note was turned off
     }
-  });
+  }, 30_000); // ~4 s locally, ~6 s on GitHub's runners: more than Vitest's 5 s default
 });

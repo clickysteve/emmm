@@ -39,10 +39,11 @@ jobs:
         run: npm run typecheck
 
       - name: Build for GitHub Pages
-        # Project sites live under /<repository>/; a <user>.github.io repository is served from /.
+        # A custom domain (CNAME file) or a <user>.github.io repository is served from /;
+        # otherwise a project site lives under /<repository>/.
         run: |
           REPO="${{ github.event.repository.name }}"
-          if [[ "$REPO" == *.github.io ]]; then BASE="/"; else BASE="/$REPO/"; fi
+          if [[ -s CNAME || "$REPO" == *.github.io ]]; then BASE="/"; else BASE="/$REPO/"; fi
           echo "Building with base path $BASE"
           npx vite build --base="$BASE"
 

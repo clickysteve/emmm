@@ -62,6 +62,10 @@ to `main` (or by hand from the Actions tab). It installs exactly what `package-l
 lists, runs the tests and the type check, builds the site for the repository's path and
 deploys it. If any step fails, nothing is deployed.
 
+The published emmm lives at <https://emmm.allmyfriendsaresynths.com/>. Because the repository
+has a `CNAME` file (a custom domain), the workflow builds for the domain root (`/`); without
+one it builds for `/<repository>/`.
+
 One-time setup:
 
 1. Push this repository to GitHub (the repository name becomes the URL path, e.g. `emmm`).
