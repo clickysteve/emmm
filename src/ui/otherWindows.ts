@@ -162,9 +162,16 @@ export class MidiAssignmentWindow {
     this.sig = this.portSig();
   }
 
+  /** Rebuild when ports change or another document is loaded (controls bind to it). */
   private portSig(): string {
     const m = this.ctx.s.midi;
-    return m.status + m.outputs().map((o) => o.id).join() + '|' + m.inputs().map((o) => o.id).join();
+    return m.status + m.outputs().map((o) => o.id).join() + '|' + m.inputs().map((o) => o.id).join() + '|' + this.compId();
+  }
+  private compIds = new WeakMap<object, number>();
+  private compId(): number {
+    const c = this.ctx.s.comp;
+    if (!this.compIds.has(c)) this.compIds.set(c, Math.random());
+    return this.compIds.get(c)!;
   }
 
   update(): void {
