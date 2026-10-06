@@ -299,3 +299,44 @@ describe('Sequence (§17)', () => {
     expect(s.comp.sequenceEnable).toBe(true);
   });
 });
+
+describe('review fixes', () => {
+  it('Slideshow Pause resumes where it left off', () => {
+    const s = mk();
+    s.comp.slideshows[0] = { events: [{ tick: 0, kind: 'position', variable: 'noteDensity', position: 1 }, { tick: 384, kind: 'position', variable: 'noteDensity', position: 2 }, { tick: 768, kind: 'position', variable: 'noteDensity', position: 3 }], loopLength: null };
+    s.start();
+    s.clickSlideshow(0);
+    const t0 = s.engine.tick;
+    s.engine.render(t0 + 300);
+    s.pauseSlideshow();
+    s.engine.render(t0 + 900);
+    expect(s.comp.noteDensity.active).toBe(1);
+    s.pauseSlideshow(); // resume: 84 ticks to the next event
+    s.engine.render(t0 + 900 + 83);
+    expect(s.comp.noteDensity.active).toBe(1);
+    s.engine.render(t0 + 900 + 85);
+    expect(s.comp.noteDensity.active).toBe(2);
+    s.engine.render(t0 + 900 + 85 + 384);
+    expect(s.comp.noteDensity.active).toBe(3);
+  });
+  it('Stop sends note-offs no earlier than notes already scheduled ahead', () => {
+    const s = mk();
+    const sent: { b: number[]; ms: number }[] = [];
+    (s as unknown as { send: (c: number, b: number[], ms: number) => void }).send = (_c, b, ms) => sent.push({ b, ms });
+    s.start();
+    s.scheduler.wake();
+    s.stop();
+    const lastOn = Math.max(...sent.filter((x) => (x.b[0] & 0xf0) === 0x90).map((x) => x.ms));
+    const offs = sent.filter((x) => (x.b[0] & 0xf0) === 0x80);
+    expect(offs.length).toBeGreaterThan(0);
+    for (const o of offs) expect(o.ms).toBeGreaterThanOrEqual(lastOn);
+  });
+  it('Tap Conduct: the first tap is a beat for nothing', () => {
+    const s = mk();
+    const sent: number[][] = [];
+    (s as unknown as { send: (c: number, b: number[]) => void }).send = (_c, b) => sent.push(b);
+    s.tapConductKey(64);
+    expect(s.engine.state).toBe('playing');
+    expect(sent.filter((b) => (b[0] & 0xf0) === 0x90)).toHaveLength(0);
+  });
+});

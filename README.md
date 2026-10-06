@@ -75,7 +75,7 @@ The Classic engine and interface are functional: all of M's Variables, cyclic va
 Distortion, conducting (incl. continuous and robot), Hold/Do, Snapshots, Slideshows, the Input
 Control System, recording modes, Pattern Editor and menus, Movies (MIDI file export), MIDI
 file import (into Patterns or as a play-along Sequence), Web MIDI I/O with timestamped scheduling, save/load and seeded randomness.
-117 automated tests (incl. a seeded fuzz test and worked examples) cover the engine, timing maths, persistence, session logic and Extended features.
+120 automated tests (incl. a seeded fuzz test and worked examples) cover the engine, timing maths, persistence, session logic and Extended features.
 
 **Extended** (Options ▸ Extended…, off by default) has begun: MIDI clock input, MIDI Learn
 for controllers, and CC Cycles (M-style cyclic distributions driving MIDI controllers). It

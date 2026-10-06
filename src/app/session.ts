@@ -49,6 +49,8 @@ interface SlideshowPlay {
   gen: number;
   waiting: boolean;
   paused: boolean;
+  /** ticks into the show at the moment of pausing */
+  pausedAt: number;
 }
 
 export class Session {
@@ -248,8 +250,11 @@ export class Session {
   }
 
   stop(): void {
+    // Note-ons up to the render frontier may already be queued in the MIDI driver with future
+    // timestamps; the note-offs must not be sent before them or notes would hang.
+    const offAt = this.playing ? Math.max(performance.now(), this.scheduler.tickToMs(this.engine.tick)) : performance.now();
     const evs = this.engine.stop();
-    this.emitNow(evs);
+    if (evs.length) this.dispatch(evs, () => offAt);
     this.scheduler.stopped();
     this.scheduler.limitTick = Infinity;
     this.tapConduct.active = false;
@@ -539,7 +544,7 @@ export class Session {
     if (mods.alt) return this.recordSlideshowStart(i);
     if (!this.comp.slideshows[i]) return;
     this.slideshowRec = null;
-    this.slideshowPlay = { index: i, t0: 0, gen: ++this.slideGen, waiting: !this.playing, paused: false };
+    this.slideshowPlay = { index: i, t0: 0, gen: ++this.slideGen, waiting: !this.playing, paused: false, pausedAt: 0 };
     if (this.playing) this.beginSlideshowPlayback();
     this.changed('slideshow');
   }
@@ -552,15 +557,17 @@ export class Session {
     this.scheduleSlideshowFrom(t0, sp.gen);
   }
 
-  private scheduleSlideshowFrom(t0: number, gen: number): void {
+  /** Schedule the show's events from `t0`; events before `from` ticks into it are skipped. */
+  private scheduleSlideshowFrom(t0: number, gen: number, from = 0): void {
     const sp = this.slideshowPlay;
     if (!sp || sp.gen !== gen) return;
     const show = this.comp.slideshows[sp.index];
     if (!show) return;
     sp.t0 = t0;
     for (const e of show.events) {
+      if (e.tick < from) continue;
       this.engine.schedule(t0 + e.tick, 'slideshow', (t) => {
-        if (!this.slideshowPlay || this.slideshowPlay.gen !== gen || this.slideshowPlay.paused) return;
+        if (!this.slideshowPlay || this.slideshowPlay.gen !== gen) return;
         if (e.kind === 'snapshot') {
           const s = this.comp.snapshots[e.index];
           if (!s) return;
@@ -586,9 +593,21 @@ export class Session {
     this.changed('slideshow');
   }
 
+  /** Slideshow Pause: like the main Pause, playback picks up where it left off. */
   pauseSlideshow(): void {
     if (this.slideshowRec) this.slideshowPausedRec = !this.slideshowPausedRec;
-    if (this.slideshowPlay) this.slideshowPlay.paused = !this.slideshowPlay.paused;
+    const sp = this.slideshowPlay;
+    if (sp && !sp.waiting) {
+      const now = this.scheduler.frontierTick();
+      if (!sp.paused) {
+        sp.paused = true;
+        sp.pausedAt = Math.max(0, now - sp.t0);
+        sp.gen = ++this.slideGen; // cancels everything already scheduled
+      } else {
+        sp.paused = false;
+        this.scheduleSlideshowFrom(now - sp.pausedAt, sp.gen, sp.pausedAt);
+      }
+    }
     this.changed('slideshow');
   }
 
@@ -1127,6 +1146,7 @@ export class Session {
       tc.active = true;
       tc.lastTap = now;
       if (!this.playing) {
+        this.scheduler.limitTick = 0; // nothing sounds until the second tap
         this.start();
       }
       // "a beat for nothing": hold at the current frontier until the next tap
