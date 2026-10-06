@@ -34,27 +34,46 @@ export class Scheduler {
   /** Rendering never passes this tick (Tap Conduct waits for the next tap). */
   limitTick = Infinity;
 
+  /** true once the worker has delivered a tick (it can take a while to boot on a cold page) */
+  private workerAlive = false;
+
   constructor(
     private engine: MEngine,
     private getTempo: () => number,
     private getSyncRatio: () => number,
     private sink: SchedulerSink,
-  ) {}
+  ) {
+    // Create the worker straight away so it has booted by the time the user presses Start.
+    this.createWorker();
+  }
+
+  private createWorker(): void {
+    if (this.worker || typeof Worker === 'undefined' || typeof Blob === 'undefined') return;
+    try {
+      const url = URL.createObjectURL(new Blob([WORKER_SRC], { type: 'text/javascript' }));
+      this.worker = new Worker(url);
+      this.worker.onmessage = () => {
+        if (!this.workerAlive) {
+          // the worker has taken over: drop the main-thread stand-in
+          this.workerAlive = true;
+          if (this.fallback) clearInterval(this.fallback);
+          this.fallback = null;
+        }
+        this.wake();
+      };
+    } catch {
+      this.worker = null;
+    }
+  }
 
   private ensureTimer(): void {
     if (this.running) return;
     this.running = true;
-    try {
-      if (!this.worker && typeof Worker !== 'undefined' && typeof Blob !== 'undefined') {
-        const url = URL.createObjectURL(new Blob([WORKER_SRC], { type: 'text/javascript' }));
-        this.worker = new Worker(url);
-        this.worker.onmessage = () => this.wake();
-      }
-      if (this.worker) this.worker.postMessage('start');
-      else this.fallback = setInterval(() => this.wake(), 10);
-    } catch {
-      this.fallback = setInterval(() => this.wake(), 10);
-    }
+    this.createWorker();
+    if (this.worker) this.worker.postMessage('start');
+    // Until the worker's first tick arrives (or if there is no worker), a main-thread timer
+    // keeps scheduling, so the first notes after Start are never held up by worker start-up.
+    if (!this.worker || !this.workerAlive) this.fallback = setInterval(() => this.wake(), 10);
   }
 
   private haltTimer(): void {

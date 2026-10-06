@@ -170,6 +170,9 @@ body {
 /* ------------------------------------------------------------ windows */
 .mwin {
   position: absolute;
+  /* each window on its own compositing layer: a flashing control repaints only its window,
+     which keeps the main thread (and so MIDI scheduling) free while playing */
+  will-change: transform;
   background: var(--paper);
   border: 1px solid var(--ink);
   outline: 1px solid var(--paper);
