@@ -3,6 +3,7 @@
  * Patterns, Conducting, Variables, Cyclic Variables, Midi and Snapshot.
  */
 import { STEP_ADVANCE, TIME_BASE_DENOMINATORS, NOTE_VALUES, NUM_SNAPSHOTS } from '../engine/constants';
+import { clearContinuous } from '../engine/conducting';
 import { SNAPSHOT_LETTERS } from '../engine/snapshots';
 import type { ArrowDir, ConductTarget, UseMode, VariableName } from '../engine/types';
 import { VariableChoice } from './choice';
@@ -491,10 +492,8 @@ export class ConductingWindow implements Updatable {
     ev.preventDefault();
     const s = this.ctx.s;
     if (ev.altKey) {
-      import('../engine/conducting').then((m) => {
-        m.clearContinuous(s.comp);
-        s.changed('baton');
-      });
+      clearContinuous(s.comp);
+      s.changed('baton');
       return;
     }
     const at = (e: PointerEvent, fresh: boolean) => {

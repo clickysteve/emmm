@@ -1,0 +1,53 @@
+# Roadmap
+
+## Classic — done
+
+* Engine: four voices, six Pattern Groups, all eleven Variables, global Rhythm/Legato tables,
+  Time Base (all denominators incl. step advance), Phase, Output Length, Note Order (three
+  schemes, mixed), Note Density, Velocity Range × Accent, Transposition (+ keyboard transpose,
+  second-order), Orchestration (any voice → any channels), Sound Choice (16 presets),
+  Time Distortion maps, cyclic variables with random ranges.
+* Transport: Start / Sync, Stop (notes off), Pause (notes held), quantized Sync.
+* Conducting: arrows with four directions on all Variables, Tempo and Snapshots; tempo range
+  bar; continuous conducting of velocity and legato; Robot Conductor; MIDI Conduct.
+* Hold/Do, 26 Snapshots (store, execute, edit, Blink Everything, Restore, forced Sync),
+  quantization, 9 Slideshows (record with Record Wait, play, loop, pause, stop).
+* MIDI input: Src channels, Record (Single / Chord / Build × Insert / Replace / Overdub, Drum
+  Machine mode, Sustain Enters Rests), Keyboard Transpose, Input Control System, Echo-Thru-
+  Orchestration, Echo Map, Tap Tempo / Tap Conduct / Freeze / Accel / Decel, Step Advance.
+* Pattern Editor with tools; Pattern and Edit menu operations.
+* Movies → Standard MIDI File; MIDI File → Patterns.
+* Web MIDI output with timestamps, Midi Assignment (16 output / input channel maps, first
+  program number, latency, MIDI messages, All Notes Off, Panic, MIDI clock out), internal
+  monitor and metronome.
+* Save/load (versioned JSON), autosave, browser library; seeded randomness.
+
+## Classic — remaining
+
+1. **Verify against the original** in an emulator (Mini vMac / Basilisk II with M 2.x, or
+   Hatari with the Atari 1.25 freeware) — work through UNCERTAINTIES.md, turning [INF]/[UNK]
+   into [OBS] and adding regression tests from captured MIDI.
+2. **Sequence** (MIDI File imported as a play-along sequence, Sequence Play-Enable, Sync
+   Restarts Sequence, snapshot item).
+3. Modified-mouse details still missing: Shift-Option quantized active-Position choice from
+   edit windows is wired; check every documented modifier against Appendix A.
+4. Pattern Editor polish: right-hand reference keyboard, MIDI-edit while viewing two patterns,
+   the "~" and "," audition keys.
+5. "Save State As Startup" (a user-defined New document).
+6. Voice colours (M 2.x colour option) — deliberately left monochrome for now.
+7. Undo (M had none; a modern addition would be welcome but is not Classic).
+8. Accessibility: keyboard focus for controls, screen-reader labels.
+
+## Extended — ideas (not started; keep separate from Classic)
+
+* More voices / Pattern Groups; more Positions per Variable.
+* MIDI CC "Variables" (a cyclic variable or position set emitting controllers).
+* MIDI clock input / Start-Stop sync; Ableton Link-like tempo sharing.
+* External MIDI control mapping of every control (beyond the fixed Input Control map).
+* Parameter automation lanes recorded from gestures (beyond Slideshows).
+* Additional ordering schemes (e.g. Jam Factory-style transition tables) and probability
+  systems.
+* MPE / per-note expression.
+
+Extended must be opt-in per document (`mode: "extended"`), implemented in separate modules,
+and covered by tests proving Classic output is unchanged.
