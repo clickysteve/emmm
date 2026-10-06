@@ -88,6 +88,7 @@ Not yet: verification against the original program in an emulator
 
 * [docs/RESEARCH.md](docs/RESEARCH.md) — what we learnt about M, and from where
 * [docs/M-BEHAVIOUR.md](docs/M-BEHAVIOUR.md) — the reconstructed behavioural specification
+* [docs/EXAMPLES.md](docs/EXAMPLES.md) — worked input → output examples (also tests)
 * [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — how emmm works
 * [docs/UNCERTAINTIES.md](docs/UNCERTAINTIES.md) — what still needs checking against M
 * [docs/ROADMAP.md](docs/ROADMAP.md) — remaining Classic work and Extended ideas
