@@ -346,6 +346,13 @@ for (const m of MENUS) {
   me.addEventListener('pointerenter', () => openMenu && openMenu.el !== me && show());
 }
 const statusEl = el('div', 'status', menubar);
+const outEl = el('div', 'menu', menubar);
+outEl.style.fontWeight = '400';
+outEl.title = 'Where M Output Channel 1 goes — click for Midi Assignment';
+outEl.addEventListener('pointerdown', (e) => {
+  e.stopPropagation();
+  openEditor('midiAssignment');
+});
 window.addEventListener('pointerdown', () => closeMenu());
 
 // ------------------------------------------------------------------ keyboard (S1 Appendix A)
@@ -487,9 +494,13 @@ function frame(): void {
     perf.total += dt;
     perf.max = Math.max(perf.max, dt);
   }
-  const st = `${session.playing ? '▶' : session.engine.state === 'paused' ? '❚❚' : '■'}  ${session.hold ? 'HOLD' : ''}`;
+  const o = session.comp.midi.outputs[0];
+  const outName = !o.port ? 'no output' : o.port === 'monitor' ? 'monitor' : session.midi.portName(o.port);
+  const st = `${session.hold ? 'HOLD  ' : ''}${session.playing ? '▶' : session.engine.state === 'paused' ? '❚❚' : '■'}|→ ${outName}${session.monitorAll && o.port !== 'monitor' ? ' + monitor' : ''}`;
   if (st !== lastStatus) {
-    statusEl.textContent = st;
+    const [a, b] = st.split('|');
+    statusEl.textContent = a;
+    outEl.textContent = b;
     lastStatus = st;
   }
   if (saveDirty && now - lastSave > 1500) {
