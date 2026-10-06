@@ -103,8 +103,20 @@ export class Scheduler {
     return this.clock.tickToMs(tick);
   }
 
+  /** Last error thrown while rendering (shown by the UI); playback continues. */
+  lastError: string | null = null;
+
   /** One scheduling pass. Public for tests and for immediate refresh after gestures. */
   wake(): void {
+    try {
+      this.pass();
+    } catch (e) {
+      this.lastError = String((e as Error)?.stack ?? e);
+      console.error('emmm scheduler error', e);
+    }
+  }
+
+  private pass(): void {
     if (this.engine.state !== 'playing') return;
     const now = performance.now();
     this.clock.setTempo(this.getTempo(), this.engine.tick);

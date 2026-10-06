@@ -426,7 +426,7 @@ export class ConductingWindow implements Updatable {
     label(b, 38, 62, 'Tempo', 'small');
     this.tempo = new Numerical(b, 64, 59, 26, 13, {
       get: () => s.comp.tempo.value,
-      set: (x) => s.setTempo(x),
+      set: (x) => s.setTempoFree(x), // widens the range if needed (@m-uncertain U22)
       min: 20,
       max: 300,
       format: (x) => (s.tapConduct.active ? 'Tap' : String(x)),
@@ -596,7 +596,7 @@ export class ConductingWindow implements Updatable {
     const beat = Math.floor(t / 96);
     const status = st === 'stopped' ? 'stopped' : `${Math.floor(beat / 4) + 1}:${(beat % 4) + 1}${st === 'paused' ? ' paused' : ''}`;
     const midi = s.midi.status === 'ready' ? 'midi ok' : s.midi.status === 'unsupported' ? 'no web midi' : s.midi.status === 'denied' ? 'midi denied' : 'midi …';
-    const txt = `${status}\n${midi}\n${s.monitorAll ? 'monitor on' : ''}`;
+    const txt = `${status}\n${midi}\n${s.monitorAll ? 'monitor on' : ''}${s.scheduler.lastError ? '\nENGINE ERROR (console)' : ''}`;
     if (this.statusEl.textContent !== txt) this.statusEl.textContent = txt;
     this.statusEl.style.whiteSpace = 'pre';
   }
