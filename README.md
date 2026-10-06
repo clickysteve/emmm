@@ -77,6 +77,9 @@ Control System, recording modes, Pattern Editor and menus, Movies (MIDI file exp
 file import (into Patterns or as a play-along Sequence), Web MIDI I/O with timestamped scheduling, save/load and seeded randomness.
 ~100 automated tests cover the engine, timing maths, persistence and session logic.
 
+**Extended** (Options ▸ Extended…, off by default) has begun: MIDI clock input and MIDI
+Learn for controllers. It never changes how Classic generates notes.
+
 Not yet: verification against the original program in an emulator
 (several behaviours are reasoned from documentation — see
 [docs/UNCERTAINTIES.md](docs/UNCERTAINTIES.md)), and the Extended mode.

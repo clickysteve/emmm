@@ -429,7 +429,7 @@ export class ConductingWindow implements Updatable {
       set: (x) => s.setTempoFree(x), // widens the range if needed (@m-uncertain U22)
       min: 20,
       max: 300,
-      format: (x) => (s.tapConduct.active ? 'Tap' : String(x)),
+      format: (x) => (s.tapConduct.active ? 'Tap' : String(Math.round(x))),
       title: 'Tempo',
     });
     this.ratio = new Numerical(b, 98, 75, 20, 15, {

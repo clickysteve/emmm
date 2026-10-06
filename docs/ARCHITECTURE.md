@@ -108,6 +108,9 @@ so the same document + seed + gestures reproduce the same output. Tests check th
 not depend on how finely `render` is called.
 
 ## Classic and Extended
-The document carries `mode: "classic"`. Extended features should live behind that flag in new
-modules (e.g. `src/extended/`), adding fields to the Composition through the migration path,
-and must not change Classic behaviour. See ROADMAP.md.
+Extended features live in `src/extended/` and the `Composition.extended` settings object
+(`enabled` is false by default). The Session consults them only at the MIDI-input boundary
+(`extendedRealtime`, `extendedLearn`); the engine never reads them, so Classic note generation
+cannot be affected — a test checks this. New Extended features should follow the same rule:
+separate modules, fields added through the migration path, inert when disabled. The Extended
+window is clearly labelled "not part of Classic M".

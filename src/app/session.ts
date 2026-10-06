@@ -18,6 +18,7 @@ import * as msg from '../midi/messages';
 import type { MovieEvent, TempoChange } from '../midi/smf';
 import { MidiManager } from '../midi/webmidi';
 import { Scheduler } from '../scheduler/scheduler';
+import { ClockFollower, sameSource, type LearnMapping, type LearnSource } from '../extended/extended';
 
 export interface VisualEvent {
   ms: number;
@@ -771,8 +772,136 @@ export class Session {
     return out;
   }
 
+  // ------------------------------------------------------------------ EXTENDED (src/extended)
+
+  readonly clockFollower = new ClockFollower();
+  /** index into comp.extended.learn waiting for a controller, or null */
+  learnArmed: number | null = null;
+  private learnLast = new Map<string, number>();
+  extStatus = { bpm: 0 };
+
+  /** Tempo from an external source: not rounded, widens the range if needed. */
+  setTempoExact(bpm: number): void {
+    const t = this.comp.tempo;
+    t.value = Math.max(10, Math.min(400, bpm));
+    if (t.value < t.lo) t.lo = Math.floor(t.value);
+    if (t.value > t.hi) t.hi = Math.ceil(t.value);
+  }
+
+  /** System real-time messages for MIDI clock input. Returns true if consumed. */
+  private extendedRealtime(port: string, status: number, ts: number): boolean {
+    const ext = this.comp.extended;
+    if (!ext.enabled || !ext.clockIn.enabled) return false;
+    if (ext.clockIn.port !== '*' && ext.clockIn.port !== port) return false;
+    const f = this.clockFollower;
+    switch (status) {
+      case 0xf8: {
+        if (!this.playing) return true;
+        const bpm = f.pulse(ts);
+        if (bpm) {
+          const c = f.corrected(bpm, this.scheduler.nowTick());
+          this.extStatus.bpm = bpm;
+          this.setTempoExact(c);
+        }
+        return true;
+      }
+      case 0xfa:
+        if (!ext.clockIn.transport) return true;
+        if (this.engine.state !== 'stopped') this.stop();
+        f.reset();
+        this.start();
+        return true;
+      case 0xfb:
+        if (!ext.clockIn.transport) return true;
+        if (this.engine.state === 'paused') this.pause();
+        else if (this.engine.state === 'stopped') {
+          f.reset();
+          this.start();
+        }
+        return true;
+      case 0xfc:
+        if (!ext.clockIn.transport) return true;
+        this.stop();
+        return true;
+    }
+    return false;
+  }
+
+  /** MIDI Learn: arm a mapping, or apply learnt mappings. Returns true if consumed. */
+  private extendedLearn(m: msg.ParsedMessage): boolean {
+    const ext = this.comp.extended;
+    if (!ext.enabled) return false;
+    if (m.type !== 'cc' && m.type !== 'noteon' && m.type !== 'noteoff') return false;
+    const src: LearnSource = { type: m.type === 'cc' ? 'cc' : 'note', channel: m.channel, number: m.data1 };
+    if (this.learnArmed !== null && m.type !== 'noteoff') {
+      const map = ext.learn[this.learnArmed];
+      if (map) map.source = src;
+      this.learnArmed = null;
+      this.changed('learn');
+      return true;
+    }
+    let used = false;
+    for (const map of ext.learn) {
+      if (!map.source || !sameSource(map.source, src)) continue;
+      used = true;
+      this.applyLearn(map, m);
+    }
+    return used;
+  }
+
+  private applyLearn(map: LearnMapping, m: msg.ParsedMessage): void {
+    const key = `${m.channel}:${m.data1}:${m.type === 'cc' ? 'cc' : 'n'}`;
+    const prev = this.learnLast.get(key) ?? 0;
+    const val = m.type === 'cc' ? m.data2 : m.type === 'noteon' ? 127 : 0;
+    this.learnLast.set(key, val);
+    const rising = val >= 64 && prev < 64;
+    const t = map.target;
+    switch (t.kind) {
+      case 'variable': {
+        const n = t.variable === 'soundChoice' ? 16 : 6;
+        if (m.type === 'cc') {
+          const pos = Math.min(n - 1, Math.floor((val / 128) * n));
+          if (pos !== (this.comp[t.variable] as { active: number }).active) this.clickPosition(t.variable, pos);
+        } else if (rising) this.clickPosition(t.variable, ((this.comp[t.variable] as { active: number }).active + 1) % n);
+        break;
+      }
+      case 'tempo':
+        if (m.type === 'cc') this.setTempo(this.comp.tempo.lo + (val / 127) * (this.comp.tempo.hi - this.comp.tempo.lo));
+        break;
+      case 'batonX':
+        if (m.type === 'cc') this.conduct(val / 127, this.comp.conducting.baton.y, false);
+        break;
+      case 'batonY':
+        if (m.type === 'cc') this.conduct(this.comp.conducting.baton.x, val / 127, false);
+        break;
+      case 'start':
+        if (rising) this.start();
+        break;
+      case 'stop':
+        if (rising) this.stop();
+        break;
+      case 'sync':
+        if (rising) this.sync();
+        break;
+      case 'holdDo':
+        if (rising) this.holdDo();
+        break;
+      case 'playEnable':
+        if (rising) this.setVoice(t.voice, 'playEnable', !this.comp.voices[t.voice].playEnable);
+        break;
+      case 'snapshot':
+        if (rising) this.executeSnapshot(t.index);
+        break;
+    }
+  }
+
   midiIn(port: string, data: ArrayLike<number>, ts: number): void {
+    if ((data[0] ?? 0) >= 0xf8 && this.extendedRealtime(port, data[0], ts)) return;
     const m = msg.parse(data);
+    if (this.extendedLearn(m)) {
+      this.changed('learn');
+      return;
+    }
     if (m.type === 'other') return;
     const inChans = this.inputChannels(port, m.channel);
     if (!inChans.length) return;

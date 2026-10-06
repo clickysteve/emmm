@@ -39,12 +39,21 @@
 7. Undo (M had none; a modern addition would be welcome but is not Classic).
 8. Accessibility: keyboard focus for controls, screen-reader labels.
 
-## Extended — ideas (not started; keep separate from Classic)
+## Extended — started (Options ▸ Extended…, off by default)
+
+* **MIDI clock input**: follow an external 24-ppq clock's tempo with gentle phase
+  correction; optional Start / Stop / Continue. (`src/extended/extended.ts`, `Session.extendedRealtime`)
+* **MIDI Learn**: map any CC or note to Variable Positions (CC value spreads over the six
+  Positions; a key steps to the next), Tempo within its range, Baton X/Y, Start, Stop, Sync,
+  Hold/Do, Play-Enable 1–4, Snapshots A–F.
+* Tests prove Classic note output is unchanged by Extended settings.
+
+## Extended — further ideas (keep separate from Classic)
 
 * More voices / Pattern Groups; more Positions per Variable.
 * MIDI CC "Variables" (a cyclic variable or position set emitting controllers).
-* MIDI clock input / Start-Stop sync; Ableton Link-like tempo sharing.
-* External MIDI control mapping of every control (beyond the fixed Input Control map).
+* Tempo sharing beyond MIDI clock (e.g. Link-style network sync).
+* Learnable mappings for every on-screen control (numericals, range bars, edit windows).
 * Parameter automation lanes recorded from gestures (beyond Slideshows).
 * Additional ordering schemes (e.g. Jam Factory-style transition tables) and probability
   systems.

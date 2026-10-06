@@ -16,6 +16,7 @@ import { CyclicEditor } from './ui/cyclicEditor';
 import { el, view } from './ui/dom';
 import { ConductingWindow, CyclicWindow, MidiWindow, PatternsWindow, SnapshotWindow, VariablesWindow, type Updatable } from './ui/mainWindows';
 import { AboutWindow, ImportWindow, LibraryWindow, MidiAssignmentWindow, MonitorWindow } from './ui/otherWindows';
+import { ExtendedWindow } from './ui/extendedWindow';
 import { PatternEditor } from './ui/patternEditor';
 import { NoteDensityEditor, NoteOrderEditor, OrchestrationEditor, TimeDistortionEditor, TranspositionEditor, VarEditor, VelocityRangeEditor } from './ui/varEditors';
 
@@ -110,7 +111,8 @@ const monitorWin = new MonitorWindow(ctx, desktop);
 const about = new AboutWindow(ctx, desktop);
 const importWin = new ImportWindow(ctx, desktop);
 const library = new LibraryWindow(ctx, desktop);
-const floating = [...Object.values(editors), cyclic, patternEditor, midiAssign, monitorWin, about, importWin, library];
+const extendedWin = new ExtendedWindow(ctx, desktop);
+const floating = [...Object.values(editors), cyclic, patternEditor, midiAssign, monitorWin, about, importWin, library, extendedWin];
 floating.forEach((f) => f.win.el.classList.add('hidden'));
 
 function openEditor(name: EditorName, opts: { position?: number; variable?: VariableName; voice?: number } = {}): void {
@@ -300,6 +302,7 @@ const MENUS: { title: string; cls?: string; items: MenuItem[] }[] = [
       opt('editorSoundWhilePlaying', 'Editor Sound While Playing'),
       opt('lockMarkedVariables', 'Locked Marked Variables', '⌘L'),
       { sep: true, label: '' },
+      { label: 'Extended…  (not Classic M)', checked: () => session.comp.extended.enabled, action: () => extendedWin.win.show() },
       { label: 'Monitor All Output (internal)', checked: () => session.monitorAll, action: () => ((session.monitorAll = !session.monitorAll), session.monitor.unlock(), session.changed('midi')) },
     ],
   },
@@ -496,7 +499,7 @@ function frame(): void {
   }
   const o = session.comp.midi.outputs[0];
   const outName = !o.port ? 'no output' : o.port === 'monitor' ? 'monitor' : session.midi.portName(o.port);
-  const st = `${session.hold ? 'HOLD  ' : ''}${session.playing ? '▶' : session.engine.state === 'paused' ? '❚❚' : '■'}|→ ${outName}${session.monitorAll && o.port !== 'monitor' ? ' + monitor' : ''}`;
+  const st = `${session.comp.extended.enabled ? 'EXT  ' : ''}${session.hold ? 'HOLD  ' : ''}${session.playing ? '▶' : session.engine.state === 'paused' ? '❚❚' : '■'}|→ ${outName}${session.monitorAll && o.port !== 'monitor' ? ' + monitor' : ''}`;
   if (st !== lastStatus) {
     const [a, b] = st.split('|');
     statusEl.textContent = a;

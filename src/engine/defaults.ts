@@ -14,6 +14,7 @@ import {
   NUM_SOUND_CHOICES,
   NUM_VOICES,
 } from './constants';
+import { defaultExtended } from '../extended/extended';
 import { newPattern } from './patternOps';
 import { Rng } from './rng';
 import type {
@@ -198,6 +199,7 @@ export function defaultComposition(seed = 38291): Composition {
     },
     sequence: null,
     sequenceEnable: false,
+    extended: defaultExtended(),
   };
   return comp;
 }

@@ -4,6 +4,8 @@
  * See docs/M-BEHAVIOUR.md and docs/ARCHITECTURE.md.
  */
 
+import type { ExtendedSettings } from '../extended/extended';
+
 /** A pattern step: MIDI pitches. [] = rest, one pitch = note, several = chord. */
 export type Step = number[];
 
@@ -244,4 +246,6 @@ export interface Composition {
   sequence: SequenceData | null;
   /** Sequence Play-Enable: a mute switch — the sequence keeps running when disabled. */
   sequenceEnable: boolean;
+  /** EXTENDED mode settings — inert unless `extended.enabled` (see src/extended). */
+  extended: ExtendedSettings;
 }
