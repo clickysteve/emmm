@@ -73,8 +73,6 @@ export class CyclicEditor {
         this.sel[cv].push(c);
       }
       if (cv !== 'accent') {
-        const table = cv === 'rhythm' ? s.comp.rhythmValues : s.comp.legatoValues;
-        void table;
         for (let lv = 4; lv >= 0; lv--) {
           const y = y0 + 4 + (4 - lv) * 14;
           label(b, 232, y + 3, `${lv} =`, 'small');

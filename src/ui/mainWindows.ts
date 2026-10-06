@@ -358,7 +358,6 @@ export class ConductingWindow implements Updatable {
   private vRange: HTMLDivElement;
   private rate: Numerical;
   private seed: Numerical;
-  private quantNum: Numerical | null = null;
 
   constructor(private ctx: UiContext, parent: HTMLElement) {
     const s = ctx.s;
@@ -515,7 +514,6 @@ export class ConductingWindow implements Updatable {
     // status: playing tick / bar:beat (emmm aid)
     this.statusEl = el('div', 'label tiny', b, [222, 48, 100, 40]);
     this.statusEl.style.lineHeight = '9px';
-    void this.quantNum;
   }
   private statusEl: HTMLDivElement;
 

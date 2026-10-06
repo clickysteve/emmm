@@ -4,7 +4,6 @@
  * `c` is ink, `bg` is paper (they swap on the active Position).
  */
 import { hasNotes } from '../engine/patternOps';
-import { mapLength } from '../engine/timeDistortion';
 import type { Composition, Cycle, VariableName } from '../engine/types';
 
 let pid = 0;
@@ -83,7 +82,6 @@ export function miniTimeDistortion(maps: Composition['timeDistortion']['position
     const x0 = 2 + v * gw;
     const pts = [[0, 0], ...m.points, [1, 1]].map(([px, py]) => `${(x0 + px * (gw - 1)).toFixed(1)},${(h - 2 - py * (h - 4)).toFixed(1)}`);
     s += `<polyline points="${pts.join(' ')}" fill="none" stroke="${c}" stroke-width="1" shape-rendering="geometricPrecision"/>`;
-    void mapLength;
   });
   return s;
 }

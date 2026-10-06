@@ -483,8 +483,7 @@ same music from Start.`;
 
 export class HelpWindow {
   win: MWindow;
-  constructor(ctx: UiContext, parent: HTMLElement) {
-    void ctx;
+  constructor(_ctx: UiContext, parent: HTMLElement) {
     this.win = new MWindow(parent, { id: 'help', title: 'Help', x: 120, y: 24, w: 420, h: 436, closable: true });
     const t = el('div', 'label', this.win.body, [8, 6, 404, 410]);
     t.style.whiteSpace = 'normal';

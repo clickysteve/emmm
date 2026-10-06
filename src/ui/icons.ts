@@ -68,7 +68,6 @@ export function iconSvg(name: string, w = 12, h = 12, c = '#000'): string {
  * den 0 = the "wave" (no quantization). */
 export function noteValueSvg(den: number, c = '#000'): string {
   if (den === 0) return ICON.wave(c);
-  const base = [1, 2, 4, 8, 16, 32].find((b) => den % b === 0 && (den / b === 1 || den / b === 1.5)) ?? den;
   const trip = den % 3 === 0;
   const b = trip ? (den / 3) * 2 : den;
   let out = '';
@@ -79,7 +78,6 @@ export function noteValueSvg(den: number, c = '#000'): string {
   if (b >= 16) out += P('M7 3 L10 6', c);
   if (b >= 32) out += P('M7 5 L10 8', c);
   if (trip) out += `<text x="12" y="5" font-size="6" text-anchor="end" fill="${c}" font-family="Silkscreen, monospace">3</text>`;
-  void base;
   return out;
 }
 
