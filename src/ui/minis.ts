@@ -90,15 +90,19 @@ export function miniTimeDistortion(maps: Composition['timeDistortion']['position
 
 export function miniCycle(cycles: Cycle[], w: number, h: number, c: string): string {
   const { y, rh } = rows(h);
+  const sx = Math.min(5.5, (w - 6) / 16);
   let s = '';
   cycles.forEach((cy, v) => {
-    const top = y(v);
-    const unit = (rh - 1) / 4;
+    const top = Math.round(y(v));
+    const unit = Math.max(1, (rh - 3) / 4);
     cy.forEach((st, i) => {
-      const x = 2 + i * ((w - 4) / 16);
+      const x = Math.round(3 + i * sx);
+      // faint step tick (shows the cycle length), then the level dot / range bar
+      s += rect(x, top + Math.round(4 * unit) + 2, 2, 1, c);
       const y1 = Math.round(top + (4 - st.hi) * unit);
       const y2 = Math.round(top + (4 - st.lo) * unit);
-      s += rect(Math.round(x), y1, 2, Math.max(1, y2 - y1 + 1), c);
+      if (y2 > y1) s += rect(x, y1, 1, y2 - y1 + 2, c);
+      s += rect(x, y1, 2, 2, c) + (y2 > y1 ? rect(x, y2, 2, 2, c) : '');
     });
   });
   return s;
@@ -123,7 +127,7 @@ export function miniOrchestration(chs: number[][], w: number, h: number, c: stri
 /** Pattern Group: the letter plus a brick per non-empty pattern (bricks flash on restart). */
 export function miniPatternGroup(comp: Composition, g: number, w: number, h: number, c: string, flash: boolean[]): string {
   const pats = comp.patternGroups[g].patterns;
-  let s = `<text x="${w - 3}" y="${h - 2}" font-size="9" font-weight="600" text-anchor="end" fill="${c}" font-family="Pixelify Sans, sans-serif">${'abcdef'[g]}</text>`;
+  let s = `<text x="${w - 3}" y="${h - 2}" font-size="9" font-weight="600" text-anchor="end" fill="${c}" font-family="Tiny5, sans-serif">${'abcdef'[g]}</text>`;
   const bh = (h - 4) / 4;
   pats.forEach((p, v) => {
     if (!hasNotes(p)) return;

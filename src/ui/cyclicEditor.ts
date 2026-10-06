@@ -99,8 +99,8 @@ export class CyclicEditor {
         setSvg(
           d,
           `<defs><pattern id="acg" width="2" height="2" patternUnits="userSpaceOnUse"><rect width="1" height="1"/><rect x="1" y="1" width="1" height="1"/></pattern></defs>` +
-            [1, 2, 3, 4].map((n, i) => `<text x="${14 + i * 14}" y="8" font-size="8" text-anchor="middle" font-family="Pixelify Sans">${n}</text><rect x="${14 + i * 14}" y="10" width="1" height="6" fill="#000"/>`).join('') +
-            `<rect x="4" y="16" width="62" height="1" fill="#000"/><rect x="14" y="14" width="42" height="5" fill="url(#acg)" stroke="#000" stroke-width="0.5"/><text x="35" y="32" font-size="8" text-anchor="middle" font-family="Pixelify Sans">Vel Range</text>`,
+            [1, 2, 3, 4].map((n, i) => `<text x="${14 + i * 14}" y="8" font-size="8" text-anchor="middle" font-family="Tiny5">${n}</text><rect x="${14 + i * 14}" y="10" width="1" height="6" fill="#000"/>`).join('') +
+            `<rect x="4" y="16" width="62" height="1" fill="#000"/><rect x="14" y="14" width="42" height="5" fill="url(#acg)" stroke="#000" stroke-width="0.5"/><text x="35" y="32" font-size="8" text-anchor="middle" font-family="Tiny5">Vel Range</text>`,
         );
         label(b, 222, y0 + 58, '0 = silent', 'tiny');
       }

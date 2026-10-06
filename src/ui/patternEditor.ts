@@ -112,8 +112,9 @@ export class PatternEditor {
       this.hover = null;
       this.draw();
     });
-    this.legend = el('div', 'label', b, [GX + COLS * CW - 70, 2, 70, 10]);
-    this.legend.style.textAlign = 'right';
+    this.legend = el('div', 'label', b, [GX + COLS * CW + 8, 120, 80, 20]);
+    this.legend.style.whiteSpace = 'pre';
+    this.legend.style.lineHeight = '10px';
     this.legend.style.pointerEvents = 'none';
     // bottom: MIDI edit range, counter, scroll bar
     const bot = el('div', '', b, [GX, GY + ROWS * RH + 3, COLS * CW + 2, 30]);
@@ -182,8 +183,8 @@ export class PatternEditor {
         title: 'Pattern Size (maximum steps)',
       }),
     );
-    label(b, RX, 112, 'Steps', 'small');
-    const stepsLbl = el('div', 'label', b, [RX + 26, 112, 30, 10]);
+    label(b, RX, 108, 'Steps', 'small');
+    const stepsLbl = el('div', 'label', b, [RX + 26, 108, 30, 10]);
     this.parts.push({ update: () => (stepsLbl.textContent = String(s.pattern(this.voice).steps.length)) });
     // edit-range buttons, sound
     const allBtn = el('div', 'btn', b, [RX, 250, 20, 14], 'All');
@@ -219,7 +220,7 @@ export class PatternEditor {
         title: 'Editor Sound Velocity',
       }),
     );
-    label(b, RX, 140, 'click: note<br>drag: run /<br>cluster<br><br>keys a–k:<br>play into<br>a "R" voice', 'tiny').style.lineHeight = '8px';
+    label(b, RX, 150, 'click: add or<br>remove a note<br>drag →: repeat<br>drag ↕: cluster<br>Shift-View:<br>show another', 'tiny').style.lineHeight = '8px';
     this.parts.push({ update: () => this.draw() });
   }
 
@@ -462,7 +463,7 @@ export class PatternEditor {
     bt = `<defs><pattern id="pbg" width="2" height="2" patternUnits="userSpaceOnUse"><rect width="1" height="1"/><rect x="1" y="1" width="1" height="1"/></pattern></defs>` + bt;
     setSvg(this.bottom, bt);
     // legend
-    this.legend.textContent = this.hover ? `${noteName(this.hover.pitch)}  step ${this.hover.step + 1}` : `${len} steps · out ${p.outputLength}`;
+    this.legend.textContent = this.hover ? `${noteName(this.hover.pitch)}\nstep ${this.hover.step + 1}` : `out ${p.outputLength}`;
   }
 
   update(): void {

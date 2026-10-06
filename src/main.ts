@@ -126,6 +126,8 @@ function openEditor(name: EditorName, opts: { position?: number; variable?: Vari
   session.changed('window');
 }
 
+(window as unknown as { emmmUi: unknown }).emmmUi = { openEditor };
+
 // ------------------------------------------------------------------ menus
 interface MenuItem {
   label: string;

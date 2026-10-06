@@ -114,7 +114,7 @@ export class PatternsWindow implements Updatable {
     // column headings
     const hy = 2;
     label(b, 3, hy, 'Src');
-    label(b, 27, hy, 'Use');
+    label(b, 26, hy, 'Use').style.fontSize = '8px';
     const hp = el('div', '', b, [40, 0, 14, 12]);
     hp.style.position = 'absolute';
     hp.innerHTML = iconSvg('speaker', 12, 12);

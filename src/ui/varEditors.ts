@@ -100,7 +100,7 @@ export abstract class VarEditor {
 
 export class NoteDensityEditor extends VarEditor {
   constructor(ctx: UiContext, parent: HTMLElement) {
-    super(ctx, parent, 'noteDensity', 'Note Density', 160, 150, 214, 98);
+    super(ctx, parent, 'noteDensity', 'Note Density', 160, 150, 214, 106);
     const b = this.win.body;
     const s = ctx.s;
     label(b, 22, 3, '%');
@@ -150,7 +150,7 @@ export class NoteDensityEditor extends VarEditor {
 
 export class VelocityRangeEditor extends VarEditor {
   constructor(ctx: UiContext, parent: HTMLElement) {
-    super(ctx, parent, 'velocityRange', 'Velocity Range', 170, 160, 226, 98);
+    super(ctx, parent, 'velocityRange', 'Velocity Range', 170, 160, 226, 104);
     const b = this.win.body;
     const s = ctx.s;
     label(b, 16, 2, 'low', 'tiny');
@@ -279,7 +279,7 @@ export class NoteOrderEditor extends VarEditor {
 
 export class TranspositionEditor extends VarEditor {
   constructor(ctx: UiContext, parent: HTMLElement) {
-    super(ctx, parent, 'transposition', 'Transposition', 190, 180, 196, 98);
+    super(ctx, parent, 'transposition', 'Transposition', 190, 180, 196, 106);
     const b = this.win.body;
     const s = ctx.s;
     label(b, 16, 3, 'Note', 'small');
@@ -376,7 +376,7 @@ export class TimeDistortionEditor extends VarEditor {
   private svg: SVGSVGElement;
   private editBtns: HTMLDivElement[] = [];
   constructor(ctx: UiContext, parent: HTMLElement) {
-    super(ctx, parent, 'timeDistortion', 'Time Distortion', 210, 120, 236, 236);
+    super(ctx, parent, 'timeDistortion', 'Time Distortion', 210, 100, 236, 252);
     const b = this.win.body;
     const s = ctx.s;
     label(b, 4, 4, 'Edit:', 'small');
@@ -443,8 +443,9 @@ export class TimeDistortionEditor extends VarEditor {
     area.title = 'Click breakpoints from lower-left to upper-right; double-click to finish. Drag a breakpoint to tug it.';
     this.svg = svgEl(G, G, '');
     area.appendChild(this.svg);
-    label(b, 2, 200, 'Clock', 'tiny').style.transform = 'rotate(-90deg)';
-    label(b, 92, 220, 'Real Time', 'tiny');
+    const ck = label(b, -8, 110, 'Clock', 'tiny');
+    ck.style.transform = 'rotate(-90deg)';
+    label(b, 96, 224, 'Real Time', 'tiny');
     const toUnit = (e: PointerEvent): [number, number] => {
       const p = localPoint(area, e);
       return [clamp(p.x / G, 0, 1), clamp(1 - p.y / G, 0, 1)];
