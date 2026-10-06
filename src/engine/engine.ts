@@ -103,6 +103,16 @@ export interface EngineOptions {
 
 const CYCLES = ['rhythm', 'legato', 'accent'] as const;
 
+export interface Modulation {
+  density: (number | null)[];
+  transpose: number[];
+  velocity: number[];
+  legato: number[];
+}
+export function neutralMod(): Modulation {
+  return { density: [null, null, null, null], transpose: [0, 0, 0, 0], velocity: [0, 0, 0, 0], legato: [1, 1, 1, 1] };
+}
+
 export class MEngine {
   comp: Composition;
   state: EngineState = 'stopped';
@@ -130,6 +140,12 @@ export class MEngine {
   /** Optional per-voice seeds (EXTENDED Reroll with locked Voices). null = the document
    * seed, which is all Classic ever uses. */
   seedOverride: (number | null)[] = [null, null, null, null];
+  /**
+   * Runtime modulation per Voice (EXTENDED Trajectories; never saved). Neutral values —
+   * density null, offsets 0, legato ×1 — leave every note exactly as Classic computes it.
+   * Density replaces the active Position's value; the others add to (or scale) it.
+   */
+  mod = neutralMod();
 
   constructor(comp: Composition, opts: EngineOptions = {}) {
     this.comp = comp;
@@ -518,7 +534,7 @@ export class MEngine {
     const choice = this.chooseStep(v);
     const p = this.pattern(v);
     const step = choice.index >= 0 ? p.steps[choice.index] : [];
-    const density = this.comp.noteDensity.positions[this.comp.noteDensity.active][v];
+    const density = this.mod.density[v] ?? this.comp.noteDensity.positions[this.comp.noteDensity.active][v];
     const dense = vr.rng.chance(density);
     const played = vs.playEnable && step.length > 0 && ac.level > 0 && dense;
 
@@ -527,8 +543,9 @@ export class MEngine {
     if (played) {
       velocity = this.velocityFor(v, ac.level);
       if (vs.mouseAdvance) velocity = Math.max(1, Math.min(127, velocity + this.mouseAdvanceVelocity));
-      const tr = this.transposition(v);
-      const legatoMul = this.comp.conducting.continuousLegato.values[v] ?? 1;
+      if (this.mod.velocity[v]) velocity = Math.max(1, Math.min(127, velocity + this.mod.velocity[v]));
+      const tr = this.transposition(v) + this.mod.transpose[v];
+      const legatoMul = (this.comp.conducting.continuousLegato.values[v] ?? 1) * this.mod.legato[v];
       const pct = (this.comp.legatoValues[lg.level] ?? 50) * legatoMul;
       // Duration is a percentage of the time to the next event, measured in real time so
       // that time distortion stretches durations along with onsets.
@@ -603,12 +620,12 @@ export class MEngine {
     const choice = this.chooseStep(v);
     const p = this.pattern(v);
     const step = choice.index >= 0 ? p.steps[choice.index] : [];
-    const density = this.comp.noteDensity.positions[this.comp.noteDensity.active][v];
+    const density = this.mod.density[v] ?? this.comp.noteDensity.positions[this.comp.noteDensity.active][v];
     const dense = vr.rng.chance(density);
     const played = vs.playEnable && step.length > 0 && ac.level > 0 && dense;
     const pitches: number[] = [];
     if (played) {
-      const tr = this.transposition(v);
+      const tr = this.transposition(v) + this.mod.transpose[v];
       const channels = this.comp.orchestration.positions[this.comp.orchestration.active][v];
       for (const raw of step) {
         const pitch = raw + tr;

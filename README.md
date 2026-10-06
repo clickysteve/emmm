@@ -117,13 +117,15 @@ randomness, and colour palettes (Options ▸ Palette…; Classic black-and-white
 Everyday comforts that do not change M's music: Undo / Redo, the Pattern's Length, Time Base
 and Phase right in the Pattern Editor, Clear Pattern, a Root + Scale per Pattern (changing it
 moves the notes by scale degree), typing any number directly, keyboard shortcuts,
-emmm-style tooltips and pop-up menus, and full screen. 237 automated tests (including a seeded
+emmm-style tooltips and pop-up menus, and full screen. 318 automated tests (including a seeded
 fuzz test, worked examples, and the whole app driven through its menus in a simulated browser)
 cover the engine, timing maths, persistence, session logic, the interface and Extended.
 
 **Extended** (Options ▸ Extended…, off by default) explores what M might have become: Seed and
 Reroll, Locks, controlled Mutation (subtle → chaos), A/B performance states, MIDI Learn for
-almost every control, MIDI clock input with sync status, Performance Feedback and CC Cycles.
+almost every control, MIDI clock input with sync status, Performance Feedback, CC Cycles and
+Trajectory (rows of values moved through at musical rates, driving MIDI controllers or
+parameters).
 These are modern additions, not features of the original M, and they never change how Classic
 generates notes.
 

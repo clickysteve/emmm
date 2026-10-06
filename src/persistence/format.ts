@@ -13,6 +13,8 @@
  *      for older files). MIDI Learn mappings leave the document: they describe the user's
  *      hardware and are now an application preference. A version-1 file's mappings are
  *      returned as `legacyLearn` so the app can adopt them once.
+ *   3  Extended gains four Trajectories (filled from defaults — switched off — for older
+ *      files).
  *
  * Each Pattern may carry an emmm `scale` ({ root, scale }); files without it load as
  * Chromatic with their notes untouched (no version change was needed: it is optional).
@@ -24,9 +26,10 @@ import { NUM_CHANNELS, NUM_POSITIONS, NUM_VOICES } from '../engine/constants';
 import { defaultComposition } from '../engine/defaults';
 import type { Composition } from '../engine/types';
 import { cleanChoice } from '../app/scales';
+import { cleanTrajectory } from '../extended/trajectory';
 
 export const FORMAT_ID = 'emmm';
-export const FORMAT_VERSION = 2;
+export const FORMAT_VERSION = 3;
 
 export interface UiState {
   windows?: Record<string, { x: number; y: number; open: boolean }>;
@@ -122,6 +125,9 @@ function restoreVariableArrays(comp: Composition, raw: Composition): void {
       if (Array.isArray(rc) && rc.length > 0) vc.cycle = rc.map((s) => ({ lo: s.lo ?? 1, hi: s.hi ?? s.lo ?? 1 }));
     }),
   );
+  // Trajectory value lists have their own lengths (never padded from the defaults)
+  const rt = (raw.extended as { trajectories?: unknown[] } | undefined)?.trajectories;
+  comp.extended.trajectories = comp.extended.trajectories.map((d, i) => cleanTrajectory(Array.isArray(rt) && rt[i] ? rt[i] : d));
   comp.snapshots = comp.snapshots.map((_, i) => (raw.snapshots?.[i] ? structuredClone(raw.snapshots[i]) : null));
   comp.slideshows = comp.slideshows.map((_, i) => (raw.slideshows?.[i] ? structuredClone(raw.slideshows[i]) : null));
 }
@@ -134,6 +140,9 @@ export function migrate(doc: Record<string, unknown>): EmmmDocument {
   if (version > FORMAT_VERSION) throw new FormatError(`This document was saved by a newer emmm (format v${version})`);
   const raw = (doc.composition ?? {}) as Composition;
   let legacyLearn: unknown[] | undefined;
+  if (version < 3) {
+    // v2 → v3: nothing to move; Trajectories arrive from the defaults (all off)
+  }
   if (version < 2) {
     // v1 → v2: MIDI Learn mappings move out of the document (see the version history)
     const ext = (raw as { extended?: { learn?: unknown } }).extended;

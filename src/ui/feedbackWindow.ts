@@ -9,6 +9,7 @@
  */
 import { noteName } from '../engine/constants';
 import { LOCK_DIMS } from '../extended/extended';
+import { targetInfo } from '../extended/trajectory';
 import type { UiContext } from './context';
 import { el } from './dom';
 import { MWindow } from './widgets';
@@ -32,11 +33,12 @@ export class FeedbackWindow {
   private head: HTMLDivElement;
   private rows: HTMLDivElement[] = [];
   private foot: HTMLDivElement;
+  private traj: HTMLDivElement;
   private last = 0;
   private lastKey = '';
 
   constructor(private ctx: UiContext, parent: HTMLElement) {
-    this.win = new MWindow(parent, { id: 'feedback', title: 'Performance Feedback', x: 300, y: 330, w: 412, h: 132, closable: true });
+    this.win = new MWindow(parent, { id: 'feedback', title: 'Performance Feedback', x: 300, y: 290, w: 412, h: 172, closable: true });
     const b = this.win.body;
     const mono = (y: number, h = 10) => {
       const d = el('div', 'label tiny', b, [6, y, 400, h]);
@@ -56,6 +58,7 @@ export class FeedbackWindow {
       this.rows.push(r);
     }
     this.foot = mono(92, 18);
+    this.traj = mono(112, 40);
   }
 
   update(): void {
@@ -100,5 +103,18 @@ export class FeedbackWindow {
       if (s.status) f += `\n${s.status}`;
     } else f = 'Extended is off (Locks, Mutation and A/B live in the Extended window).';
     if (this.foot.textContent !== f) this.foot.textContent = f;
+    // Trajectories: target, step, the value now (Smooth: between steps), controller messages
+    const lines: string[] = [];
+    ext.trajectories.forEach((d, i) => {
+      if (!d.on || d.target.kind === 'none') return;
+      const info = targetInfo(d.target);
+      const st = s.traj[i];
+      const live = ext.enabled && s.trajLive[i] && s.playing;
+      const tgt = d.target.kind === 'cc' ? `CC${d.target.cc} ON CH ${d.target.channel}` : info.name.toUpperCase();
+      lines.push(`T${i + 1} ${tgt.padEnd(24)} ${live ? `STEP ${st.index + 1}/${d.values.length}`.padEnd(11) + `VALUE ${st.value ?? '—'}${d.smooth ? ' (SMOOTH)' : ''}${st.held ? ' HELD BY HAND' : ''}` : 'WAITING FOR START'}`);
+    });
+    if (lines.length) lines.push(`CC SENT BY TRAJECTORIES: ${s.trajCcCount}`);
+    const tt = lines.join('\n');
+    if (this.traj.textContent !== tt) this.traj.textContent = tt;
   }
 }

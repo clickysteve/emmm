@@ -811,3 +811,9 @@ body.dragging * {
   font-weight: 600;
   white-space: nowrap;
 }
+
+/* Trajectory: the current step's value */
+.num.tstep {
+  outline: 2px solid var(--activity);
+  outline-offset: -1px;
+}

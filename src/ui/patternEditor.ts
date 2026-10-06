@@ -37,6 +37,7 @@ export class PatternEditor {
   sound = true;
   velocity = 64;
   private grid: SVGSVGElement;
+  private playCol: SVGSVGElement;
   private kb: SVGSVGElement;
   private strip: SVGSVGElement;
   private bottom: SVGSVGElement;
@@ -110,7 +111,13 @@ export class PatternEditor {
     // grid
     const gridBox = el('div', 'box', b, [GX, GY, COLS * CW + 2, ROWS * RH + 2]);
     gridBox.style.background = 'var(--paper)';
+    // the "now playing" column: a small picture that only moves, behind the grid, so a
+    // playing Voice does not make the whole grid redraw on every step
+    this.playCol = svgEl(CW - 1, ROWS * RH, `<defs><pattern id="pea" width="2" height="2" patternUnits="userSpaceOnUse" fill="var(--activity)"><rect width="1" height="1"/><rect x="1" y="1" width="1" height="1"/></pattern></defs><rect width="${CW - 1}" height="${ROWS * RH}" fill="url(#pea)"/>`);
+    Object.assign(this.playCol.style, { position: 'absolute', top: '0', left: '0', display: 'none' });
+    gridBox.appendChild(this.playCol);
     this.grid = svgEl(COLS * CW, ROWS * RH, '');
+    this.grid.style.position = 'relative';
     gridBox.appendChild(this.grid);
     gridBox.title = 'Click: add or remove a note · drag →: repeat it along the steps · drag ↕: a chord cluster. Columns are steps (no durations: Rhythm times them). Keys: ← → select steps, ↑ ↓ scroll, ⌫ delete selected steps.';
     gridBox.addEventListener('pointerdown', (ev) => this.gridDown(ev, gridBox));
@@ -441,8 +448,13 @@ export class PatternEditor {
     const s = this.ctx.s;
     const p = this.pattern;
     const len = p.steps.length;
-    const playingNow = s.engine.state !== 'stopped' && this.ctx.flash.notes[this.voice].until > this.ctx.now() ? this.ctx.flash.notes[this.voice].step : -1;
-    const key = [s.rev, playingNow, this.hover?.step, this.hover?.pitch, this.low, this.scroll, this.voice, this.ghost, this.region?.join(), s.recorders[this.voice].counter, this.tool, this.scaleOf().root, this.scaleOf().scale].join('|');
+    const playing = s.engine.state !== 'stopped' && s.nowPlaying[this.voice] && this.ctx.flash.notes[this.voice].until > this.ctx.now() ? this.ctx.flash.notes[this.voice].step : -1;
+    const pc = playing - this.scroll;
+    const show = playing >= 0 && pc >= 0 && pc < COLS;
+    const d = show ? '' : 'none';
+    if (this.playCol.style.display !== d) this.playCol.style.display = d;
+    if (show && this.playCol.style.left !== pc * CW + 1 + 'px') this.playCol.style.left = pc * CW + 1 + 'px';
+    const key = [s.rev, this.hover?.step, this.hover?.pitch, this.low, this.scroll, this.voice, this.ghost, this.region?.join(), s.recorders[this.voice].counter, this.tool, this.scaleOf().root, this.scaleOf().scale].join('|');
     if (key === this.drawnKey) return;
     this.drawnKey = key;
     let g = '';
@@ -492,11 +504,9 @@ export class PatternEditor {
       }
     }
     // notes
-    const playing = s.engine.state !== 'stopped' && s.nowPlaying[this.voice] && this.ctx.flash.notes[this.voice].until > this.ctx.now() ? this.ctx.flash.notes[this.voice].step : -1;
     for (let c = 0; c < COLS; c++) {
       const st = this.scroll + c;
       const step = p.steps[st];
-      if (st === playing) g += `<rect x="${c * CW + 1}" y="0" width="${CW - 1}" height="${ROWS * RH}" fill="url(#pea)"/>`;
       if (!step) continue;
       for (const n of step) {
         const r = this.low + ROWS - 1 - n;
@@ -510,7 +520,7 @@ export class PatternEditor {
       const r = this.low + ROWS - 1 - this.hover.pitch;
       g += `<line x1="${c * CW + 4}" y1="0" x2="${c * CW + 4}" y2="${ROWS * RH}" stroke="var(--dim)" stroke-dasharray="1 1"/><line x1="0" y1="${r * RH + 3}" x2="${COLS * CW}" y2="${r * RH + 3}" stroke="var(--dim)" stroke-dasharray="1 1"/>`;
     }
-    g = `<defs><pattern id="peg" width="2" height="2" patternUnits="userSpaceOnUse"><rect width="1" height="1"/><rect x="1" y="1" width="1" height="1"/></pattern><pattern id="pea" width="2" height="2" patternUnits="userSpaceOnUse" fill="var(--activity)"><rect width="1" height="1"/><rect x="1" y="1" width="1" height="1"/></pattern><pattern id="pes" width="2" height="2" patternUnits="userSpaceOnUse" fill="var(--dim)" fill-opacity="0.45"><rect width="1" height="1"/></pattern></defs>` + g;
+    g = `<defs><pattern id="peg" width="2" height="2" patternUnits="userSpaceOnUse"><rect width="1" height="1"/><rect x="1" y="1" width="1" height="1"/></pattern><pattern id="pes" width="2" height="2" patternUnits="userSpaceOnUse" fill="var(--dim)" fill-opacity="0.45"><rect width="1" height="1"/></pattern></defs>` + g;
     setSvg(this.grid, g);
     // keyboard
     let k = '';

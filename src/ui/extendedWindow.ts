@@ -29,6 +29,7 @@ export class ExtendedWindow {
   private builtFor: object | null = null;
   openCc: (() => void) | null = null;
   openLearn: (() => void) | null = null;
+  openTrajectory: (() => void) | null = null;
   constructor(private ctx: UiContext, parent: HTMLElement) {
     this.win = new MWindow(parent, { id: 'extended', title: 'Extended', x: 150, y: 20, w: 300, h: 300, closable: true });
   }
@@ -73,8 +74,9 @@ export class ExtendedWindow {
     note.style.lineHeight = '10px';
     note.innerHTML = 'Not part of Classic M — emmm’s ideas for what M might have become. Classic note generation is never changed.';
     this.toggle(6, 25, 112, () => ext.enabled, (v) => (ext.enabled = v), 'Extended on', 'Switch the Extended features on for this document');
-    this.button(122, 25, 84, 'MIDI Learn…', 'Map controllers and keys to emmm controls', () => this.openLearn?.());
-    this.button(210, 25, 84, 'CC Cycles…', 'Cyclic patterns of MIDI controller values, one per Voice', () => this.openCc?.());
+    this.button(122, 25, 56, 'Learn…', 'MIDI Learn: map controllers and keys to emmm controls', () => this.openLearn?.());
+    this.button(181, 25, 56, 'Traject…', `Trajectory (${keyLabel('trajectoryWindow')}): rows of values moved through at a musical rate, driving a parameter or a MIDI controller`, () => this.openTrajectory?.());
+    this.button(240, 25, 54, 'CC Cyc…', 'CC Cycles: cyclic patterns of MIDI controller values, one per Voice', () => this.openCc?.());
     const off = el('div', 'label tiny', b, [6, 43, 288, 8]);
     this.parts.push({ update: () => (off.textContent = ext.enabled ? '' : 'Extended is off: the controls below are inactive until you switch it on.') });
 

@@ -67,6 +67,9 @@
   target with clear re-assignment.
 * **Seed / Reroll**, **Locks** (Voices and twelve kinds of setting), **Mutation** (subtle →
   chaos, seeded, undoable), **A/B performance states**, **Performance Feedback** inspector.
+* **Trajectory**: four slots of value rows moved through at Time Base rates (forward,
+  backward, ping-pong, random, random walk; step or smooth) driving MIDI CC or a typed set of
+  parameters; tick-exact, seeded, saved, undoable, in the Movie.
 * **CC Cycles**: per voice, a cyclic distribution of levels (M's own cyclic-variable model,
   16 steps × levels 0–4, random ranges) sends a controller value before each played note on the
   voice's orchestrated channels; six Positions; a global level → value table. Runs in the
@@ -79,6 +82,8 @@
 * Tempo sharing beyond MIDI clock (e.g. Link-style network sync).
 * Learnable mappings for every on-screen control (numericals, range bars, edit windows).
 * Morphing between A and B (the A/B state format is field-by-field, ready for it).
+* Trajectory ideas not in version 1: per-step probability or durations, restart-on-Sync,
+  Trajectories driving other Trajectories, MIDI Learn for single Trajectory values.
 * Scale-constrained *output* as an explicit Extended option (a Pattern's scale only
   transforms its notes when you change it; M never corrects what it plays).
 * Parameter automation lanes recorded from gestures (beyond Slideshows).

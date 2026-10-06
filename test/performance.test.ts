@@ -435,14 +435,14 @@ describe('MIDI clock output (Send Clock)', () => {
 });
 
 describe('persistence: Classic document, Extended state, preferences', () => {
-  it('format version 2 saves Extended performance state in the document', () => {
+  it('the current format saves Extended performance state in the document', () => {
     const s = mk();
     s.comp.extended.locks.dims.accent = true;
     s.comp.extended.mutation.amount = 70;
     s.abCapture('a');
     const doc = deserialize(serialize(s.comp));
     expect(doc.version).toBe(FORMAT_VERSION);
-    expect(FORMAT_VERSION).toBe(2);
+    expect(FORMAT_VERSION).toBe(3);
     expect(doc.mode).toBe('extended');
     expect(doc.composition.extended.locks.dims.accent).toBe(true);
     expect(doc.composition.extended.mutation.amount).toBe(70);
@@ -469,7 +469,7 @@ describe('persistence: Classic document, Extended state, preferences', () => {
     onLegacyLearn((l) => (adopted = l));
     const doc = deserialize(JSON.stringify(v1));
     onLegacyLearn(null);
-    expect(doc.version).toBe(2);
+    expect(doc.version).toBe(3);
     expect('learn' in doc.composition.extended).toBe(false);
     expect(doc.composition.extended.locks).toEqual(defaultLocks());
     expect(doc.composition.extended.voiceSeeds).toEqual([null, null, null, null]);

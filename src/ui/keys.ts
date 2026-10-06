@@ -85,6 +85,7 @@ export const KEYS: KeyDef[] = [
   { id: 'captureA', label: 'Capture A', group: 'Extended', keys: [alt('KeyA', { shift: true })] },
   { id: 'captureB', label: 'Capture B', group: 'Extended', keys: [alt('KeyB', { shift: true })] },
   { id: 'feedback', label: 'Performance Feedback', group: 'Extended', keys: [alt('KeyO')] },
+  { id: 'trajectoryWindow', label: 'Trajectory window', group: 'Extended', keys: [alt('KeyJ')] },
   // View / Help
   { id: 'fullScreen', label: 'Full Screen', group: 'View', keys: [alt('Enter')] },
   { id: 'shortcuts', label: 'Keyboard Shortcuts', group: 'View', keys: [alt('KeyH')] },
@@ -114,6 +115,7 @@ export const PATTERN_EDITOR_KEYS: [string, string][] = [
 
 export const NUMBER_KEYS: [string, string][] = [
   ['click a number, then type', 'type the value you want; Return keeps it, Escape cancels'],
+  ['(3 seconds)', 'a clicked number lets go of the keyboard after 3 s without a key'],
   ['Return', 'edit the selected number (its value is shown highlighted)'],
   ['↑ ↓', 'one step up / down (⇧: ten steps)'],
   ['Page Up / Down', 'ten steps'],

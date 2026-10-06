@@ -719,7 +719,9 @@ number is highlighted and nothing else listens to the keyboard; **Escape** cance
 number selected, **Return** edits the current value, **↑ ↓** step it (**⇧** ten at a time),
 **Page Up / Down** step by ten and **Home / End** go to the minimum and maximum. Values are
 kept within the control's legal range; anything that is not a number is refused (the box
-flashes) and nothing changes. One typed value is one **⌘Z**.
+flashes) and nothing changes. One typed value is one **⌘Z**. A clicked number lets go of the
+keyboard after three seconds without a key (or at once with **Escape** or a click elsewhere),
+so **Return** stops and **1–9** play Slideshows again, as in M.
 
 - **Time Base** takes both numbers at once — type `3/8` in either box — and `sa` for step
   advance; only legal denominators are accepted.
@@ -746,7 +748,7 @@ The most useful:
 | ⌥Y · ⌥M | Cyclic Editor · Midi Assignment |
 | ⌥T | metronome on/off |
 | ⌥↩ | full screen |
-| ⌥X · ⌥R · ⌥A ⌥B · ⇧⌥A ⇧⌥B · ⌥O | Extended: Mutate · Reroll · recall A / B · capture A / B · Performance Feedback |
+| ⌥X · ⌥R · ⌥A ⌥B · ⇧⌥A ⇧⌥B · ⌥O · ⌥J | Extended: Mutate · Reroll · recall A / B · capture A / B · Performance Feedback · Trajectory |
 
 In the **Pattern Editor** (when it is the front window): **← →** move through the steps (**⇧**
 selects), **⌘A** selects all, **⌫** deletes the selected steps (with nothing selected,
@@ -797,6 +799,40 @@ all does nothing.
   let it through (PASS / SKIP), the transposition, the Rhythm / Legato / Accent levels picked,
   the velocity and the channels — plus the active Positions, Locks and A/B state.
 - **CC Cycles** drive MIDI controllers with M-style cyclic patterns, one per Voice.
+- **Trajectory** (Extended button **Traject…**, **⌥J**, or **Windows ▸ Trajectory**) — see below.
+
+### Trajectory
+
+A Trajectory is a short row of values that emmm moves through at a musical rate, pointed at
+something: `20 40 80 127 60 30` → MIDI controller 74 makes a filter breathe; `0 7 12 7` →
+Transposition moves the music through a little progression; `30 80 50 100` → Note Density
+thins and fills it. Up to four run at once, each on its own clock, while Patterns, Variables
+and Cyclic Variables carry on as before. It is emmm's idea, not part of M.
+
+- **Make one:** in a row of the Trajectory window choose the target (left pop-up), type the
+  values into the boxes (click a box and type; **→** moves to the next box; **+** adds a box,
+  **Delete** removes one; or drag a box up and down), then click the row's number to switch it
+  on. **Clr** leaves one value; **×2** repeats the row.
+- **Rate** is a Time Base, like a Pattern's: one step every `n | d` of a whole note — `1|16`
+  sixteenths, `1|4` quarter notes, `4|4` a bar, `8|4` two bars. Type `1/8` to set both.
+- **How it moves:** Forward, Backward, Ping-Pong (back and forth, the ends not repeated),
+  Random, or Random Walk (always to a neighbouring value). Random ones follow the seed: the same
+  document and seed take the same path from Start; **Reroll** gives a new path.
+- **Step or Smooth:** Step jumps to each value; Smooth glides from one value to the next during
+  the step (Positions always step).
+- **Targets:** a MIDI controller (on an M Output Channel, so it goes to the device and channel
+  set in Midi Assignment), Note Density (replaces the Position's %), Transposition +, Velocity +,
+  Legato × (these add to what the Positions say), Tempo, the Baton (↔ ↕), Mutation strength, or
+  which Position of a Variable is active (Pattern Group changes restart the Voices, as in M).
+  For Voice targets the **1 2 3 4** boxes choose the Voices.
+- **Rules:** Start begins every Trajectory at its first value; Pause freezes them; Stop releases
+  their targets (Density, Transposition … go back to what the Positions say). If you move a
+  parameter a Trajectory is driving (click a Density Position, change the tempo), your hand
+  wins until the Trajectory's next step. Locks do not stop a Trajectory (they only hold back
+  Mutate and Reroll), and A / B states leave Trajectories running.
+- The current step is outlined and its bar marked; **Performance Feedback** lists each
+  Trajectory's step and value. Controller messages go into the MIDI **Movie** (and so into the
+  exported file). Trajectories are saved with the document; editing them is undoable.
 
 ---
 

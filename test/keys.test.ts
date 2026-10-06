@@ -166,6 +166,23 @@ describe('number boxes: direct entry', () => {
     t.n.el.blur();
     expect(t.v).toBe(200);
   });
+  it('a clicked box lets go of the keyboard after 3 s without a key (Return and digits are M’s again); typing holds on', () => {
+    vi.useFakeTimers();
+    const t = num();
+    press(t.n.el);
+    expect(document.activeElement).toBe(t.n.el);
+    vi.advanceTimersByTime(3100);
+    expect(document.activeElement).not.toBe(t.n.el);
+    press(t.n.el);
+    typeText(t.n.el, '15');
+    vi.advanceTimersByTime(10000); // still typing: kept
+    expect(t.n.editing).toBe(true);
+    key(t.n.el, 'Enter');
+    expect(t.v).toBe(20); // 15 clamped to the minimum
+    vi.advanceTimersByTime(3100);
+    expect(document.activeElement).not.toBe(t.n.el);
+    vi.useRealTimers();
+  });
   it('only one control is typed into at a time', () => {
     const a = num();
     const b = num();

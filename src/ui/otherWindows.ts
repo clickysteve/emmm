@@ -499,8 +499,9 @@ B3 Hold/Do, F3 Sync, black keys + white keys select Positions.<br><br>
 <b>Seed</b> — emmm's randomness is seeded (Conducting window). Same document + seed + gestures =
 same music from Start.<br><br>
 <b>Extended</b> (emmm's additions, not M) — Options ▸ Extended…: Seed &amp; Reroll, Locks, Mutation
-(subtle → chaos), A/B states, MIDI clock input, MIDI Learn, CC Cycles; Options ▸ Performance
-Feedback shows what M decides for each note.<br>
+(subtle → chaos), A/B states, MIDI clock input, MIDI Learn, CC Cycles, and <b>Trajectory</b> (⌥J):
+rows of values moved through at a musical rate, driving a MIDI controller, Density, Transposition,
+Tempo, the Baton or a Position. Options ▸ Performance Feedback shows what M decides for each note.<br>
 <b>Comfort</b> — rest the mouse on a control for a tip (Options ▸ Show Tips) · ⤢ in the menu bar =
 full screen.<br><br>
 <b>Colours</b> — Options ▸ Palette… changes emmm's colours (Classic, Dark, Colour or your own).

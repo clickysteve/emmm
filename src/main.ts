@@ -30,6 +30,7 @@ import { closeSelectors } from './ui/selector';
 import { installTooltips } from './ui/tooltip';
 import { commands, dispatch, keyLabel } from './ui/keys';
 import { ShortcutsWindow } from './ui/shortcutsWindow';
+import { TrajectoryWindow } from './ui/trajectoryWindow';
 import { lastVariable } from './ui/choice';
 import { NoteDensityEditor, NoteOrderEditor, OrchestrationEditor, TimeDistortionEditor, TranspositionEditor, VarEditor, VelocityRangeEditor } from './ui/varEditors';
 
@@ -144,9 +145,11 @@ feedbackWin.win.o.onClose = () => {
 };
 const paletteWin = new PaletteWindow(palettes, desktop);
 const shortcutsWin = new ShortcutsWindow(desktop);
+const trajectoryWin = new TrajectoryWindow(ctx, desktop);
+extendedWin.openTrajectory = () => bringForward(trajectoryWin.win);
 // a window that appears is drawn at once (not only at the next change)
 windowEvents.shown = () => (session.dirty = true);
-const floating = [...Object.values(editors), cyclic, patternEditor, midiAssign, monitorWin, about, importWin, library, extendedWin, helpWin, ccWin, paletteWin, learnWin, feedbackWin, shortcutsWin];
+const floating = [...Object.values(editors), cyclic, patternEditor, midiAssign, monitorWin, about, importWin, library, extendedWin, helpWin, ccWin, paletteWin, learnWin, feedbackWin, shortcutsWin, trajectoryWin];
 floating.forEach((f) => f.win.el.classList.add('hidden'));
 if (prefs.app.feedback) feedbackWin.win.show();
 
@@ -279,8 +282,9 @@ function windowsMenu(): MenuItem[] {
     C('cyclicEditor', 'Cyclic Editor'),
     { label: 'Pattern Editor', key: keyLabel('patternEditor'), action: () => (openEditor('patternEditor', { voice: patternEditor.voice }), patternEditor.win.flashTitle()) },
     { label: 'Monitor', action: () => (openEditor('monitor'), monitorWin.win.flashTitle()) },
+    C('trajectoryWindow', 'Trajectory  (Extended)'),
   ];
-  const fixed = new Set<MWindow>([cyclic.win, patternEditor.win, monitorWin.win]);
+  const fixed = new Set<MWindow>([cyclic.win, patternEditor.win, monitorWin.win, trajectoryWin.win]);
   const open: MenuItem[] = floating.filter((f) => f.win.open && !fixed.has(f.win)).map((f) => ({ label: f.win.titleEl.textContent || f.win.o.title, action: () => bringForward(f.win) }));
   return [
     { label: 'Close Edit Windows', key: keyLabel('closeEditWindows'), enabled: () => floating.some((f) => f.win.open), action: closeEditWindows },
@@ -378,6 +382,7 @@ cmd('captureB', () => session.abCapture('b'), () => ext().enabled);
 cmd('feedback', toggleFeedback);
 cmd('fullScreen', () => toggleFullScreen(), () => !!document.documentElement.requestFullscreen);
 cmd('shortcuts', () => bringForward(shortcutsWin.win));
+cmd('trajectoryWindow', () => bringForward(trajectoryWin.win));
 
 /** A menu item for a keyboard command: same action, same enabling, its key shown. */
 const C = (id: string, label: string, extra: Partial<MenuItem> = {}): MenuItem => {
@@ -513,6 +518,7 @@ const MENUS: { title: string; cls?: string; items: MenuItem[] | (() => MenuItem[
       { label: 'Extended…  (not Classic M)', checked: () => session.comp.extended.enabled, action: () => extendedWin.win.show() },
       C('feedback', 'Performance Feedback  (Extended)', { checked: () => prefs.app.feedback }),
       { label: 'MIDI Learn…  (Extended)', action: () => learnWin.win.show() },
+      C('trajectoryWindow', 'Trajectory…  (Extended)'),
       { label: 'Monitor All Output (internal)', checked: () => session.monitorAll, action: () => ((session.monitorAll = !session.monitorAll), session.monitor.unlock(), session.changed('midi')) },
     ],
   },

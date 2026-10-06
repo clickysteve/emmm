@@ -20,14 +20,20 @@ import { MidiManager } from '../midi/webmidi';
 import { Scheduler } from '../scheduler/scheduler';
 import { CcCycleRunner, ClockFollower, learnInto, sameSource, targetLabel, type LearnMapping, type LearnSource, type LearnTarget, type SyncStatus } from '../extended/extended';
 import { mutate, mutationRng } from '../extended/mutation';
+import { cleanTrajectory, clampTo, freshState, MAX_TRAJECTORY_VALUES, nextIndex, SMOOTH_TICKS, stepTicks, targetInfo, TRAJECTORY_SLOTS, trajRng, valueAt, type Trajectory, type TrajState, type TrajTarget } from '../extended/trajectory';
+import { neutralMod } from '../engine/engine';
 import { capturePerfState, recallPerfState } from '../extended/perfState';
 import { freshSeed } from '../engine/rng';
 import { assignDeep } from './assign';
 import { History } from './history';
 import { CHROMATIC, cleanChoice, transformSteps, type ScaleChoice } from './scales';
 
+function trajTargetKey(t: TrajTarget): string {
+  return t.kind === 'position' ? 'position:' + t.variable : t.kind === 'cc' ? `cc:${t.channel}:${t.cc}` : t.kind;
+}
+
 /** Changes that are about playing or viewing, not editing: they never make an Undo step. */
-const TRANSIENT = new Set(['editor', 'baton', 'tempo', 'transport', 'select', 'window', 'step', 'mouse', 'learn', 'hold', 'movie', 'sync', 'load', 'undo', 'midi', 'transpose', 'ics', 'clock', 'feedback', 'ab-recall']);
+const TRANSIENT = new Set(['editor', 'baton', 'tempo', 'transport', 'select', 'window', 'step', 'mouse', 'learn', 'hold', 'movie', 'sync', 'load', 'undo', 'midi', 'transpose', 'ics', 'clock', 'feedback', 'ab-recall', 'trajectory']);
 
 export interface VisualEvent {
   ms: number;
@@ -110,7 +116,8 @@ export class Session {
   constructor(comp?: Composition) {
     this.comp = comp ?? defaultComposition();
     this.editRng = new Rng(this.comp.seed, 500);
-    this.engine = new MEngine(this.comp, { onChange: (w) => this.changed(w) });
+    // Trajectory actions ('traj') report their own visible changes (see trajApply)
+    this.engine = new MEngine(this.comp, { onChange: (w) => w !== 'traj' && this.changed(w) });
     this.scheduler = new Scheduler(
       this.engine,
       () => this.comp.tempo.value,
@@ -137,6 +144,7 @@ export class Session {
   changed(what = 'state'): void {
     this.dirty = true;
     this.rev++;
+    if (what !== 'trajectory') this.trajManual(what);
     if (!TRANSIENT.has(what)) this.historySoon();
     this.listeners.forEach((f) => f(what));
   }
@@ -186,7 +194,7 @@ export class Session {
       conducting: { ...c.conducting, baton: null, continuousVelocity: { ...c.conducting.continuousVelocity, values: null }, continuousLegato: { ...c.conducting.continuousLegato, values: null } },
       midi: null,
       sequenceEnable: false,
-      extended: { ...c.extended, ccCycles: { ...c.extended.ccCycles, active: 0 }, clockIn: null, ab: { ...c.extended.ab, last: null } },
+      extended: { ...c.extended, ccCycles: { ...c.extended.ccCycles, active: 0 }, clockIn: null, ab: { ...c.extended.ab, last: null }, mutation: { ...c.extended.mutation, amount: 0 } },
     });
   }
 
@@ -211,6 +219,7 @@ export class Session {
     next.extended.ccCycles.active = c.extended.ccCycles.active;
     next.extended.clockIn = structuredClone(c.extended.clockIn);
     next.extended.ab.last = c.extended.ab.last;
+    next.extended.mutation.amount = c.extended.mutation.amount;
     const dens = c.patternGroups.map((g) => g.patterns.map((p) => p.tbDen));
     assignDeep(c, next);
     // a step-advance voice that is no longer step-advance must be woken by the engine
@@ -227,14 +236,14 @@ export class Session {
 
   undo(): boolean {
     if (this.historyTimer) clearTimeout(this.historyTimer), (this.historyTimer = null);
-    const ok = this.history.undo((st) => this.restoreDoc(st));
+    const ok = this.history.undo((st) => (this.restoreDoc(st), this.trajSync()));
     if (ok) this.notify('undo');
     return ok;
   }
 
   redo(): boolean {
     if (this.historyTimer) clearTimeout(this.historyTimer), (this.historyTimer = null);
-    const ok = this.history.redo((st) => this.restoreDoc(st));
+    const ok = this.history.redo((st) => (this.restoreDoc(st), this.trajSync()));
     if (ok) this.notify('undo');
     return ok;
   }
@@ -378,6 +387,7 @@ export class Session {
       this.clockOut = this.clockTarget();
       if (this.clockOut) this.midi.send(this.clockOut, msg.START);
       this.ccRunner.reset(this.comp.seed);
+      this.trajStart();
       this.scheduler.started();
       if (this.slideshowPlay?.waiting) this.beginSlideshowPlayback();
       if (this.slideshowRec && !this.comp.options.slideshowRecordWait) this.slideshowRec.start = 0;
@@ -391,6 +401,7 @@ export class Session {
     const offAt = this.afterQueued();
     const evs = this.engine.stop();
     if (evs.length) this.dispatch(evs, () => offAt);
+    this.trajStop();
     this.scheduler.stopped();
     this.scheduler.limitTick = Infinity;
     this.tapConduct.active = false;
@@ -1145,7 +1156,278 @@ export class Session {
       case 'abToggle':
         if (rising) this.abToggle();
         break;
+      case 'trajToggle':
+        if (rising) this.setTrajectory(t.slot, { on: !this.comp.extended.trajectories[t.slot].on });
+        break;
     }
+  }
+
+  // ------------------------------------------------------------------ EXTENDED: Trajectories
+
+  /** Where each Trajectory is (runtime only). */
+  traj: TrajState[] = Array.from({ length: TRAJECTORY_SLOTS }, freshState);
+  private trajRngs: Rng[] = Array.from({ length: TRAJECTORY_SLOTS }, (_, i) => trajRng(0, i));
+  /** a chain of steps is scheduled for this slot */
+  trajLive = [false, false, false, false];
+  /** the target each slot last applied (to release it when it changes) */
+  private trajApplied: (TrajTarget | null)[] = [null, null, null, null];
+  private trajAppliedKey = ['', '', '', ''];
+  /** controller messages sent by Trajectories (for Performance Feedback / tests) */
+  trajCcCount = 0;
+
+  private trajActive(slot: number): boolean {
+    const ext = this.comp.extended;
+    const d = ext.trajectories[slot];
+    return ext.enabled && !!d && d.on && d.target.kind !== 'none' && d.values.length > 0;
+  }
+
+  /** Start: every active Trajectory from its first step, at tick 0. */
+  private trajStart(): void {
+    this.trajRngs = this.trajRngs.map((_, i) => trajRng(this.comp.seed, i));
+    for (let i = 0; i < TRAJECTORY_SLOTS; i++) {
+      this.traj[i] = freshState();
+      this.trajLive[i] = false;
+      if (this.trajActive(i)) this.trajBegin(i, 0);
+    }
+  }
+
+  /** Stop: everything released (note-level targets back to their Positions). */
+  private trajStop(): void {
+    for (let i = 0; i < TRAJECTORY_SLOTS; i++) {
+      this.traj[i] = { ...freshState(), gen: this.traj[i].gen + 1 };
+      this.trajLive[i] = false;
+      this.trajApplied[i] = null;
+      this.trajAppliedKey[i] = '';
+    }
+    this.engine.mod = neutralMod();
+  }
+
+  /** Begin a slot's chain at `tick` (first step chosen by its traversal). */
+  private trajBegin(slot: number, tick: number): void {
+    const d = this.comp.extended.trajectories[slot];
+    const n = d.values.length;
+    const st = this.traj[slot];
+    st.gen++;
+    st.index = d.mode === 'backward' ? n - 1 : d.mode === 'random' ? this.trajRngs[slot].int(0, n - 1) : 0;
+    st.dir = d.mode === 'backward' ? -1 : 1;
+    st.start = tick;
+    st.end = tick; // the first action starts the step
+    st.value = null;
+    st.sent = null;
+    st.held = false;
+    (st as TrajState & { begun?: boolean }).begun = false;
+    this.trajLive[slot] = true;
+    this.trajSchedule(slot, tick);
+  }
+
+  private trajSchedule(slot: number, tick: number): void {
+    const gen = this.traj[slot].gen;
+    this.engine.schedule(tick, 'traj', (t) => {
+      if (this.traj[slot].gen !== gen) return;
+      return this.trajTick(slot, t);
+    });
+  }
+
+  /** One Trajectory action: a new step at a step boundary, else a Smooth update. */
+  private trajTick(slot: number, t: number): EngineEvent[] | void {
+    if (!this.trajActive(slot)) {
+      this.trajLive[slot] = false;
+      this.trajRelease(slot);
+      return;
+    }
+    const d = this.comp.extended.trajectories[slot];
+    const st = this.traj[slot] as TrajState & { begun?: boolean };
+    const n = d.values.length;
+    if (t >= st.end - 1e-9) {
+      if (st.begun) st.index = st.next % n;
+      st.begun = true;
+      st.index = Math.min(st.index, n - 1);
+      st.held = false;
+      st.start = t;
+      st.end = t + stepTicks(d);
+      const nx = nextIndex(d.mode, st.index, st.dir, n, this.trajRngs[slot]);
+      st.next = nx.i;
+      st.dir = nx.dir;
+    }
+    let out: EngineEvent[] | void = undefined;
+    if (!st.held) out = this.trajApply(slot, d, valueAt(d, st, t), t);
+    // The Trajectory's own Baton / Position moves are not a hand on them, and a Baton glide
+    // must not make the whole screen recompute (only a real Position change does).
+    if (out) out = out.filter((e) => !(e.kind === 'change' && e.what === 'baton')).map((e) => (e.kind === 'change' && e.what !== 'sync' ? { ...e, what: 'trajectory' } : e));
+    const glide = d.smooth && targetInfo(d.target).kind !== 'enumerated';
+    this.trajSchedule(slot, glide ? Math.min(t + SMOOTH_TICKS, st.end) : st.end);
+    return out;
+  }
+
+  private trajPerVoice(d: Trajectory, f: (v: number) => void): void {
+    d.voices.forEach((on, v) => on && f(v));
+  }
+
+  private trajApply(slot: number, d: Trajectory, value: number, t: number): EngineEvent[] | void {
+    const st = this.traj[slot];
+    // a different target than last time: give the old one back first (cheap check per update)
+    const key = trajTargetKey(d.target);
+    if (this.trajAppliedKey[slot] !== key) {
+      if (this.trajApplied[slot]) this.trajRelease(slot);
+      this.trajApplied[slot] = structuredClone(d.target);
+      this.trajAppliedKey[slot] = key;
+    }
+    st.value = value;
+    const m = this.engine.mod;
+    const tg = d.target;
+    switch (tg.kind) {
+      case 'density':
+        return this.trajPerVoice(d, (v) => (m.density[v] = Math.round(value)));
+      case 'transpose':
+        return this.trajPerVoice(d, (v) => (m.transpose[v] = Math.round(value)));
+      case 'velocity':
+        return this.trajPerVoice(d, (v) => (m.velocity[v] = Math.round(value)));
+      case 'legato':
+        return this.trajPerVoice(d, (v) => (m.legato[v] = value / 100));
+      case 'tempo':
+        this.setTempoExact(value);
+        this.dirty = true; // redraw (the numbers read the value directly)
+        return;
+      case 'mutation':
+        this.comp.extended.mutation.amount = Math.round(value);
+        this.dirty = true;
+        return;
+      case 'batonX':
+        this.dirty = true;
+        return this.engine.conduct(value / 100, this.comp.conducting.baton.y, t, false);
+      case 'batonY':
+        this.dirty = true;
+        return this.engine.conduct(this.comp.conducting.baton.x, value / 100, t, false);
+      case 'position': {
+        const pos = Math.max(0, Math.min(5, Math.round(value) - 1));
+        if ((this.comp[tg.variable] as { active: number }).active === pos) return;
+        return this.engine.selectPosition(tg.variable, pos, t);
+      }
+      case 'cc': {
+        const v = Math.max(0, Math.min(127, Math.round(value)));
+        if (st.sent === v) return; // never the same value twice in a row
+        st.sent = v;
+        const ms = this.scheduler.tickToMs(t);
+        this.send(tg.channel, msg.controlChange(tg.channel, tg.cc, v), ms);
+        this.movieAdd(t, msg.controlChange(this.outTarget(tg.channel).channel, tg.cc, v));
+        this.trajCcCount++;
+        return;
+      }
+    }
+  }
+
+  /** Give a target back: note-level modulation to neutral (others simply stay where they are). */
+  private trajRelease(slot: number): void {
+    const tg = this.trajApplied[slot];
+    this.trajApplied[slot] = null;
+    this.trajAppliedKey[slot] = '';
+    if (!tg) return;
+    const d = this.comp.extended.trajectories[slot];
+    const m = this.engine.mod;
+    const voices = d?.voices ?? [true, true, true, true];
+    voices.forEach((on, v) => {
+      if (!on) return;
+      if (tg.kind === 'density') m.density[v] = null;
+      if (tg.kind === 'transpose') m.transpose[v] = 0;
+      if (tg.kind === 'velocity') m.velocity[v] = 0;
+      if (tg.kind === 'legato') m.legato[v] = 1;
+    });
+  }
+
+  /** A hand on a parameter a Trajectory drives: it wins until the Trajectory's next step. */
+  private trajManual(what: string): void {
+    if (!this.playing || !this.comp.extended.enabled) return;
+    for (let i = 0; i < TRAJECTORY_SLOTS; i++) {
+      if (!this.trajLive[i]) continue;
+      const tg = this.comp.extended.trajectories[i].target;
+      const hit =
+        (tg.kind === 'density' && what === 'noteDensity') ||
+        (tg.kind === 'tempo' && what === 'tempo') ||
+        ((tg.kind === 'batonX' || tg.kind === 'batonY') && what === 'baton') ||
+        (tg.kind === 'mutation' && what === 'mutation') ||
+        (tg.kind === 'position' && what === tg.variable);
+      if (!hit) continue;
+      this.traj[i].held = true;
+      if (tg.kind === 'density') this.trajRelease(i); // so the hand's own value is heard
+    }
+  }
+
+  /** After edits / Undo: start chains that should run, stop the ones that should not. */
+  trajSync(): void {
+    if (this.engine.state === 'stopped') return;
+    for (let i = 0; i < TRAJECTORY_SLOTS; i++) {
+      const want = this.trajActive(i);
+      if (want && !this.trajLive[i]) {
+        // join on the Trajectory's own grid from Start, so it stays in step with the music
+        const step = stepTicks(this.comp.extended.trajectories[i]);
+        const now = this.scheduler.frontierTick();
+        this.trajBegin(i, Math.ceil((now - 1e-6) / step) * step);
+      } else if (!want && this.trajLive[i]) {
+        this.traj[i].gen++;
+        this.trajLive[i] = false;
+        this.trajRelease(i);
+      }
+    }
+  }
+
+  /** Change a Trajectory's definition (one Undo step). Values, rate and traversal take
+   * effect at the next step; switching it on joins at the next step of its own grid. */
+  setTrajectory(slot: number, patch: Partial<Trajectory>): void {
+    const ext = this.comp.extended;
+    const cur = ext.trajectories[slot];
+    if (!cur) return;
+    const targetChanged = patch.target && JSON.stringify(patch.target) !== JSON.stringify(cur.target);
+    const next = cleanTrajectory({ ...cur, ...patch });
+    // a new target keeps the values where they fit its range
+    Object.assign(cur, next);
+    if (targetChanged && this.trajLive[slot]) {
+      this.trajRelease(slot);
+      this.traj[slot].gen++;
+      this.trajLive[slot] = false;
+    }
+    this.trajSync();
+    this.changed('trajectory-edit');
+  }
+
+  setTrajectoryValue(slot: number, i: number, value: number): void {
+    const d = this.comp.extended.trajectories[slot];
+    if (!d || i < 0 || i >= d.values.length) return;
+    d.values[i] = clampTo(targetInfo(d.target), value);
+    this.changed('trajectory-edit');
+  }
+
+  /** Add a value after `i` (a copy of it), up to 16. */
+  addTrajectoryValue(slot: number, i = -1): number {
+    const d = this.comp.extended.trajectories[slot];
+    if (!d || d.values.length >= MAX_TRAJECTORY_VALUES) return -1;
+    const at = i < 0 ? d.values.length - 1 : i;
+    d.values.splice(at + 1, 0, d.values[at] ?? targetInfo(d.target).min);
+    this.changed('trajectory-edit');
+    return at + 1;
+  }
+
+  removeTrajectoryValue(slot: number, i: number): void {
+    const d = this.comp.extended.trajectories[slot];
+    if (!d || d.values.length <= 1 || i < 0 || i >= d.values.length) return;
+    d.values.splice(i, 1);
+    this.changed('trajectory-edit');
+  }
+
+  /** Clear: one value (the target's minimum, or 0 where 0 is legal). */
+  clearTrajectory(slot: number): void {
+    const d = this.comp.extended.trajectories[slot];
+    if (!d) return;
+    const info = targetInfo(d.target);
+    d.values = [clampTo(info, 0)];
+    this.changed('trajectory-edit');
+  }
+
+  /** Duplicate the sequence (1 2 3 → 1 2 3 1 2 3), up to 16 values. */
+  duplicateTrajectory(slot: number): void {
+    const d = this.comp.extended.trajectories[slot];
+    if (!d) return;
+    d.values = [...d.values, ...d.values].slice(0, MAX_TRAJECTORY_VALUES);
+    this.changed('trajectory-edit');
   }
 
   // ------------------------------------------------------------------ EXTENDED: seed, locks, mutation, A/B
@@ -1168,6 +1450,7 @@ export class Session {
     this.comp.seed = seed >>> 0;
     this.applySeedOverrides();
     if (this.engine.state !== 'stopped') this.engine.voices.forEach((_, v) => !ext.locks.voices[v] && this.engine.reseedVoice(v, this.comp.seed));
+    this.trajRngs = this.trajRngs.map((_, i) => trajRng(this.comp.seed, i));
     this.status = `Reroll: seed ${this.comp.seed}`;
     this.changed('seed');
   }

@@ -26,6 +26,7 @@ export const ROLES = [
   'conducting',
   'midi',
   'snapshots',
+  'trajectory',
   'activity',
   'selection',
 ] as const;
@@ -43,13 +44,14 @@ export const ROLE_INFO: Record<Role, { label: string; help: string }> = {
   conducting: { label: 'Conducting', help: 'transport, tempo and Conducting Grid' },
   midi: { label: 'Midi', help: 'Orchestration, Sound Choice, Midi Assignment, Monitor' },
   snapshots: { label: 'Snapshots', help: 'Snapshot window' },
+  trajectory: { label: 'Trajectory', help: 'Trajectory window (Extended)' },
   activity: { label: 'Activity', help: 'the Baton, now-playing marks, flashing bricks' },
   selection: { label: 'Selection', help: 'selected Patterns, editor regions, menu highlight' },
 };
 
 /** Which windows belong to which functional area (data-area attribute on the window). */
-export type Area = 'patterns' | 'variables' | 'cyclic' | 'conducting' | 'midi' | 'snapshots';
-export const AREAS: Area[] = ['patterns', 'variables', 'cyclic', 'conducting', 'midi', 'snapshots'];
+export type Area = 'patterns' | 'variables' | 'cyclic' | 'conducting' | 'midi' | 'snapshots' | 'trajectory';
+export const AREAS: Area[] = ['patterns', 'variables', 'cyclic', 'conducting', 'midi', 'snapshots', 'trajectory'];
 
 export interface Palette {
   id: string;
@@ -96,6 +98,7 @@ export const BUILT_INS: Palette[] = [
       conducting: '#a94f12',
       midi: '#4e44a0',
       snapshots: '#7d6208',
+      trajectory: '#8d2fa3',
       activity: '#d0372a',
       selection: '#2b78c9',
     },
@@ -148,6 +151,7 @@ const NEEDS: Partial<Record<Role, number>> = {
   conducting: 3,
   midi: 3,
   snapshots: 3,
+  trajectory: 3,
   activity: 2,
   selection: 2,
 };
@@ -294,6 +298,9 @@ export function importPalette(text: string): ImportResult {
     if (h) {
       colors[r] = h;
       valid++;
+    } else if (r === 'trajectory' && src[r] === undefined) {
+      // added after palette files existed: older files take their own Ink for it
+      colors[r] = normHex(src.ink) ?? CLASSIC.colors.ink;
     } else {
       colors[r] = CLASSIC.colors[r];
       filled.push(r);

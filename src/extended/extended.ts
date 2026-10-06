@@ -12,6 +12,7 @@ import { Rng } from '../engine/rng';
  *   4. Seed / Reroll, Locks, Mutation and A/B performance states (mutation.ts, perfState.ts).
  */
 import type { Cycle, VariableName } from '../engine/types';
+import { defaultTrajectories, type Trajectory } from './trajectory';
 
 export type LearnTarget =
   /** a controller sweeps the six Positions; a key steps to the next one */
@@ -33,7 +34,8 @@ export type LearnTarget =
   | { kind: 'reroll' }
   | { kind: 'abRecall'; slot: 'a' | 'b' }
   | { kind: 'abCapture'; slot: 'a' | 'b' }
-  | { kind: 'abToggle' };
+  | { kind: 'abToggle' }
+  | { kind: 'trajToggle'; slot: number };
 
 export interface LearnSource {
   type: 'cc' | 'note';
@@ -114,6 +116,8 @@ export interface ExtendedSettings {
    * document seed. All null = exactly Classic. */
   voiceSeeds: (number | null)[];
   ab: { a: PerfStateData | null; b: PerfStateData | null; last: 'a' | 'b' | null };
+  /** Trajectories (trajectory.ts): four slots */
+  trajectories: Trajectory[];
 }
 
 const VARS: VariableName[] = ['patternGroup', 'noteDensity', 'velocityRange', 'noteOrder', 'transposition', 'timeDistortion', 'rhythm', 'legato', 'accent', 'orchestration', 'soundChoice'];
@@ -139,6 +143,7 @@ export function allLearnTargets(): { group: string; targets: LearnTarget[] }[] {
         { kind: 'abToggle' },
         { kind: 'abCapture', slot: 'a' },
         { kind: 'abCapture', slot: 'b' },
+        ...[0, 1, 2, 3].map((slot) => ({ kind: 'trajToggle', slot }) as LearnTarget),
       ],
     },
   ];
@@ -205,6 +210,7 @@ export function defaultExtended(): ExtendedSettings {
     mutation: { amount: 25, count: 0 },
     voiceSeeds: [null, null, null, null],
     ab: { a: null, b: null, last: null },
+    trajectories: defaultTrajectories(),
   };
 }
 
@@ -274,6 +280,8 @@ export function targetLabel(t: LearnTarget): string {
       return `Capture ${t.slot.toUpperCase()}`;
     case 'abToggle':
       return 'A ⇄ B';
+    case 'trajToggle':
+      return `Trajectory ${t.slot + 1} on/off`;
   }
 }
 

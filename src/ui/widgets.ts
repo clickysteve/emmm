@@ -38,6 +38,8 @@ export interface NumericalOpts {
   chars?: string;
   /** the text an edit starts from (default: the shown text, or the number if it shows none) */
   editText?: (v: number) => string;
+  /** extra keys while selected (not typing), e.g. ← → between neighbours; true = used */
+  onKey?: (e: KeyboardEvent) => boolean;
 }
 
 /** Shared "last numerical value" for Shift-click copying (S1 Appendix A). */
@@ -81,6 +83,21 @@ class TextEntry {
     this.text = this.replace ? '' : this.text.slice(0, -1);
     this.replace = false;
   }
+}
+
+/**
+ * A clicked number box or range bar owns the keyboard only while you are working with it:
+ * it lets go after 3 s without a key (or at once with Escape or a click elsewhere), so M's
+ * performance keys — Return to Stop, digits for Slideshows — are never taken for long.
+ * While you are typing a value it holds on until Return or Escape.
+ */
+const SELECT_MS = 3000;
+function holdSelection(e: HTMLElement, typing: () => boolean): void {
+  const h = e as HTMLElement & { _idle?: ReturnType<typeof setTimeout> };
+  if (h._idle) clearTimeout(h._idle);
+  h._idle = setTimeout(() => {
+    if (document.activeElement === e && !typing()) e.blur();
+  }, SELECT_MS);
 }
 
 /** Brief "no" flash for invalid typing (the value stays as it was). */
@@ -140,6 +157,7 @@ export class Numerical {
     if (!this.entryState.on) return;
     this.entryState.stop();
     if (typing.active) typing.active = null;
+    if (document.activeElement === this.el) holdSelection(this.el, () => this.entryState.on);
     this.textEl = null;
     this.el.textContent = '';
     // boxes drawn as pictures (note values) redraw their picture
@@ -191,6 +209,12 @@ export class Numerical {
     // selected (not typing): numbers, Enter, arrows, Home/End and Escape belong to the box;
     // everything else (Space, Return-less letters, Tab …) still reaches emmm
     const o = this.o;
+    if (o.onKey?.(e)) {
+      e.stopPropagation();
+      e.preventDefault();
+      holdSelection(this.el, () => this.entryState.on);
+      return;
+    }
     const big = o.bigStep ?? (o.values ? 3 : 10);
     let handled = true;
     if (k.length === 1 && /[0-9]/.test(k)) this.beginEdit(k);
@@ -205,6 +229,7 @@ export class Numerical {
     if (handled) {
       e.stopPropagation();
       e.preventDefault();
+      holdSelection(this.el, () => this.entryState.on);
     }
   }
 
@@ -245,6 +270,7 @@ export class Numerical {
     ev.preventDefault();
     if (this.entryState.on) this.commitText(false);
     this.el.focus({ preventScroll: true }); // selected: typing a number now edits it
+    holdSelection(this.el, () => this.entryState.on);
     if (this.o.intercept?.(ev)) return;
     const alt = ev.altKey;
     const shift = ev.shiftKey;
@@ -383,6 +409,7 @@ export class RangeBar {
     if (!this.entryState.on) return;
     this.entryState.stop();
     if (typing.active) typing.active = null;
+    if (document.activeElement === this.el) holdSelection(this.el, () => this.entryState.on);
     this.entryEl?.remove();
     this.entryEl = null;
   }
@@ -453,6 +480,7 @@ export class RangeBar {
     if (handled) {
       e.stopPropagation();
       e.preventDefault();
+      holdSelection(this.el, () => this.entryState.on);
     }
   }
 
@@ -474,6 +502,7 @@ export class RangeBar {
     ev.preventDefault();
     if (this.entryState.on) this.commitText();
     this.el.focus({ preventScroll: true });
+    holdSelection(this.el, () => this.entryState.on);
     const v0 = this.valueAt(ev);
     this.o.set(v0, v0, false);
     this.update();

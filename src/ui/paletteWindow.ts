@@ -34,7 +34,7 @@ export class PaletteWindow {
     private lib: PaletteLibrary,
     parent: HTMLElement,
   ) {
-    this.win = new MWindow(parent, { id: 'palette', title: 'Palette', x: 200, y: 80, w: 304, h: 262, closable: true });
+    this.win = new MWindow(parent, { id: 'palette', title: 'Palette', x: 200, y: 60, w: 304, h: 280, closable: true });
     const b = this.win.body;
     // keys typed here are for the text fields, not emmm's keyboard shortcuts
     b.addEventListener('keydown', (e) => e.stopPropagation());
@@ -113,7 +113,7 @@ export class PaletteWindow {
       warn.style.fontWeight = '600';
       this.rows.set(role, { swatch, picker, hex, warn });
     });
-    this.status = el('div', 'label tiny', b, [6, 227, 292, 14]);
+    this.status = el('div', 'label tiny', b, [6, 245, 292, 14]);
     this.status.style.whiteSpace = 'normal';
     this.status.style.lineHeight = '8px';
     this.status.setAttribute('aria-live', 'polite');

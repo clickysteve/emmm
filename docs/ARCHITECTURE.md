@@ -155,7 +155,7 @@ State lives in four separate places:
 | What | Where | Examples |
 |---|---|---|
 | Classic musical document | `Composition` (saved file) | Patterns, Variables, Positions, Snapshots, routing, seed |
-| Extended musical / performance state | `Composition.extended` (saved file) | Locks, Mutation amount, A/B states, voice seeds, CC Cycles |
+| Extended musical / performance state | `Composition.extended` (saved file) | Locks, Mutation amount, A/B states, voice seeds, CC Cycles, Trajectories |
 | Pattern editing metadata | `Pattern.scale` (saved file, optional) | each Pattern's Root + Scale |
 | Application preferences | `app/prefs.ts` → `emmm.prefs`; `ui/palette.ts` | tips, Performance Feedback, MIDI Learn mappings; palettes |
 
@@ -183,6 +183,16 @@ Extended is on.
 * `mutation.ts` — `mutate(comp, amount, locks, rng)`: changes the active Positions' values,
   cycles, active Positions and Cyclic Random order — never Pattern notes, routing, Snapshots or
   options — from a stream seeded by the document seed and a mutation counter.
+* `trajectory.ts` — Trajectory: the model (target, values, rate as Time Base n|d, traversal,
+  Step / Smooth), the typed target registry (`targetInfo`: range, continuous / integer /
+  enumerated, absolute / offset / output, per-Voice), traversal (`nextIndex`), validation.
+  The Session runs them as chains of exact-tick engine actions (label `traj`; Slideshows use
+  the same mechanism), one action per step, plus Smooth updates at most every 6 ticks with
+  repeated controller values suppressed. Note-level targets write `MEngine.mod` (runtime
+  modulation, neutral = Classic); Tempo, Baton, Positions and Mutation strength are set the way
+  conducting sets them. Controller messages go through `Session.send` (Midi Assignment
+  routing) and into the Movie. Runtime state (`Session.traj`) is never saved and never makes
+  Undo steps; definitions are in `extended.trajectories` (document v3).
 * `perfState.ts` — A/B capture / recall of the performance state (a plain object keyed by
   composition field, ready for interpolation if morphing is added later).
 
