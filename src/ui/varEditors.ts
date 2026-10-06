@@ -451,18 +451,30 @@ export class TimeDistortionEditor extends VarEditor {
       return [clamp(p.x / G, 0, 1), clamp(1 - p.y / G, 0, 1)];
     };
     let lastDown = 0;
+    let finishedAt = -1e9;
+    let lastXY: [number, number] = [-1, -1];
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && this.drawing) {
+        this.drawing = null;
+        s.changed('timeDistortion');
+      }
+    });
     area.addEventListener('pointerdown', (ev) => {
       ev.preventDefault();
       if (this.locked) return;
       const [x, y] = toUnit(ev);
       const now = performance.now();
-      const dbl = now - lastDown < 350;
+      const dbl = now - lastDown < 350 && Math.hypot((x - lastXY[0]) * G, (y - lastXY[1]) * G) < 6;
       lastDown = now;
+      lastXY = [x, y];
       const m = this.map();
+      // the second click of the double-click that finished a map must not start a new one
+      if (!this.drawing && now - finishedAt < 450) return;
       if (this.drawing) {
         if (dbl || (x > 0.95 && y > 0.95)) {
           m.points = sanitizePoints(this.drawing);
           this.drawing = null;
+          finishedAt = now;
         } else {
           const last = this.drawing[this.drawing.length - 1] ?? [0, 0];
           if (x > last[0] + 0.01 && y > last[1] + 0.01) this.drawing.push([x, y]);
