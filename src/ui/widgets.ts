@@ -27,14 +27,75 @@ export interface NumericalOpts {
   intercept?: (ev: PointerEvent) => boolean;
   cls?: string;
   title?: string;
+  /** typed text → value (default: a decimal number); null = not valid */
+  parse?: (text: string) => number | null;
+  /** take typed text completely (compound values such as Time Base n / d); true = done,
+   * false = not valid */
+  entry?: (text: string) => boolean;
+  /** step for Shift + ↑ / ↓ and Page Up / Down (default 10; 3 values in a value list) */
+  bigStep?: number;
+  /** characters accepted while typing, besides digits (default "-.") */
+  chars?: string;
+  /** the text an edit starts from (default: the shown text, or the number if it shows none) */
+  editText?: (v: number) => string;
 }
 
 /** Shared "last numerical value" for Shift-click copying (S1 Appendix A). */
 export const numericalMemory = { last: null as number | null };
 
+/** The control that currently owns typing (a number box or range bar being edited). */
+export const typing = { active: null as { cancel(): void } | null };
+
+/**
+ * Direct entry shared by number boxes and range bars: the control keeps its look; typed
+ * characters replace its text (with a caret) until Enter commits or Escape cancels.
+ */
+class TextEntry {
+  text = '';
+  /** the first key replaces the shown value */
+  replace = true;
+  constructor(
+    private host: HTMLElement,
+    private accept: (ch: string) => boolean,
+  ) {}
+  start(initial: string, replace: boolean): void {
+    this.text = initial;
+    this.replace = replace;
+    this.host.classList.add('editing');
+  }
+  get on(): boolean {
+    return this.host.classList.contains('editing');
+  }
+  stop(): void {
+    this.host.classList.remove('editing');
+  }
+  /** a typed character; false if refused */
+  type(ch: string): boolean {
+    if (!this.accept(ch)) return false;
+    if (this.replace) this.text = '';
+    this.replace = false;
+    if (this.text.length < 12) this.text += ch;
+    return true;
+  }
+  backspace(): void {
+    this.text = this.replace ? '' : this.text.slice(0, -1);
+    this.replace = false;
+  }
+}
+
+/** Brief "no" flash for invalid typing (the value stays as it was). */
+function refuse(e: HTMLElement): void {
+  e.classList.remove('refused');
+  void e.offsetWidth;
+  e.classList.add('refused');
+  setTimeout(() => e.classList.remove('refused'), 300);
+}
+
 export class Numerical {
   el: HTMLDivElement;
   private temp: number | null = null;
+  private entryState: TextEntry;
+  private textEl: HTMLSpanElement | null = null;
   constructor(
     parent: HTMLElement,
     x: number,
@@ -44,9 +105,118 @@ export class Numerical {
     private o: NumericalOpts,
   ) {
     this.el = el('div', 'num ' + (o.cls ?? ''), parent, [x, y, w, h]);
-    if (o.title) this.el.title = o.title;
+    if (o.title) this.el.title = o.title + ' — click, then type a number';
     this.el.addEventListener('pointerdown', (ev) => this.down(ev));
+    // keyboard: click to select, then type a number (Enter = edit the current one);
+    // ↑ ↓ step, Shift = bigger steps, Home / End = minimum / maximum
+    this.el.tabIndex = -1;
+    this.el.setAttribute('role', 'spinbutton');
+    if (o.min !== undefined) this.el.setAttribute('aria-valuemin', String(o.values ? o.values[0] : o.min));
+    if (o.max !== undefined) this.el.setAttribute('aria-valuemax', String(o.values ? o.values[o.values.length - 1] : o.max));
+    const chars = o.chars ?? '-.';
+    this.entryState = new TextEntry(this.el, (ch) => /[0-9]/.test(ch) || chars.includes(ch.toLowerCase()));
+    this.el.addEventListener('keydown', (e) => this.key(e));
+    this.el.addEventListener('blur', () => this.entryState.on && this.commitText(false));
     this.update();
+  }
+
+  /** Is the box being typed into? */
+  get editing(): boolean {
+    return this.entryState.on;
+  }
+
+  /** Start direct entry (keyboard, or from code / tests). */
+  beginEdit(first?: string): void {
+    typing.active?.cancel();
+    const v = this.o.get();
+    const shown = this.o.format ? this.o.format(v) : String(v);
+    this.entryState.start(this.o.editText ? this.o.editText(v) : shown || String(v), true);
+    typing.active = { cancel: () => this.cancelEdit() };
+    if (first) this.entryState.type(first);
+    this.render();
+  }
+
+  cancelEdit(): void {
+    if (!this.entryState.on) return;
+    this.entryState.stop();
+    if (typing.active) typing.active = null;
+    this.textEl = null;
+    this.el.textContent = '';
+    // boxes drawn as pictures (note values) redraw their picture
+    delete this.el.dataset.v;
+    this.update();
+  }
+
+  private commitText(alt: boolean): void {
+    const t = this.entryState.replace ? '' : this.entryState.text.trim();
+    this.cancelEdit();
+    if (t === '') return; // nothing typed: keep the value
+    if (this.o.entry) {
+      if (!this.o.entry(t)) refuse(this.el);
+      this.update();
+      return;
+    }
+    const parsed = this.o.parse ? this.o.parse(t) : t === '' || !/^-?(\d+\.?\d*|\.\d+)$/.test(t) ? null : Number(t);
+    if (parsed === null || !Number.isFinite(parsed)) {
+      refuse(this.el);
+      return;
+    }
+    this.apply(this.clampV(parsed), alt);
+  }
+
+  private apply(v: number, alt = false): void {
+    numericalMemory.last = v;
+    this.o.set(v, { final: true, alt, shift: false });
+    this.update();
+  }
+
+  private key(e: KeyboardEvent): void {
+    if (e.metaKey || e.ctrlKey) {
+      if (this.entryState.on) e.stopPropagation();
+      return;
+    }
+    const k = e.key;
+    if (this.entryState.on) {
+      // while typing, every key belongs to the box (no shortcuts, no Snapshot letters)
+      e.stopPropagation();
+      if (k === 'Enter') this.commitText(e.altKey);
+      else if (k === 'Escape') this.cancelEdit();
+      else if (k === 'Tab') this.commitText(false);
+      else if (k === 'Backspace' || k === 'Delete') (this.entryState.backspace(), this.render());
+      else if (k.length === 1 && !this.entryState.type(k)) refuse(this.el);
+      else this.render();
+      e.preventDefault();
+      return;
+    }
+    // selected (not typing): numbers, Enter, arrows, Home/End and Escape belong to the box;
+    // everything else (Space, Return-less letters, Tab …) still reaches emmm
+    const o = this.o;
+    const big = o.bigStep ?? (o.values ? 3 : 10);
+    let handled = true;
+    if (k.length === 1 && /[0-9]/.test(k)) this.beginEdit(k);
+    else if (k.length === 1 && (o.chars ?? '-.').includes(k.toLowerCase()) && k !== ' ') this.beginEdit(k);
+    else if (k === 'Enter') this.beginEdit();
+    else if (k === 'ArrowUp' || k === 'ArrowDown') this.apply(this.stepFrom(o.get(), (k === 'ArrowUp' ? 1 : -1) * (e.shiftKey ? big : 1)));
+    else if (k === 'PageUp' || k === 'PageDown') this.apply(this.stepFrom(o.get(), (k === 'PageUp' ? 1 : -1) * big));
+    else if (k === 'Home') this.apply(o.values ? o.values[0] : this.clampV(o.min ?? o.get()));
+    else if (k === 'End') this.apply(o.values ? o.values[o.values.length - 1] : this.clampV(o.max ?? o.get()));
+    else if (k === 'Escape') this.el.blur();
+    else handled = false;
+    if (handled) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+  }
+
+  /** Show the typed text with a caret. */
+  private render(): void {
+    if (!this.entryState.on) return;
+    if (!this.textEl) {
+      this.el.textContent = '';
+      this.textEl = el('span', 'entrytext', this.el);
+    }
+    this.textEl.textContent = this.entryState.text;
+    this.textEl.classList.toggle('whole', this.entryState.replace);
   }
 
   private clampV(v: number): number {
@@ -73,6 +243,8 @@ export class Numerical {
   private down(ev: PointerEvent): void {
     ev.stopPropagation();
     ev.preventDefault();
+    if (this.entryState.on) this.commitText(false);
+    this.el.focus({ preventScroll: true }); // selected: typing a number now edits it
     if (this.o.intercept?.(ev)) return;
     const alt = ev.altKey;
     const shift = ev.shiftKey;
@@ -137,9 +309,11 @@ export class Numerical {
   }
 
   update(): void {
+    if (this.entryState.on) return; // the typed text stays until Enter / Escape
     const v = this.temp ?? this.o.get();
     const t = this.o.format ? this.o.format(v) : String(v);
     if (this.el.textContent !== t) this.el.textContent = t;
+    this.el.setAttribute('aria-valuenow', String(v));
   }
 }
 
@@ -153,6 +327,10 @@ export interface RangeOpts {
   /** optional current-value indicator line */
   cur?: () => number | null;
   fill?: 'grey' | 'black' | 'hatch';
+  /** one value (the top of the bar), not a range: Mutation strength, Robot jump */
+  single?: boolean;
+  /** accessible name (also the tooltip, if the bar has none) */
+  label?: string;
 }
 
 export class RangeBar {
@@ -171,7 +349,118 @@ export class RangeBar {
     this.fill = el('div', 'fill ' + (o.fill === 'black' ? 'inv' : o.fill === 'hatch' ? 'fill-hatch' : 'fill-grey'), this.el);
     this.cur = el('div', 'cur', this.el);
     this.el.addEventListener('pointerdown', (ev) => this.down(ev));
+    // keyboard: click, then type "40-100" (or one number); ↑ ↓ move it, Shift = by 10
+    this.el.tabIndex = -1;
+    this.el.setAttribute('role', 'slider');
+    if (o.label) this.el.setAttribute('aria-label', o.label);
+    this.entryState = new TextEntry(this.el, (ch) => /[0-9]/.test(ch) || (!o.single && /[-– ,]/.test(ch)));
+    this.el.addEventListener('keydown', (e) => this.key(e));
+    this.el.addEventListener('blur', () => this.entryState.on && this.commitText());
     this.update();
+  }
+
+  private entryState: TextEntry;
+  private entryEl: HTMLDivElement | null = null;
+
+  get editing(): boolean {
+    return this.entryState.on;
+  }
+
+  private text(): string {
+    const [lo, hi] = this.o.get();
+    return this.o.single ? String(hi) : `${lo}-${hi}`;
+  }
+
+  beginEdit(first?: string): void {
+    typing.active?.cancel();
+    this.entryState.start(this.text(), true);
+    typing.active = { cancel: () => this.cancelEdit() };
+    if (first) this.entryState.type(first);
+    this.render();
+  }
+
+  cancelEdit(): void {
+    if (!this.entryState.on) return;
+    this.entryState.stop();
+    if (typing.active) typing.active = null;
+    this.entryEl?.remove();
+    this.entryEl = null;
+  }
+
+  private set(lo: number, hi: number): void {
+    const o = this.o;
+    hi = clamp(Math.round(hi), o.min, o.max);
+    if (o.single) {
+      // one value: only the top end moves (the bottom is fixed by the owner)
+      o.set(o.get()[0], hi, true);
+      this.update();
+      return;
+    }
+    lo = clamp(Math.round(lo), o.min, o.max);
+    if (lo > hi) [lo, hi] = [hi, lo];
+    o.set(lo, hi, true);
+    this.update();
+  }
+
+  private commitText(): void {
+    const t = this.entryState.replace ? '' : this.entryState.text.trim();
+    this.cancelEdit();
+    if (!t) return;
+    const m = /^(\d+)(?:\s*[-–, ]\s*(\d+))?$/.exec(t);
+    if (!m || (this.o.single && m[2] !== undefined)) {
+      refuse(this.el);
+      return;
+    }
+    const a = Number(m[1]);
+    const b = m[2] === undefined ? a : Number(m[2]);
+    this.set(a, b);
+  }
+
+  private key(e: KeyboardEvent): void {
+    if (e.metaKey || e.ctrlKey) {
+      if (this.entryState.on) e.stopPropagation();
+      return;
+    }
+    const k = e.key;
+    if (this.entryState.on) {
+      e.stopPropagation();
+      e.preventDefault();
+      if (k === 'Enter' || k === 'Tab') this.commitText();
+      else if (k === 'Escape') this.cancelEdit();
+      else if (k === 'Backspace' || k === 'Delete') (this.entryState.backspace(), this.render());
+      else if (k.length === 1 && !this.entryState.type(k)) refuse(this.el);
+      else this.render();
+      return;
+    }
+    const [lo, hi] = this.o.get();
+    const d = e.shiftKey ? 10 : 1;
+    let handled = true;
+    if (k.length === 1 && /[0-9]/.test(k)) this.beginEdit(k);
+    else if (k === 'Enter') this.beginEdit();
+    else if (k === 'ArrowUp' || k === 'ArrowRight' || k === 'ArrowDown' || k === 'ArrowLeft') {
+      const dir = k === 'ArrowUp' || k === 'ArrowRight' ? d : -d;
+      if (this.o.single) this.set(lo, hi + dir);
+      else {
+        // move the whole range, keeping its width
+        const sh = clamp(dir, this.o.min - lo, this.o.max - hi);
+        this.set(lo + sh, hi + sh);
+      }
+    } else if (k === 'Home' || k === 'End') {
+      if (this.o.single) this.set(lo, k === 'Home' ? this.o.min : this.o.max);
+      else this.set(k === 'Home' ? this.o.min : this.o.max - (hi - lo), k === 'Home' ? this.o.min + (hi - lo) : this.o.max);
+    } else if (k === 'Escape') this.el.blur();
+    else handled = false;
+    if (handled) {
+      e.stopPropagation();
+      e.preventDefault();
+    }
+  }
+
+  private render(): void {
+    if (!this.entryState.on) return;
+    if (!this.entryEl) this.entryEl = el('div', 'entrytext rangeentry', this.el);
+    this.entryEl.textContent = this.entryState.text;
+    this.entryEl.classList.toggle('whole', this.entryState.replace);
   }
 
   private valueAt(ev: PointerEvent): number {
@@ -183,6 +472,8 @@ export class RangeBar {
   private down(ev: PointerEvent): void {
     ev.stopPropagation();
     ev.preventDefault();
+    if (this.entryState.on) this.commitText();
+    this.el.focus({ preventScroll: true });
     const v0 = this.valueAt(ev);
     this.o.set(v0, v0, false);
     this.update();
@@ -204,6 +495,7 @@ export class RangeBar {
 
   update(): void {
     const [lo, hi] = this.o.get();
+    this.el.setAttribute('aria-valuetext', this.o.single ? String(hi) : `${lo} to ${hi}`);
     const span = this.o.max - this.o.min || 1;
     const w = parseFloat(this.el.style.width) - 2;
     const a = ((lo - this.o.min) / span) * w;
@@ -427,6 +719,9 @@ let zTop = 100;
 /** Hooks for the app: a window that appears must be drawn at once (main.ts sets this). */
 export const windowEvents = { shown: () => {} };
 
+/** The window most recently brought to the front (its keyboard context is active). */
+export const windowFocus = { front: null as MWindow | null };
+
 /** An M-style window: title in a tab with a slanted edge, optional close triangle. */
 export class MWindow {
   el: HTMLDivElement;
@@ -493,6 +788,7 @@ export class MWindow {
 
   front(): void {
     this.el.style.zIndex = String(++zTop);
+    windowFocus.front = this;
   }
 
   /** Briefly highlight the title tab (Windows menu: shows which window came forward). */
@@ -539,6 +835,7 @@ export class MWindow {
 
   close(): void {
     this.el.classList.add('hidden');
+    if (windowFocus.front === this) windowFocus.front = null;
     this.o.onClose?.();
   }
 

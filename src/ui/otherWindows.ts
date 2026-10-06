@@ -485,7 +485,10 @@ pencil = Edit Snapshot · frames = Restore. <b>Slideshows</b> 1–9: Alt-click t
 n/d of a whole note (1|8 = eighths); Rhythm multiplies each step; Time Distortion bends the timing;
 Phase delays the start. Also in the Pattern Editor (Length, T Base, Phase).<br>
 <b>Pattern Editor</b> — Length = steps the Voice plays (Alt: cut / extend the Pattern) · Clear
-Pattern · scale guide (helps enter notes; never changes them or what M plays).<br>
+Pattern · Root + Scale of the Pattern (changing it moves the notes by scale degree; new notes snap
+into it; M plays the notes as written).<br>
+<b>Typing numbers</b> — click any number, type the value, Return (Escape cancels); ↑ ↓ step it.
+Time Base takes "3/8". Range bars take "40-100". emmm ▸ Keyboard Shortcuts… (⌥H) lists every key.<br>
 <b>Undo</b> — ⌘Z / ⇧⌘Z undo and redo edits; the performance (active Positions, tempo, Baton) is
 never rewound.<br><br>
 <b>Keys</b> — Space Start/Sync · Return Stop · Tab Pause · Caps Lock or ⌘⌥ + moving the mouse =

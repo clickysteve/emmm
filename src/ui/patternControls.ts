@@ -13,7 +13,7 @@ import { Numerical } from './widgets';
 export const TIPS = {
   outputLength:
     'Output Length: how many steps of this Pattern the Voice plays (the rest stay in the Pattern). Alt-drag: change the Pattern itself — add rests or delete steps at the end.',
-  tbNum: 'Time Base numerator. The Voice moves one step every n / d of a whole note: 1|8 = eighth notes, 1|4 = quarters, 3|8 = dotted quarters. Rhythm multiplies this; Tempo sets the speed of everything.',
+  tbNum: 'Time Base numerator (type 3/8 to set both). The Voice moves one step every n / d of a whole note: 1|8 = eighth notes, 1|4 = quarters, 3|8 = dotted quarters. Rhythm multiplies this; Tempo sets the speed of everything.',
   tbDen: 'Time Base denominator: 1 whole · 2 half · 4 quarter · 8 eighth · 16 sixteenth; 3, 6, 12, 24 are triplets; sa = step advance (moves only on MIDI input).',
   phase: 'Phase: delay this Voice’s first step after Start or Sync by 0–199 ticks (96 = one quarter note), to set it against the others.',
 };
@@ -55,11 +55,28 @@ export function timingControls(
     intercept: hold?.('outputLength'),
     title: TIPS.outputLength,
   });
+  // Time Base is n | d: either box also takes both at once, e.g. "3/8" or "1/sa"
+  const both = (t: string): boolean => {
+    const m = /^(\d+)\s*\/\s*(\d+|sa?)$/i.exec(t.trim());
+    if (!m) return false;
+    const n = Number(m[1]);
+    const d = /^s/i.test(m[2]) ? STEP_ADVANCE : Number(m[2]);
+    if (n < 1 || n > 99 || !(TIME_BASE_DENOMINATORS as readonly number[]).includes(d)) return false;
+    s.setTimeBase(voice(), n, d);
+    return true;
+  };
   const num = new Numerical(parent, ...at.num, {
     get: () => pat().tbNum,
     set: (x) => s.setTimeBase(voice(), x, pat().tbDen),
     min: 1,
     max: 99,
+    chars: '/sa',
+    entry: (t) => {
+      if (t.includes('/')) return both(t);
+      if (!/^\d+$/.test(t)) return false;
+      s.setTimeBase(voice(), Math.max(1, Math.min(99, Number(t))), pat().tbDen);
+      return true;
+    },
     intercept: hold?.('tbNum'),
     title: TIPS.tbNum,
   });
@@ -70,6 +87,15 @@ export function timingControls(
     set: (x) => s.setTimeBase(voice(), pat().tbNum, x),
     values: TIME_BASE_DENOMINATORS,
     format: (x) => (x === STEP_ADVANCE ? 'sa' : String(x)),
+    chars: '/sa',
+    // only the legal denominators (1–9, 11, 12, 13, 15, 16, 24, sa); anything else is refused
+    entry: (t) => {
+      if (t.includes('/')) return both(t);
+      const d = /^s/i.test(t) ? STEP_ADVANCE : /^\d+$/.test(t) ? Number(t) : NaN;
+      if (!(TIME_BASE_DENOMINATORS as readonly number[]).includes(d)) return false;
+      s.setTimeBase(voice(), pat().tbNum, d);
+      return true;
+    },
     intercept: hold?.('tbDen'),
     title: TIPS.tbDen,
   });

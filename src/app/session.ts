@@ -24,6 +24,7 @@ import { capturePerfState, recallPerfState } from '../extended/perfState';
 import { freshSeed } from '../engine/rng';
 import { assignDeep } from './assign';
 import { History } from './history';
+import { CHROMATIC, cleanChoice, transformSteps, type ScaleChoice } from './scales';
 
 /** Changes that are about playing or viewing, not editing: they never make an Undo step. */
 const TRANSIENT = new Set(['editor', 'baton', 'tempo', 'transport', 'select', 'window', 'step', 'mouse', 'learn', 'hold', 'movie', 'sync', 'load', 'undo', 'midi', 'transpose', 'ics', 'clock', 'feedback', 'ab-recall']);
@@ -785,6 +786,20 @@ export class Session {
     const p = this.pattern(v);
     p.tbNum = Math.max(1, Math.min(99, num));
     this.engine.setTimeBaseDen(v, den, this.scheduler.frontierTick());
+    this.changed('patterns');
+  }
+
+  /**
+   * Give voice v's Pattern a Root + Scale (emmm). Its notes move to the new scale (see
+   * transformPitch for the exact rule); choosing Chromatic leaves them as they are. One
+   * Undo step restores the scale and every pitch.
+   */
+  setPatternScale(v: number, choice: ScaleChoice): void {
+    const p = this.pattern(v);
+    const from = p.scale ? cleanChoice(p.scale) : CHROMATIC;
+    const to = cleanChoice(choice);
+    p.steps = transformSteps(p.steps, from, to);
+    p.scale = to;
     this.changed('patterns');
   }
 

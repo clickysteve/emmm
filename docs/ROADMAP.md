@@ -45,8 +45,11 @@
 
 * Undo / Redo of editing (not of performing), one step per gesture, bounded history.
 * Pattern Editor: Output Length (incl. Alt structural change), Time Base, Phase and a
-  plain-words speed readout, sharing the Patterns window's controls; Clear Pattern; a scale
-  guide for entering notes (14 scales × 12 roots; editing aid only).
+  plain-words speed readout, sharing the Patterns window's controls; Clear Pattern; a Root +
+  Scale per Pattern (14 scales × 12 roots) that transforms the notes by scale degree when
+  changed.
+* Direct numerical entry for every number box and range bar; a shared keyboard command
+  layer with shortcuts in the menus and a Keyboard Shortcuts window; Pattern Editor keys.
 * emmm-style tooltips for every control (Options ▸ Show Tips), one shared pop-up selector in
   place of every native `<select>`, emmm dialogs in place of the browser's confirm / prompt.
 * Windows menu fixed to M's documented behaviour (live list, visible bring-to-front); Full
@@ -76,8 +79,8 @@
 * Tempo sharing beyond MIDI clock (e.g. Link-style network sync).
 * Learnable mappings for every on-screen control (numericals, range bars, edit windows).
 * Morphing between A and B (the A/B state format is field-by-field, ready for it).
-* Scale-constrained *output* as an explicit Extended option (the current scale guide only
-  helps editing and never changes what M plays).
+* Scale-constrained *output* as an explicit Extended option (a Pattern's scale only
+  transforms its notes when you change it; M never corrects what it plays).
 * Parameter automation lanes recorded from gestures (beyond Slideshows).
 * Additional ordering schemes (e.g. Jam Factory-style transition tables) and probability
   systems.

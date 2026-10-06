@@ -11,6 +11,7 @@ import { allLearnTargets, LOCK_DIMS, sourceLabel, targetKey, targetLabel, type L
 import type { UiContext } from './context';
 import { el, label, localPoint, setSvg, setTip, svgEl, trackDrag } from './dom';
 import { iconSvg } from './icons';
+import { keyLabel } from './keys';
 import { Selector } from './selector';
 import { MWindow, Numerical, RangeBar } from './widgets';
 
@@ -95,7 +96,7 @@ export class ExtendedWindow {
       seed.value = String(s.comp.seed);
     });
     this.parts.push({ update: () => document.activeElement !== seed && seed.value !== String(s.comp.seed) && (seed.value = String(s.comp.seed)) });
-    this.button(114, 53, 84, 'Reroll', 'New Variation: a new seed — the same settings played with different random choices. Locked Voices keep theirs. Patterns are untouched.', () => ext.enabled && s.reroll());
+    this.button(114, 53, 84, 'Reroll', `Reroll (${keyLabel('reroll')}). New Variation: a new seed — the same settings played with different random choices. Locked Voices keep theirs. Patterns are untouched.`, () => ext.enabled && s.reroll());
 
     // locks
     label(b, 6, 76, '<b>Locks</b>');
@@ -142,19 +143,21 @@ export class ExtendedWindow {
         if (final) s.setMutationAmount(hi);
       },
       fill: 'black',
+      single: true,
+      label: 'Mutation strength',
     });
     bar.el.title = 'Mutation strength: subtle (small, related changes) ←→ chaos (big transformations)';
     this.parts.push(bar);
     label(b, 216, 159, 'chaos', 'tiny');
     const amt = el('div', 'label small', b, [240, 159, 20, 10]);
     this.parts.push({ update: () => (amt.textContent = String(ext.mutation.amount)) });
-    this.button(254, 155, 40, 'Mutate', 'Mutate: change the active settings by this amount (not the Patterns’ notes). Locks are respected. ⌘Z undoes it.', () => ext.enabled && s.mutateNow());
+    this.button(254, 155, 40, 'Mutate', `Mutate (${keyLabel('mutate')}): change the active settings by this amount (not the Patterns’ notes). Locks are respected. ${keyLabel('undo')} undoes it.`, () => ext.enabled && s.mutateNow());
 
     // A/B
     label(b, 6, 180, '<b>A / B</b>');
     const ab = (x: number, slot: 'a' | 'b') => {
-      const cap = this.button(x, 177, 62, `Capture ${slot.toUpperCase()}`, `Store the current performance state (Positions, cycles, tempo, Voice settings) as ${slot.toUpperCase()}`, () => ext.enabled && s.abCapture(slot));
-      const rec = this.button(x + 64, 177, 24, slot.toUpperCase(), `Recall ${slot.toUpperCase()} (safe while playing)`, () => ext.enabled && s.abRecall(slot));
+      const cap = this.button(x, 177, 62, `Capture ${slot.toUpperCase()}`, `Capture ${slot.toUpperCase()} (${keyLabel(slot === 'a' ? 'captureA' : 'captureB')}): store the current performance state (Positions, cycles, tempo, Voice settings)`, () => ext.enabled && s.abCapture(slot));
+      const rec = this.button(x + 64, 177, 24, slot.toUpperCase(), `Recall ${slot.toUpperCase()} (${keyLabel(slot === 'a' ? 'recallA' : 'recallB')}; safe while playing)`, () => ext.enabled && s.abRecall(slot));
       this.parts.push({
         update: () => {
           rec.classList.toggle('on', ext.ab.last === slot && !!ext.ab[slot]);

@@ -715,3 +715,99 @@ body.dragging * {
   border: 1px dotted var(--ink);
   pointer-events: none;
 }
+
+/* ------------------------------------------------------------ direct numerical entry */
+/* a selected number box / range bar (click it, then type) */
+.num:focus,
+.range:focus {
+  outline: 1px dotted var(--ink);
+  outline-offset: 1px;
+}
+.num.editing {
+  background: var(--paper);
+  color: var(--ink);
+  outline: 2px solid var(--selection);
+  outline-offset: 0;
+}
+.entrytext {
+  white-space: nowrap;
+  overflow: hidden;
+}
+/* the old value is shown inverted until the first key replaces it */
+.entrytext.whole {
+  background: var(--selection);
+  color: var(--paper);
+}
+/* caret */
+.entrytext::after {
+  content: '';
+  display: inline-block;
+  width: 1px;
+  height: 0.9em;
+  margin-left: 1px;
+  vertical-align: -1px;
+  background: var(--ink);
+  animation: mcaret 1s steps(1) infinite;
+}
+.entrytext.whole::after {
+  background: var(--paper);
+}
+@keyframes mcaret {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+.range.editing {
+  outline: 2px solid var(--selection);
+}
+.rangeentry {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 9px;
+  font-weight: 600;
+  z-index: 2;
+}
+/* refused input: a brief inversion; the value stays as it was */
+.refused {
+  animation: mrefuse 0.3s steps(1) 1;
+}
+@keyframes mrefuse {
+  0%,
+  49% {
+    filter: invert(1);
+  }
+  50%,
+  100% {
+    filter: none;
+  }
+}
+
+/* Keyboard Shortcuts window */
+.shortcuts {
+  font-size: 9px;
+  line-height: 11px;
+}
+.shortcuts table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 2px 0 8px;
+}
+.shortcuts td {
+  padding: 1px 4px 1px 0;
+  vertical-align: top;
+}
+.shortcuts td.k {
+  width: 112px;
+  font-weight: 600;
+  white-space: nowrap;
+}

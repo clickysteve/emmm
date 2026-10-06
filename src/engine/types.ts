@@ -28,6 +28,9 @@ export interface Pattern {
   drumMachine: boolean;
   /** Pattern Size numerical: maximum steps. */
   size: number;
+  /** emmm (editing aid, not M): the Pattern's Root + Scale. Absent = Chromatic. Changing it
+   * transforms the notes (app/scales.ts); the engine never reads it. */
+  scale?: { root: number; scale: string };
 }
 
 /** A Pattern Group holds four patterns (one per voice). */

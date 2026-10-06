@@ -481,16 +481,14 @@ describe('persistence: Classic document, Extended state, preferences', () => {
     b.start();
     expect(a.render(2000)).toEqual(b.render(2000));
   });
-  it('editor assistance and app preferences have their own versioned stores', () => {
+  it('app preferences have their own versioned store', () => {
     const store = memStore();
     const p = new Prefs(store);
-    p.editor.scale = { root: 9, scale: 'minor' };
     p.app.tips = false;
     p.app.feedback = true;
     p.saveEditor();
     p.saveApp();
     const q = new Prefs(store);
-    expect(q.editor.scale).toEqual({ root: 9, scale: 'minor' });
     expect(q.app.tips).toBe(false);
     expect(q.app.feedback).toBe(true);
     expect(JSON.parse(store.data['emmm.prefs']).version).toBe(1);

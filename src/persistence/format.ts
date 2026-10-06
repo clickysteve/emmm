@@ -14,12 +14,16 @@
  *      hardware and are now an application preference. A version-1 file's mappings are
  *      returned as `legacyLearn` so the app can adopt them once.
  *
- * Not in the document at all: colour palettes, tooltips, Performance Feedback, the Pattern
- * Editor's scale guide (see app/prefs.ts, ui/palette.ts).
+ * Each Pattern may carry an emmm `scale` ({ root, scale }); files without it load as
+ * Chromatic with their notes untouched (no version change was needed: it is optional).
+ *
+ * Not in the document at all: colour palettes, tooltips, Performance Feedback, MIDI Learn
+ * (see app/prefs.ts, ui/palette.ts).
  */
 import { NUM_CHANNELS, NUM_POSITIONS, NUM_VOICES } from '../engine/constants';
 import { defaultComposition } from '../engine/defaults';
 import type { Composition } from '../engine/types';
+import { cleanChoice } from '../app/scales';
 
 export const FORMAT_ID = 'emmm';
 export const FORMAT_VERSION = 2;
@@ -186,6 +190,8 @@ export function validate(c: Composition): void {
     g.patterns.forEach((p) => {
       p.tbNum = clamp(p.tbNum, 1, 99);
       p.phase = clamp(p.phase, 0, 199);
+      // emmm Pattern scale: optional; absent (older files) = Chromatic, notes untouched
+      if (p.scale !== undefined) p.scale = cleanChoice(p.scale);
     }),
   );
   c.tempo.value = clamp(c.tempo.value, 10, 400);

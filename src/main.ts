@@ -13,8 +13,8 @@ import { autosave, clearStartup, downloadBytes, downloadDocument, loadAutosave, 
 import { noteName } from './engine/constants';
 import type { EditorName, FlashState, UiContext } from './ui/context';
 import { CyclicEditor } from './ui/cyclicEditor';
-import { el, view } from './ui/dom';
-import { windowEvents, type MWindow } from './ui/widgets';
+import { el, setTip, view } from './ui/dom';
+import { windowEvents, windowFocus, type MWindow } from './ui/widgets';
 import { ConductingWindow, CyclicWindow, MidiWindow, PatternsWindow, SnapshotWindow, VariablesWindow, type Updatable } from './ui/mainWindows';
 import { AboutWindow, HelpWindow, ImportWindow, LibraryWindow, MidiAssignmentWindow, MonitorWindow } from './ui/otherWindows';
 import { CcCyclesWindow, ExtendedWindow, LearnWindow } from './ui/extendedWindow';
@@ -28,6 +28,9 @@ import { alertDialog, closeDialog, confirmDialog, promptDialog } from './ui/dial
 import { FeedbackWindow } from './ui/feedbackWindow';
 import { closeSelectors } from './ui/selector';
 import { installTooltips } from './ui/tooltip';
+import { commands, dispatch, keyLabel } from './ui/keys';
+import { ShortcutsWindow } from './ui/shortcutsWindow';
+import { lastVariable } from './ui/choice';
 import { NoteDensityEditor, NoteOrderEditor, OrchestrationEditor, TimeDistortionEditor, TranspositionEditor, VarEditor, VelocityRangeEditor } from './ui/varEditors';
 
 const W = 720;
@@ -140,9 +143,10 @@ feedbackWin.win.o.onClose = () => {
   prefs.saveApp();
 };
 const paletteWin = new PaletteWindow(palettes, desktop);
+const shortcutsWin = new ShortcutsWindow(desktop);
 // a window that appears is drawn at once (not only at the next change)
 windowEvents.shown = () => (session.dirty = true);
-const floating = [...Object.values(editors), cyclic, patternEditor, midiAssign, monitorWin, about, importWin, library, extendedWin, helpWin, ccWin, paletteWin, learnWin, feedbackWin];
+const floating = [...Object.values(editors), cyclic, patternEditor, midiAssign, monitorWin, about, importWin, library, extendedWin, helpWin, ccWin, paletteWin, learnWin, feedbackWin, shortcutsWin];
 floating.forEach((f) => f.win.el.classList.add('hidden'));
 if (prefs.app.feedback) feedbackWin.win.show();
 
@@ -269,16 +273,17 @@ function windowsMenu(): MenuItem[] {
   const order = [main[1], main[0], main[2], main[3], main[4], main[5]]; // Conducting first, as in M
   // the Conducting window is titled with the document's name
   const live = (m: Updatable) => (m === main[1] ? session.comp.name || 'Untitled' : m === main[0] ? 'Patterns ' + 'abcdef'[session.comp.patternGroup.active] : m.win.titleEl.textContent || m.win.o.title);
-  const named: MenuItem[] = order.map((m) => ({ label: live(m), action: () => bringForward(m.win) }));
+  const keyOf = ['conductingWindow', 'patternsWindow', 'variablesWindow', 'cyclicWindow', '', ''];
+  const named: MenuItem[] = order.map((m, i) => ({ label: live(m), key: keyOf[i] ? keyLabel(keyOf[i]) : undefined, action: () => bringForward(m.win) }));
   const editors: MenuItem[] = [
-    { label: 'Cyclic Editor', action: () => (openEditor('cyclic'), cyclic.win.flashTitle()) },
-    { label: 'Pattern Editor', action: () => (openEditor('patternEditor', { voice: patternEditor.voice }), patternEditor.win.flashTitle()) },
+    C('cyclicEditor', 'Cyclic Editor'),
+    { label: 'Pattern Editor', key: keyLabel('patternEditor'), action: () => (openEditor('patternEditor', { voice: patternEditor.voice }), patternEditor.win.flashTitle()) },
     { label: 'Monitor', action: () => (openEditor('monitor'), monitorWin.win.flashTitle()) },
   ];
   const fixed = new Set<MWindow>([cyclic.win, patternEditor.win, monitorWin.win]);
   const open: MenuItem[] = floating.filter((f) => f.win.open && !fixed.has(f.win)).map((f) => ({ label: f.win.titleEl.textContent || f.win.o.title, action: () => bringForward(f.win) }));
   return [
-    { label: 'Close Edit Windows', key: '⌘0', enabled: () => floating.some((f) => f.win.open), action: closeEditWindows },
+    { label: 'Close Edit Windows', key: keyLabel('closeEditWindows'), enabled: () => floating.some((f) => f.win.open), action: closeEditWindows },
     { sep: true, label: '' },
     ...named,
     { sep: true, label: '' },
@@ -295,6 +300,91 @@ function toggleFullScreen(): void {
   else void document.documentElement.requestFullscreen?.().catch(() => alertBox('This browser did not allow full screen here.'));
 }
 
+// ------------------------------------------------------------------ keyboard commands (ui/keys.ts)
+const editorFront = () => patternEditor.win.open && windowFocus.front === patternEditor.win;
+const ext = () => session.comp.extended;
+function toggleFeedback(): void {
+  prefs.app.feedback = !prefs.app.feedback;
+  prefs.saveApp();
+  if (prefs.app.feedback) feedbackWin.win.show();
+  else feedbackWin.win.el.classList.add('hidden');
+}
+function clearPattern(): void {
+  session.editOp('clear', patternEditor.win.open && !session.selected.some(Boolean) ? { voice: patternEditor.voice } : undefined);
+}
+function openPatternEditor(): void {
+  openEditor('patternEditor', { voice: patternEditor.win.open ? patternEditor.voice : Math.max(0, session.selected.findIndex(Boolean)) });
+  patternEditor.win.flashTitle();
+}
+/** ⌥↑ ⌥↓: select the previous / next Voice's Pattern (and view it in the Pattern Editor) */
+function stepVoice(d: number): void {
+  const cur = patternEditor.win.open && editorFront() ? patternEditor.voice : Math.max(0, session.selected.findIndex(Boolean));
+  const v = (cur + d + 4) % 4;
+  session.selected = session.selected.map((_, k) => k === v);
+  if (patternEditor.win.open) {
+    patternEditor.voice = v;
+    patternEditor.region = null;
+  }
+  session.changed('select');
+}
+/** ⌥[ ⌥]: previous / next Position of the Variable last clicked (a performance gesture) */
+function stepPosition(d: number): void {
+  const v = lastVariable.v;
+  const n = v === 'soundChoice' ? 16 : 6;
+  const cur = (session.comp[v] as { active: number }).active;
+  session.clickPosition(v, (cur + d + n) % n);
+}
+const toggleOpt = (k: keyof typeof session.comp.options) => () => {
+  session.comp.options[k] = !session.comp.options[k];
+  session.changed('options');
+};
+const cmd = (id: string, run: () => void, enabled?: () => boolean) => commands.set(id, { run, enabled });
+cmd('open', () => void openDocument());
+cmd('save', () => downloadDocument(session.comp));
+cmd('midiAssignment', () => (openEditor('midiAssignment'), midiAssign.win.flashTitle()));
+cmd('undo', () => session.undo(), () => session.history.canUndo);
+cmd('redo', () => session.redo(), () => session.history.canRedo);
+cmd('cut', editOp('cut'), anySelected);
+cmd('copy', editOp('copy'), anySelected);
+cmd('paste', editOp('paste'), () => anySelected() && !!session.clipboard);
+cmd('changeToRests', editOp('changeToRests'), anySelected);
+cmd('selectAll', () => patternEditor.selectAll(), editorFront);
+cmd('patternEditor', openPatternEditor);
+cmd('clearPattern', clearPattern, anySelected);
+cmd('prevVoice', () => stepVoice(-1));
+cmd('nextVoice', () => stepVoice(1));
+cmd('transposeUp', patOp('transposeUp'), anySelected);
+cmd('transposeDown', patOp('transposeDown'), anySelected);
+cmd('rescramble', patOp('rescramble'), anySelected);
+cmd('rotateForward', patOp('rotateForward'), anySelected);
+cmd('rotateBackward', patOp('rotateBackward'), anySelected);
+cmd('prevPosition', () => stepPosition(-1));
+cmd('nextPosition', () => stepPosition(1));
+cmd('closeEditWindows', () => closeEditWindows());
+cmd('conductingWindow', () => bringForward(main[1].win));
+cmd('patternsWindow', () => bringForward(main[0].win));
+cmd('variablesWindow', () => bringForward(main[2].win));
+cmd('cyclicWindow', () => bringForward(main[3].win));
+cmd('cyclicEditor', () => (openEditor('cyclic'), cyclic.win.flashTitle()));
+cmd('allNotesOff', () => session.allNotesOff());
+cmd('metronome', toggleOpt('useMetronome'));
+cmd('lockMarked', toggleOpt('lockMarkedVariables'));
+cmd('mutate', () => session.mutateNow(), () => ext().enabled);
+cmd('reroll', () => session.reroll(), () => ext().enabled);
+cmd('recallA', () => session.abRecall('a'), () => ext().enabled && !!ext().ab.a);
+cmd('recallB', () => session.abRecall('b'), () => ext().enabled && !!ext().ab.b);
+cmd('captureA', () => session.abCapture('a'), () => ext().enabled);
+cmd('captureB', () => session.abCapture('b'), () => ext().enabled);
+cmd('feedback', toggleFeedback);
+cmd('fullScreen', () => toggleFullScreen(), () => !!document.documentElement.requestFullscreen);
+cmd('shortcuts', () => bringForward(shortcutsWin.win));
+
+/** A menu item for a keyboard command: same action, same enabling, its key shown. */
+const C = (id: string, label: string, extra: Partial<MenuItem> = {}): MenuItem => {
+  const c = commands.get(id)!;
+  return { label, key: keyLabel(id), action: c.run, enabled: c.enabled, ...extra };
+};
+
 const MENUS: { title: string; cls?: string; items: MenuItem[] | (() => MenuItem[]) }[] = [
   {
     title: 'emmm',
@@ -302,6 +392,7 @@ const MENUS: { title: string; cls?: string; items: MenuItem[] | (() => MenuItem[
     items: [
       { label: 'About emmm…', action: () => openEditor('about') },
       { label: 'Help…', action: () => helpWin.win.show() },
+      C('shortcuts', 'Keyboard Shortcuts…'),
       { label: 'Monitor', action: () => openEditor('monitor') },
       { sep: true, label: '' },
       { label: 'New random seed', action: () => session.setSeed(freshSeed()) },
@@ -311,40 +402,42 @@ const MENUS: { title: string; cls?: string; items: MenuItem[] | (() => MenuItem[
     title: 'File',
     items: [
       { label: 'New', action: () => void confirmDialog(screen, 'Start a new document? Unsaved changes are kept only in the autosave.', 'New').then((ok) => ok && session.load(newDocument())) },
-      { label: 'Open…', key: '⌘O', action: () => void openDocument() },
+      C('open', 'Open…'),
       { label: 'Open Demo', action: () => session.load(demoComposition()) },
       { label: 'Open Midi File…', action: async () => {
           const f = await pickFile('.mid,.midi,audio/midi');
           if (f) await importWin.openFile(f);
         } },
       { sep: true, label: '' },
-      { label: 'Save', key: '⌘S', action: () => downloadDocument(session.comp) },
+      C('save', 'Save'),
       { label: 'Save As…', action: () => void saveAs() },
       { label: 'Browser Library…', action: () => openEditor('library') },
       { label: 'Save Movie As Midi File…', enabled: () => session.movie.length > 0 && !session.movieRecording, action: () => downloadBytes(`${session.comp.name || 'M'} Movie.mid`, writeSmf(session.movie, session.movieTempos, (session.comp.name || 'emmm') + ' movie') as BlobPart, 'audio/midi') },
       { label: 'Save State As Startup', action: () => (saveStartup(session.comp) ? alertBox('The current state (without Pattern contents and Time Distortion maps) is now what <b>New</b> gives you.') : alertBox('Could not save the startup state in this browser.')) },
       { label: 'Forget Startup State', enabled: () => !!loadStartup(), action: () => clearStartup() },
       { sep: true, label: '' },
-      { label: 'Midi Assignment…', action: () => openEditor('midiAssignment') },
+      C('midiAssignment', 'Midi Assignment…'),
     ],
   },
   {
     title: 'Edit',
     items: [
-      { label: 'Undo', key: '⌘Z', enabled: () => session.history.canUndo, action: () => session.undo() },
-      { label: 'Redo', key: '⇧⌘Z', enabled: () => session.history.canRedo, action: () => session.redo() },
+      C('undo', 'Undo'),
+      C('redo', 'Redo'),
       { sep: true, label: '' },
-      { label: 'Cut', enabled: anySelected, action: editOp('cut') },
-      { label: 'Copy', enabled: anySelected, action: editOp('copy') },
-      { label: 'Paste', enabled: () => anySelected() && !!session.clipboard, action: editOp('paste') },
+      C('cut', 'Cut'),
+      C('copy', 'Copy'),
+      C('paste', 'Paste'),
       { label: 'Clear', enabled: anySelected, action: editOp('clear') },
       { sep: true, label: '' },
       { label: 'Paste Notes', enabled: () => anySelected() && !!session.clipboard, action: editOp('pasteNotes') },
-      { label: 'Change to Rests', key: '⌘K', enabled: anySelected, action: editOp('changeToRests') },
+      C('changeToRests', 'Change to Rests'),
       { label: 'Fill With Rests', enabled: anySelected, action: editOp('fillWithRests') },
       { label: 'Paste at End / Insert Paste', enabled: () => anySelected() && !!session.clipboard, action: editOp('pasteAtEnd') },
       { sep: true, label: '' },
       { label: 'Erase Snapshot', enabled: () => session.currentSnapshot !== null, action: () => session.eraseSnapshot() },
+      { sep: true, label: '' },
+      C('selectAll', 'Select All Steps'),
     ],
   },
   {
@@ -360,27 +453,28 @@ const MENUS: { title: string; cls?: string; items: MenuItem[] | (() => MenuItem[
       { label: 'Rhythm…', action: () => openEditor('cyclic', { variable: 'rhythm' }) },
       { label: 'Legato…', action: () => openEditor('cyclic', { variable: 'legato' }) },
       { label: 'Accent…', action: () => openEditor('cyclic', { variable: 'accent' }) },
+      { sep: true, label: '' },
+      C('prevPosition', 'Previous Position'),
+      C('nextPosition', 'Next Position'),
     ],
   },
   {
     title: 'Pattern',
     items: [
-      { label: 'Edit…', action: () => openEditor('patternEditor', { voice: Math.max(0, session.selected.findIndex(Boolean)) }) },
-      {
-        label: 'Clear Pattern',
-        enabled: anySelected,
-        action: () => session.editOp('clear', patternEditor.win.open && !session.selected.some(Boolean) ? { voice: patternEditor.voice } : undefined),
-      },
+      C('patternEditor', 'Edit…'),
+      C('clearPattern', 'Clear Pattern'),
+      C('prevVoice', 'Select Previous Pattern'),
+      C('nextVoice', 'Select Next Pattern'),
       { sep: true, label: '' },
-      { label: 'Transpose Up Half-Step', key: "⌘U", enabled: anySelected, action: patOp('transposeUp') },
+      C('transposeUp', 'Transpose Up Half-Step'),
       { label: 'Transpose Up Octave', enabled: anySelected, action: patOp('octaveUp') },
-      { label: 'Transpose Down Half-Step', key: "⌘D", enabled: anySelected, action: patOp('transposeDown') },
+      C('transposeDown', 'Transpose Down Half-Step'),
       { label: 'Transpose Down Octave', enabled: anySelected, action: patOp('octaveDown') },
-      { label: 'ReScramble', key: "⌘'", enabled: anySelected, action: patOp('rescramble') },
+      C('rescramble', 'ReScramble'),
       { label: 'Original -> Scrambled', enabled: anySelected, action: patOp('originalToScrambled') },
       { label: 'Swap Scrambled and Original', enabled: anySelected, action: patOp('swapScrambled') },
-      { label: 'Rotate Forward', key: "⌘]", enabled: anySelected, action: patOp('rotateForward') },
-      { label: 'Rotate Backward', key: "⌘[", enabled: anySelected, action: patOp('rotateBackward') },
+      C('rotateForward', 'Rotate Forward'),
+      C('rotateBackward', 'Rotate Backward'),
       { label: 'Reverse Order', enabled: anySelected, action: patOp('reverse') },
       { label: 'Double with Rests', enabled: anySelected, action: patOp('double') },
       { label: 'Triple with Rests', enabled: anySelected, action: patOp('triple') },
@@ -392,7 +486,7 @@ const MENUS: { title: string; cls?: string; items: MenuItem[] | (() => MenuItem[
   {
     title: 'Options',
     items: [
-      opt('useMetronome', 'Use Metronome', '⌘M'),
+      opt('useMetronome', 'Use Metronome', keyLabel('metronome')),
       opt('sendClock', 'Send Clock'),
       opt('tapAffectsVelocity', 'Tap Affects Velocity'),
       opt('dontScrambleRests', "Don't Scramble Rests"),
@@ -402,7 +496,7 @@ const MENUS: { title: string; cls?: string; items: MenuItem[] | (() => MenuItem[
       opt('secondOrderTranspose', 'Second Order Transpose'),
       opt('noCyclicBlinking', 'No Cyclic Blinking'),
       opt('editorSoundWhilePlaying', 'Editor Sound While Playing'),
-      opt('lockMarkedVariables', 'Locked Marked Variables', '⌘L'),
+      opt('lockMarkedVariables', 'Locked Marked Variables', keyLabel('lockMarked')),
       opt('noZoomRects', 'No Zoom Rects'),
       { sep: true, label: '' },
       { label: 'Palette…', action: () => paletteWin.show() },
@@ -414,19 +508,10 @@ const MENUS: { title: string; cls?: string; items: MenuItem[] | (() => MenuItem[
           prefs.saveApp();
         },
       },
-      { label: 'Full Screen', checked: () => !!document.fullscreenElement, enabled: () => !!document.documentElement.requestFullscreen, action: toggleFullScreen },
+      C('fullScreen', 'Full Screen', { checked: () => !!document.fullscreenElement }),
       { sep: true, label: '' },
       { label: 'Extended…  (not Classic M)', checked: () => session.comp.extended.enabled, action: () => extendedWin.win.show() },
-      {
-        label: 'Performance Feedback  (Extended)',
-        checked: () => prefs.app.feedback,
-        action: () => {
-          prefs.app.feedback = !prefs.app.feedback;
-          prefs.saveApp();
-          if (prefs.app.feedback) feedbackWin.win.show();
-          else feedbackWin.win.el.classList.add('hidden');
-        },
-      },
+      C('feedback', 'Performance Feedback  (Extended)', { checked: () => prefs.app.feedback }),
       { label: 'MIDI Learn…  (Extended)', action: () => learnWin.win.show() },
       { label: 'Monitor All Output (internal)', checked: () => session.monitorAll, action: () => ((session.monitorAll = !session.monitorAll), session.monitor.unlock(), session.changed('midi')) },
     ],
@@ -502,7 +587,7 @@ const tips = installTooltips(screen, () => view.scale, prefs.app.tips);
 session.onChange((w) => w === 'learn' && prefs.saveApp());
 // full screen: obvious way in and out at the right of the menu bar (Escape also leaves)
 const fsEl = el('div', 'menu', menubar, undefined, '⤢');
-fsEl.title = 'Full Screen (Escape leaves)';
+fsEl.title = `Full Screen (${keyLabel('fullScreen')}; Escape leaves)`;
 fsEl.setAttribute('role', 'button');
 fsEl.addEventListener('pointerdown', (e) => {
   e.stopPropagation();
@@ -510,35 +595,25 @@ fsEl.addEventListener('pointerdown', (e) => {
 });
 document.addEventListener('fullscreenchange', () => {
   fsEl.textContent = document.fullscreenElement ? '⤡' : '⤢';
-  fsEl.title = document.fullscreenElement ? 'Leave Full Screen (or press Escape)' : 'Full Screen (Escape leaves)';
+  setTip(fsEl, document.fullscreenElement ? 'Leave Full Screen (or press Escape)' : `Full Screen (${keyLabel('fullScreen')}; Escape leaves)`);
 });
 
 // ------------------------------------------------------------------ keyboard (S1 Appendix A)
 let capsLock = false;
 window.addEventListener('keydown', (e) => {
+  // Keys first go to whatever owns typing (a number being typed, a pop-up, a dialog, a text
+  // field: those handle and stop them); then emmm's commands (ui/keys.ts); then the Pattern
+  // Editor's keys when it is the front window; then M's performance keys.
   const tgt = e.target as HTMLElement;
-  if (tgt.tagName === 'INPUT' || tgt.tagName === 'SELECT' || tgt.tagName === 'TEXTAREA') return;
+  if (tgt.tagName === 'INPUT' || tgt.tagName === 'SELECT' || tgt.tagName === 'TEXTAREA' || tgt.isContentEditable) return;
   capsLock = e.getModifierState?.('CapsLock') ?? capsLock;
-  const cmd = e.metaKey || e.ctrlKey;
-  if (cmd) {
-    const k = e.key.toLowerCase();
-    if (k === 'z') e.shiftKey ? session.redo() : session.undo();
-    else if (k === '.') session.allNotesOff();
-    else if (k === 's') downloadDocument(session.comp);
-    else if (k === 'o') void openDocument();
-    else if (k === '0') floating.forEach((f) => f.win.open && f.win.close());
-    else if (k === 'm') opt('useMetronome', '').action?.();
-    else if (k === 'l') opt('lockMarkedVariables', '').action?.();
-    else if (k === 'u' && anySelected()) patOp('transposeUp')();
-    else if (k === 'd' && anySelected()) patOp('transposeDown')();
-    else if (k === "'" && anySelected()) patOp('rescramble')();
-    else if (k === ']' && anySelected()) patOp('rotateForward')();
-    else if (k === '[' && anySelected()) patOp('rotateBackward')();
-    else if (k === 'k' && anySelected()) editOp('changeToRests')();
-    else return;
+  if (dispatch(e)) return;
+  if (e.metaKey || e.ctrlKey) return; // the browser's own shortcuts stay the browser's
+  if (editorFront() && patternEditor.key(e)) {
     e.preventDefault();
     return;
   }
+  if (e.altKey && /^Key/.test(e.code)) return; // unassigned ⌥ letters do nothing
   if (e.repeat && e.key !== 'Backspace') return;
   switch (e.key) {
     case ' ':
@@ -564,6 +639,7 @@ window.addEventListener('keydown', (e) => {
       closeSelectors();
       closeDialog();
       session.cancelLearn();
+      (document.activeElement as HTMLElement | null)?.blur?.();
       break;
     case '`':
     case '~':

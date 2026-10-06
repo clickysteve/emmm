@@ -77,3 +77,48 @@ export function cleanChoice(v: unknown): ScaleChoice {
   const scale = SCALES.some((s) => s.id === o.scale) ? (o.scale as string) : 'chromatic';
   return { root, scale };
 }
+
+// ---------------------------------------------------------------------------- transforming a Pattern
+
+/**
+ * Move one pitch from one scale to another (the Pattern's notes follow a change of its Root
+ * or Scale). The rule, exactly:
+ *
+ * 1. To Chromatic: the pitch is unchanged.
+ * 2. From Chromatic (or no scale): the nearest pitch of the new scale (the lower one when two
+ *    are equally near).
+ * 3. Scale to scale: the pitch keeps its scale degree and its octave above the root. The root
+ *    moves the shorter way (−6 … +5 semitones), so a melody stays in its register. Scales of
+ *    different sizes map degree d to ⌊d × n₂ / n₁⌋ (the tonic stays the tonic, the order of the
+ *    degrees is kept).
+ * 4. A pitch outside the old scale is taken as the scale degree just below it plus the same
+ *    number of semitones, transformed by rule 3.
+ * 5. A result outside MIDI 0–127 moves by octaves into range.
+ */
+export function transformPitch(from: ScaleChoice, to: ScaleChoice, pitch: number): number {
+  const s2 = scaleById(to.scale).steps;
+  if (s2.length === 12) return pitch;
+  const s1 = scaleById(from.scale).steps;
+  let out: number;
+  if (s1.length === 12) out = snapToScale(to, pitch);
+  else {
+    const rel = pitch - from.root;
+    const oct = Math.floor(rel / 12);
+    const pc = rel - oct * 12;
+    let d = s1.length - 1;
+    while (d > 0 && s1[d] > pc) d--; // the degree at or just below
+    const offset = pc - s1[d];
+    const d2 = s1.length === s2.length ? d : Math.floor((d * s2.length) / s1.length);
+    const shift = ((((to.root - from.root) % 12) + 18) % 12) - 6; // −6 … +5
+    out = from.root + shift + oct * 12 + s2[d2] + offset;
+  }
+  while (out > 127) out -= 12;
+  while (out < 0) out += 12;
+  return out;
+}
+
+/** Transform every step of a Pattern; steps are never removed, identical pitches in one
+ * chord merge (they would be the same MIDI note). */
+export function transformSteps(steps: number[][], from: ScaleChoice, to: ScaleChoice): number[][] {
+  return steps.map((st) => [...new Set(st.map((p) => transformPitch(from, to, p)))]);
+}

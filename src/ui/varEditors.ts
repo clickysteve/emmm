@@ -239,14 +239,38 @@ export class NoteOrderEditor extends VarEditor {
         apply(ev);
         trackDrag(ev, bar, ({ ev: e }) => apply(e));
       });
-      const box = (x: number, get: () => number) => {
-        const d = el('div', 'num', b, [x, y, 28, 15]);
-        this.parts.push({ update: () => (d.textContent = String(get())) });
-        return d;
-      };
-      box(140, () => o().original);
-      box(170, () => o().cyclic);
-      box(200, () => 100 - o().original - o().cyclic);
+      // the three percentages, typed or stepped; the other two give way to keep 100 %
+      const box = (x: number, title: string, get: () => number, put: (v: number) => void) =>
+        this.parts.push(
+          new Numerical(b, x, y, 28, 15, {
+            get,
+            set: (v) => {
+              if (this.locked) return;
+              put(Math.max(0, Math.min(100, v)));
+              s.changed('noteOrder');
+            },
+            min: 0,
+            max: 100,
+            title: `Voice ${v + 1}: ${title} (%)`,
+          }),
+        );
+      box(140, 'Original Order', () => o().original, (x) => {
+        const cur = o();
+        cur.original = x;
+        cur.cyclic = Math.min(cur.cyclic, 100 - x);
+      });
+      box(170, 'Cyclic Random', () => o().cyclic, (x) => {
+        const cur = o();
+        cur.cyclic = x;
+        cur.original = Math.min(cur.original, 100 - x);
+      });
+      box(200, 'Utterly Random', () => 100 - o().original - o().cyclic, (x) => {
+        const cur = o();
+        const rest = 100 - x; // shared by Original and Cyclic, Cyclic gives way first
+        cur.cyclic = Math.max(0, Math.min(cur.cyclic, rest - cur.original));
+        cur.original = Math.min(cur.original, rest);
+        cur.cyclic = Math.max(0, rest - cur.original);
+      });
       this.parts.push({
         update: () => {
           const a = Math.round((o().original / 100) * W);

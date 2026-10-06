@@ -13,6 +13,9 @@ import { miniFor } from './minis';
 
 const LOCKABLE = new Set<string>(LOCK_DIMS.map((d) => d.id));
 
+/** The Variable whose Positions were clicked last (⌥[ ⌥] step through its Positions). */
+export const lastVariable = { v: 'patternGroup' as VariableName };
+
 export class VariableChoice {
   cells: HTMLDivElement[] = [];
   private svgs: SVGSVGElement[] = [];
@@ -66,6 +69,7 @@ export class VariableChoice {
 
   private down(ev: PointerEvent, i: number): void {
     ev.preventDefault();
+    lastVariable.v = this.variable;
     const s = this.ctx.s;
     const now = ev.timeStamp; // the press's own time (robust when the screen is busy)
     const dbl = this.lastClick.i === i && now - this.lastClick.t < 350;

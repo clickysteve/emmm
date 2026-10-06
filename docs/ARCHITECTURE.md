@@ -115,6 +115,16 @@ proportions stay those of a 1-bit Macintosh screen at any size.
   layer that shows every control's `title` in emmm's style and suppresses the system
   tooltip), `patternControls.ts` (Output Length, Time Base, Phase — used by both the Patterns
   window and the Pattern Editor, so both are the same controls on the same Pattern state).
+* `keys.ts` — the keyboard command table (ids, labels, chords) used by the one window-level
+  dispatcher in `main.ts`, the menus' key labels, tooltips and the Keyboard Shortcuts window
+  (`shortcutsWindow.ts`). Key routing order: whatever owns typing (a number being typed, a
+  pop-up, a dialog, a text field — they stop the event) → a command → the Pattern Editor's
+  keys when it is the front window (`PatternEditor.key`) → M's performance keys. Commands only
+  prevent the browser's default when they act.
+* Direct numerical entry lives in the shared widgets (`Numerical`, `RangeBar` in
+  `widgets.ts`): a press focuses the control; typing edits it in place with a caret (no
+  native `<input>`); Enter commits one `set(…, final)` (one Undo step), Escape cancels;
+  `parse` / `entry` options handle special forms (Time Base `n/d`, `sa`, program numbers).
 * `feedbackWindow.ts` — Performance Feedback: reads the engine's existing step events
   (`Session.nowPlaying`), at most ~12 redraws a second, only while open.
 * `palette.ts` — colour palettes. All drawing uses CSS custom properties (`--desktop`,
@@ -146,7 +156,7 @@ State lives in four separate places:
 |---|---|---|
 | Classic musical document | `Composition` (saved file) | Patterns, Variables, Positions, Snapshots, routing, seed |
 | Extended musical / performance state | `Composition.extended` (saved file) | Locks, Mutation amount, A/B states, voice seeds, CC Cycles |
-| Editor assistance | `app/prefs.ts` → `emmm.editor` | the Pattern Editor's scale guide |
+| Pattern editing metadata | `Pattern.scale` (saved file, optional) | each Pattern's Root + Scale |
 | Application preferences | `app/prefs.ts` → `emmm.prefs`; `ui/palette.ts` | tips, Performance Feedback, MIDI Learn mappings; palettes |
 
 `storage.ts`: autosave to `localStorage` (every ~1.5 s after a change), a named browser
@@ -176,7 +186,9 @@ Extended is on.
 * `perfState.ts` — A/B capture / recall of the performance state (a plain object keyed by
   composition field, ready for interpolation if morphing is added later).
 
-The Pattern Editor's scale guide (`app/scales.ts`) is an editing aid only: pitch-class sets
-used to shade the grid and snap new notes; nothing in the engine reads it. New Extended features should follow the same rule:
+A Pattern's Root + Scale (`Pattern.scale`, `app/scales.ts`) is editing metadata: pitch-class
+sets that shade the grid, snap new notes, and — when changed with `Session.setPatternScale` —
+transform the Pattern's notes by scale degree (`transformPitch` documents the exact rule;
+one Undo step). Nothing in the engine reads it: there is no real-time quantiser. New Extended features should follow the same rule:
 separate modules, fields added through the migration path, inert when disabled. The Extended
 window is clearly labelled "not part of Classic M".

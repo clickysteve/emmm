@@ -225,7 +225,7 @@ describe('Undo / Redo', () => {
   });
 });
 
-describe('scale guide (editing aid only)', () => {
+describe('scales (pitch-class sets)', () => {
   const cMinPent = { root: 0, scale: 'minorPentatonic' };
   const dDorian = { root: 2, scale: 'dorian' };
   it('pitch-class sets for all 12 roots', () => {
@@ -249,8 +249,7 @@ describe('scale guide (editing aid only)', () => {
     expect(cleanChoice({ root: 14, scale: 'nope' })).toEqual(CHROMATIC);
     expect(cleanChoice({ root: 2, scale: 'dorian' })).toEqual(dDorian);
   });
-  it('is not in the document and changes no playback', () => {
-    // the engine and the composition have no notion of a scale at all
+  it('the engine has no notion of a scale (no real-time quantiser)', () => {
     const c = demoComposition(3);
     expect(JSON.stringify(c)).not.toMatch(/scale/i);
     const sig = () => {

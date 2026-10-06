@@ -4,12 +4,13 @@
  * Tools: Selector, Eraser, Plunger (insert), Scissors (delete) operate in the strip above
  * the grid. View 1–4 (Shift: show a second pattern in grey). MIDI Edit Counter and Range.
  */
-import { inScale, isChromatic, isRoot, ROOT_NAMES, SCALES, snapToScale } from '../app/scales';
+import { CHROMATIC, inScale, isChromatic, isRoot, ROOT_NAMES, SCALES, snapToScale, type ScaleChoice } from '../app/scales';
 import { MAX_PATTERN_STEPS, noteName } from '../engine/constants';
 import * as ops from '../engine/patternOps';
 import type { UiContext } from './context';
 import { clamp, el, label, localPoint, svgEl, setSvg, trackDrag } from './dom';
 import { iconSvg } from './icons';
+import { keyLabel } from './keys';
 import { timeBaseWords, timingControls } from './patternControls';
 import { Selector } from './selector';
 import { MWindow, Numerical, pictureMatrix } from './widgets';
@@ -111,13 +112,13 @@ export class PatternEditor {
     gridBox.style.background = 'var(--paper)';
     this.grid = svgEl(COLS * CW, ROWS * RH, '');
     gridBox.appendChild(this.grid);
-    gridBox.title = 'Click: add or remove a note · drag →: repeat it along the steps · drag ↕: a chord cluster. Columns are steps (no durations: Rhythm times them).';
+    gridBox.title = 'Click: add or remove a note · drag →: repeat it along the steps · drag ↕: a chord cluster. Columns are steps (no durations: Rhythm times them). Keys: ← → select steps, ↑ ↓ scroll, ⌫ delete selected steps.';
     gridBox.addEventListener('pointerdown', (ev) => this.gridDown(ev, gridBox));
     gridBox.addEventListener('pointermove', (ev) => {
       const p = localPoint(gridBox, ev);
       const step = this.scroll + Math.floor((p.x - 1) / CW);
       let pitch = this.low + ROWS - 1 - Math.floor((p.y - 1) / RH);
-      const sc = this.ctx.prefs.editor.scale;
+      const sc = this.scaleOf();
       const pat = s.pattern(this.voice);
       if (!isChromatic(sc) && !pat.steps[step]?.includes(pitch)) pitch = snapToScale(sc, pitch);
       this.hover = { step, pitch };
@@ -223,30 +224,25 @@ export class PatternEditor {
         if (words.textContent !== t) words.textContent = t;
       },
     });
-    // scale guide (editing aid only: never changes notes or playback)
-    const prefs = ctx.prefs;
-    const setScale = (root: number, scale: string) => {
-      prefs.editor.scale = { root, scale };
-      prefs.saveEditor();
-      s.changed('editor');
-    };
+    // the Pattern's Root + Scale (emmm): changing it moves the notes to the new scale
+    const cur = () => this.scaleOf();
     this.parts.push(
       new Selector(b, RX, 190, 30, 14, {
-        label: 'Scale guide root note',
+        label: 'Root of this Pattern’s scale. Changing it moves the notes to the new key, keeping their scale degrees and register (⌘Z undoes).',
         options: () => ROOT_NAMES.map((n, i) => ({ value: String(i), text: n })),
-        value: () => String(prefs.editor.scale.root),
-        onChange: (v) => setScale(Number(v), prefs.editor.scale.scale),
+        value: () => String(cur().root),
+        onChange: (v) => s.setPatternScale(this.voice, { root: Number(v), scale: cur().scale }),
       }),
       new Selector(b, RX + 32, 190, 62, 14, {
-        label: 'Scale guide: shades notes outside the scale and snaps new notes into it (Chromatic = no guide). Existing notes and playback are never changed.',
+        label: 'Scale of this Pattern. Changing it moves the notes to the matching degrees of the new scale; Chromatic leaves them as they are. New notes snap into the scale; notes outside it are shaded. (⌘Z undoes.)',
         options: () => SCALES.map((x) => ({ value: x.id, text: x.name })),
-        value: () => prefs.editor.scale.scale,
-        onChange: (v) => setScale(prefs.editor.scale.root, v),
+        value: () => cur().scale,
+        onChange: (v) => s.setPatternScale(this.voice, { root: cur().root, scale: v }),
       }),
     );
     const clear = el('div', 'btn', b, [RX, 208, 94, 14], 'Clear Pattern');
     clear.style.fontSize = '9px';
-    clear.title = 'Clear Pattern: remove every step of this Voice’s Pattern (Time Base, Phase and Size stay). ⌘Z undoes it.';
+    clear.title = `Clear Pattern (${keyLabel('clearPattern')}): remove every step of this Voice’s Pattern (Time Base, Phase and Size stay). ${keyLabel('undo')} undoes it.`;
     clear.setAttribute('role', 'button');
     clear.addEventListener('pointerdown', (ev) => {
       ev.preventDefault();
@@ -294,6 +290,11 @@ export class PatternEditor {
     return this.ctx.s.pattern(this.voice);
   }
 
+  /** The edited Pattern's scale (Chromatic if it has none). */
+  scaleOf(): ScaleChoice {
+    return this.pattern.scale ?? CHROMATIC;
+  }
+
   private stepAt(box: HTMLElement, e: PointerEvent): number {
     return this.scroll + Math.floor((localPoint(box, e).x - 1) / CW);
   }
@@ -309,7 +310,7 @@ export class PatternEditor {
     const a = at(ev);
     const has = a.step < p.steps.length && p.steps[a.step].includes(a.pitch);
     const want = !has;
-    const scale = this.ctx.prefs.editor.scale;
+    const scale = this.scaleOf();
     const guided = !isChromatic(scale);
     // with a scale guide, a new note goes to the nearest scale note; removing works anywhere
     if (want && guided) a.pitch = snapToScale(scale, a.pitch);
@@ -441,12 +442,12 @@ export class PatternEditor {
     const p = this.pattern;
     const len = p.steps.length;
     const playingNow = s.engine.state !== 'stopped' && this.ctx.flash.notes[this.voice].until > this.ctx.now() ? this.ctx.flash.notes[this.voice].step : -1;
-    const key = [s.rev, playingNow, this.hover?.step, this.hover?.pitch, this.low, this.scroll, this.voice, this.ghost, this.region?.join(), s.recorders[this.voice].counter, this.tool, this.ctx.prefs.editor.scale.root, this.ctx.prefs.editor.scale.scale].join('|');
+    const key = [s.rev, playingNow, this.hover?.step, this.hover?.pitch, this.low, this.scroll, this.voice, this.ghost, this.region?.join(), s.recorders[this.voice].counter, this.tool, this.scaleOf().root, this.scaleOf().scale].join('|');
     if (key === this.drawnKey) return;
     this.drawnKey = key;
     let g = '';
     // scale guide: notes outside the scale dotted in the dim colour, the root's row marked
-    const sc = this.ctx.prefs.editor.scale;
+    const sc = this.scaleOf();
     if (!isChromatic(sc)) {
       for (let r = 0; r < ROWS; r++) {
         const pitch = this.low + ROWS - 1 - r;
@@ -588,6 +589,67 @@ export class PatternEditor {
     const rec = s.recorders[this.voice];
     if (rec.counter >= this.scroll + COLS) this.scroll = rec.counter - COLS + 1;
     this.parts.forEach((p) => p.update());
+  }
+
+  /** keyboard selection: where Shift + ← → started, and the moving end */
+  private anchor = 0;
+  private caret = 0;
+  private keyRegion: [number, number] | null = null;
+
+  /**
+   * Keyboard, while the Pattern Editor is the front window. Returns true if the key was
+   * used. ← → move the insertion point (⇧ extends the selection), ↑ ↓ scroll the keyboard
+   * (⇧: an octave), ⌫ / Delete delete the selected steps, Escape clears the selection.
+   */
+  key(e: KeyboardEvent): boolean {
+    if (e.metaKey || e.ctrlKey || e.altKey) return false;
+    const s = this.ctx.s;
+    const len = this.pattern.steps.length;
+    const r = this.region;
+    switch (e.key) {
+      case 'ArrowLeft':
+      case 'ArrowRight': {
+        const d = e.key === 'ArrowLeft' ? -1 : 1;
+        // pick up a selection made with the mouse
+        if (r !== this.keyRegion) {
+          this.anchor = r ? r[0] : this.scroll;
+          this.caret = r ? r[1] : this.scroll;
+        }
+        this.caret = clamp(this.caret + d, 0, len);
+        if (!e.shiftKey) this.anchor = this.caret;
+        this.region = [Math.min(this.anchor, this.caret), Math.max(this.anchor, this.caret)];
+        this.keyRegion = this.region;
+        if (this.caret >= this.scroll + COLS) this.scroll = this.caret - COLS + 1;
+        if (this.caret < this.scroll) this.scroll = this.caret;
+        s.changed('editor');
+        return true;
+      }
+      case 'ArrowUp':
+      case 'ArrowDown':
+        this.low = clamp(this.low + (e.key === 'ArrowUp' ? 1 : -1) * (e.shiftKey ? 12 : 1), 0, 127 - ROWS + 1);
+        s.changed('editor');
+        return true;
+      case 'Backspace':
+      case 'Delete':
+        if (!r || r[1] <= r[0]) return false; // no steps selected: Backspace stays Hold/Do
+        s.editOp('clear', { voice: this.voice, region: [r[0], r[1]] });
+        this.region = this.keyRegion = [r[0], r[0]];
+        this.anchor = this.caret = r[0];
+        return true;
+      case 'Escape':
+        if (!r) return false;
+        this.region = null;
+        s.changed('editor');
+        return true;
+    }
+    return false;
+  }
+
+  selectAll(): void {
+    this.region = this.keyRegion = [0, this.pattern.steps.length];
+    this.anchor = 0;
+    this.caret = this.pattern.steps.length;
+    this.ctx.s.changed('editor');
   }
 
   openFor(voice: number): void {

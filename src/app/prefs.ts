@@ -4,14 +4,13 @@
  *
  *   app preferences:  tooltips on/off, Performance Feedback on/off, MIDI Learn mappings
  *                     (they describe the user's hardware), full-screen on start
- *   editor assistance: the Pattern Editor's scale guide (root + scale)
+ *   editor assistance: reserved (the scale is now part of each Pattern, see Pattern.scale)
  *
  * (Colour palettes keep their own store, see ui/palette.ts.) Everything is versioned and
  * validated on load, and every storage access is guarded: private windows simply start
  * from the defaults.
  */
 import { cleanLearnMappings, type LearnMapping } from '../extended/extended';
-import { cleanChoice, type ScaleChoice } from './scales';
 
 export interface AppPrefs {
   version: 1;
@@ -22,7 +21,6 @@ export interface AppPrefs {
 
 export interface EditorPrefs {
   version: 1;
-  scale: ScaleChoice;
 }
 
 export interface PrefStore {
@@ -70,8 +68,7 @@ export class Prefs {
       feedback: a.feedback === true,
       learn: cleanLearnMappings(a.learn),
     };
-    const e = read(store, KEY_EDITOR);
-    this.editor = { version: 1, scale: cleanChoice(e.scale) };
+    this.editor = { version: 1 };
   }
 
   saveApp(): void {

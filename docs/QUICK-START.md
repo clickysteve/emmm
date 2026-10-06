@@ -199,7 +199,7 @@ Variable on Position 1. (Your MIDI routing from the previous step is kept.)
 Double-click Voice 1's **Select** box (the box with ♪ ●● · in the first row of the Patterns
 window). The **Pattern Editor** opens.
 
-![Pattern Editor with C3 E3 G3 B♭3 entered; 1 tools, 2 View (which Voice), 3 Length, 4 Time Base, 5 Phase, 6 scale guide, 7 Clear Pattern](images/qs-pattern-editor.png)
+![Pattern Editor with C3 E3 G3 B♭3 entered; 1 tools, 2 View (which Voice), 3 Length, 4 Time Base, 5 Phase, 6 the Pattern's root and scale, 7 Clear Pattern](images/qs-pattern-editor.png)
 
 Pitch runs vertically (a keyboard on the left, with C2, C3, C4… marked in tiny letters);
 **steps** run left to right. As you move the mouse over the grid, the right-hand panel shows
@@ -217,7 +217,7 @@ same values) as its row in the Patterns window:
 - **4 T Base** and **5 Phase** — how fast the Voice steps through the Pattern, and how late it
   starts (see *Making a Voice faster or slower* below). The line under them says it in words,
   e.g. "step = 1/4 note · 120/min × Rhythm".
-- **6 Scale guide** and **7 Clear Pattern** — see *Pattern editing helpers* below.
+- **6 Root and Scale** of the Pattern and **7 Clear Pattern** — see *Pattern editing helpers* below.
 
 Now close the Pattern Editor with the triangle at its top-left corner (it covers part of
 the Patterns window).
@@ -635,11 +635,16 @@ slow section to a fast one. All of these can be changed while the music plays.
   editing — notes, lengths, Variable and cycle values, Clear Pattern, Mutation — and treats a
   whole drag as one step. It never rewinds the *performance*: which Positions are active, the
   tempo and the Baton stay where they are, so you can undo an edit without the music jumping.
-- **Scale guide** (box 6): choose a root and a scale (Major, the minor scales, the modes,
-  pentatonics, Blues, Whole Tone). Notes outside the scale are dotted grey in the grid, the
-  root's rows are tinted, and a click on a wrong note enters the nearest scale note instead.
-  It is only a guide for entering notes: it never changes notes you already have, and it has
-  no effect at all on what M plays (choose **Chromatic** to switch it off).
+- **Root and Scale** (box 6, emmm — not in M): every Pattern can have a key, e.g. **C** and
+  **Major**. New notes you click snap into it, notes outside it are dotted grey in the grid and
+  the root's rows are tinted. **Changing the root or scale moves the Pattern's notes**, keeping
+  each note's scale degree and octave: C E G A in C Major becomes C E♭ G A♭ in C Minor, and
+  D F G A C in D Minor Pentatonic after a change of root to D. A note outside the old scale
+  keeps its distance from the scale note below it. Switching to **Chromatic** leaves the notes
+  as they are; switching from Chromatic to a scale moves each note to the nearest scale note.
+  One **⌘Z** undoes the whole change. The scale is saved with the document; older documents
+  open as Chromatic, unchanged. It is an editing tool: M plays the Pattern's notes exactly as
+  they are — nothing is corrected while the music plays.
 
 ## Saving your work
 
@@ -663,7 +668,7 @@ slow section to a fast one. All of these can be changed while the music plays.
   from that seed, so **the same document, seed and gestures produce the same performance**.
   Keep a seed you like (it is saved in the document); change it (press in the box, or
   **emmm ▸ New random seed**) to hear a different "take" of the same settings.
-- **Not in the document:** colour palettes, tips on/off, the scale guide and MIDI Learn
+- **Not in the document:** colour palettes, tips on/off and MIDI Learn
   mappings belong to this browser (they describe you and your equipment), so they stay as
   they are when you open someone else's file.
 - **MIDI Movie export:** click the film button (the middle of the lower transport strip in
@@ -705,6 +710,47 @@ on the music or MIDI.
   too; **Close Edit Windows** (⌘0) puts them all away.
 - **Full screen:** the **⤢** at the right of the menu bar (or **Options ▸ Full Screen**).
   Escape or **⤡** comes back. Everything works the same in full screen.
+
+## Typing numbers and keyboard shortcuts
+
+**Any number you can change, you can type.** Click the number (it gets a dotted outline —
+the click also steps it, as in M), then type: `1` `3` `7` and **Return**. While you type, the
+number is highlighted and nothing else listens to the keyboard; **Escape** cancels. With a
+number selected, **Return** edits the current value, **↑ ↓** step it (**⇧** ten at a time),
+**Page Up / Down** step by ten and **Home / End** go to the minimum and maximum. Values are
+kept within the control's legal range; anything that is not a number is refused (the box
+flashes) and nothing changes. One typed value is one **⌘Z**.
+
+- **Time Base** takes both numbers at once — type `3/8` in either box — and `sa` for step
+  advance; only legal denominators are accepted.
+- **Length** with **⌥Return** changes the Pattern itself (adds rests or cuts steps), like
+  Alt-dragging the box.
+- **Range bars** (Velocity Range, the Tempo range, Mutation strength): click, then type
+  `40-100` (or one number).
+- **Programs** in the Midi window: type the number as shown; `-` means no program change.
+
+M's own performance keys are unchanged (Space, Return, Tab, Backspace, letters for
+Snapshots, digits for Slideshows), so emmm's shortcuts use **⌘** or **⌥**. They are shown
+beside the commands in the menus, and **emmm ▸ Keyboard Shortcuts…** (**⌥H**) lists them all.
+The most useful:
+
+| Keys | Does |
+|---|---|
+| ⌘Z · ⇧⌘Z | Undo · Redo |
+| ⌘X · ⌘C · ⌘V | Cut · Copy · Paste Patterns (or the selected steps) |
+| ⌥G | Pattern Editor |
+| ⌘⌫ | Clear Pattern |
+| ⌥↑ · ⌥↓ | select the previous / next Voice's Pattern |
+| ⌥[ · ⌥] | previous / next Position of the Variable you clicked last |
+| ⌥K ⌥P ⌥V ⌥C | Conducting · Patterns · Variables · Cyclic Variables window |
+| ⌥Y · ⌥M | Cyclic Editor · Midi Assignment |
+| ⌥T | metronome on/off |
+| ⌥↩ | full screen |
+| ⌥X · ⌥R · ⌥A ⌥B · ⇧⌥A ⇧⌥B · ⌥O | Extended: Mutate · Reroll · recall A / B · capture A / B · Performance Feedback |
+
+In the **Pattern Editor** (when it is the front window): **← →** move through the steps (**⇧**
+selects), **⌘A** selects all, **⌫** deletes the selected steps (with nothing selected,
+Backspace is Hold/Do as always), **Escape** clears the selection, **↑ ↓** scroll the keyboard.
 
 ---
 
@@ -838,7 +884,8 @@ how timed) → Cyclic Variables (rhythm, length, accent per note) → Orchestrat
 | ⌘. | All Notes Off |
 | ⌘S · ⌘O · ⌘0 | Save · Open · close edit windows |
 | ⌘Z · ⇧⌘Z | Undo · Redo (editing, not performing) |
-| ⌘M | metronome on/off |
+| ⌥T (or ⌘M where the system allows) | metronome on/off |
+| ⌥H | all keyboard shortcuts |
 | Escape | close a menu, pop-up or dialog; cancel MIDI Learn; leave full screen |
 
 **Mouse**

@@ -162,8 +162,10 @@ export class PatternsWindow implements Updatable {
         min: 0,
         max: 16,
         format: (x) => (x === 0 ? 'All' : String(x)),
+        chars: 'al',
+        parse: (t) => (/^a/i.test(t) ? 0 : /^\d+$/.test(t) ? Number(t) : null),
         intercept: hold('src'),
-        title: 'Source Channel (M Input Channel)',
+        title: 'Source Channel (M Input Channel; 0 or "a" = All)',
       });
       const use = el('div', 'num', b, [26, y, 14, H]);
       use.title = 'Use: how MIDI input affects this voice';
@@ -458,6 +460,8 @@ export class ConductingWindow implements Updatable {
       get: () => [0, Math.round(s.comp.conducting.robot.hRange * 100)],
       set: (_lo, hi) => ((s.comp.conducting.robot.hRange = hi / 100), s.changed('robot')),
       fill: 'black',
+      single: true,
+      label: 'Robot horizontal jump range',
     });
     this.vRange = el('div', 'range', b, [298, 2, 8, 40]);
     const vfill = el('div', 'fill inv', this.vRange);
@@ -664,7 +668,15 @@ export class MidiWindow implements Updatable {
         min: -1,
         max: 127,
         format: (x) => (x < 0 ? '' : String(x + (s.comp.midi.firstProgramIsOne[ch - 1] ? 1 : 0))),
-        title: `Program change for output channel ${ch} (blank = none). Sent when released.`,
+        // typed as shown (1–128 or 0–127 for this channel); "-" = no program change
+        parse: (t) => {
+          if (t === '-') return -1;
+          if (!/^\d+$/.test(t)) return null;
+          const p = Number(t) - (s.comp.midi.firstProgramIsOne[ch - 1] ? 1 : 0);
+          return p >= 0 && p <= 127 ? p : null;
+        },
+        editText: (x) => (x < 0 ? '-' : String(x + (s.comp.midi.firstProgramIsOne[ch - 1] ? 1 : 0))),
+        title: `Program change for output channel ${ch} (blank = none; type - for none). Sent when released.`,
       });
       this.progs.push(n);
     }

@@ -115,7 +115,8 @@ and menus, Movies (MIDI file export), MIDI file import (into Patterns or as a pl
 Sequence), Web MIDI input and output with timestamped scheduling, save/load and seeded
 randomness, and colour palettes (Options ▸ Palette…; Classic black-and-white by default).
 Everyday comforts that do not change M's music: Undo / Redo, the Pattern's Length, Time Base
-and Phase right in the Pattern Editor, Clear Pattern, a scale guide for entering notes,
+and Phase right in the Pattern Editor, Clear Pattern, a Root + Scale per Pattern (changing it
+moves the notes by scale degree), typing any number directly, keyboard shortcuts,
 emmm-style tooltips and pop-up menus, and full screen. 237 automated tests (including a seeded
 fuzz test, worked examples, and the whole app driven through its menus in a simulated browser)
 cover the engine, timing maths, persistence, session logic, the interface and Extended.
