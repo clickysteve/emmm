@@ -8,8 +8,14 @@
 @import '@fontsource/silkscreen/400.css';
 
 :root {
+  /* Colour roles. These defaults are the Classic palette; src/ui/palette.ts overrides them
+     (and gives each functional area its own --ink) when another palette is chosen. */
+  --desktop: #000;
   --ink: #000;
   --paper: #fff;
+  --dim: #000;
+  --activity: #000;
+  --selection: #000;
   --font: 'Tiny5', 'Geneva', 'Chicago', system-ui, sans-serif;
   --font-tiny: 'Silkscreen', 'Tiny5', monospace;
   /* 1-bit fills (2×2 logical-pixel cells) */
@@ -28,7 +34,7 @@ html,
 body {
   margin: 0;
   height: 100%;
-  background: #000;
+  background: var(--desktop);
   color: var(--ink);
   overflow: hidden;
   font-family: var(--font);
@@ -42,7 +48,7 @@ body {
 #stage {
   position: fixed;
   inset: 0;
-  background: #000;
+  background: var(--desktop);
 }
 
 /* The logical screen. Its pixel size is set from JS; it is scaled to fit. */
@@ -51,11 +57,16 @@ body {
   left: 0;
   top: 0;
   transform-origin: 0 0;
-  background: #000;
+  background: var(--desktop);
   overflow: hidden;
   image-rendering: pixelated;
   font-size: 10px;
   line-height: 1;
+}
+
+/* SVG shapes without their own fill (text, pattern cells) draw in the ink colour */
+svg {
+  fill: var(--ink);
 }
 
 .fill-grey {
@@ -99,7 +110,7 @@ body {
   cursor: default;
 }
 #menubar .menu.open {
-  background: var(--ink);
+  background: var(--selection);
   color: var(--paper);
 }
 #menubar .menu.logo {
@@ -141,11 +152,11 @@ body {
   left: 2px;
 }
 .dropdown .item:hover:not(.disabled) {
-  background: var(--ink);
+  background: var(--selection);
   color: var(--paper);
 }
 .dropdown .item.disabled {
-  color: #000;
+  color: var(--ink);
   opacity: 1;
   background-image: none;
   -webkit-text-fill-color: transparent;
@@ -265,8 +276,8 @@ body {
   inset: -1px 0 0 0;
   font-size: 9px;
   line-height: 9px;
-  mix-blend-mode: difference;
-  color: #fff;
+  mix-blend-mode: var(--mark-blend, difference);
+  color: var(--mark-color, #fff);
 }
 
 /* ------------------------------------------------------------ generic controls */
@@ -288,6 +299,10 @@ body {
   background: var(--ink);
   color: var(--paper);
 }
+.num.selected {
+  background: var(--selection);
+  color: var(--paper);
+}
 .num.held {
   outline: 1px dotted var(--ink);
 }
@@ -302,6 +317,7 @@ body {
 }
 .label.tiny {
   font-family: var(--font-tiny);
+  color: var(--dim);
   font-size: 7px;
   line-height: 7px;
 }
@@ -399,6 +415,11 @@ body {
 .flash {
   filter: invert(1);
 }
+/* cycle-restart bricks on an active cyclic Position */
+.cbrick {
+  background: var(--brick-color, #fff);
+  mix-blend-mode: var(--brick-blend, difference);
+}
 
 /* picture matrix pop-up */
 .pmatrix {
@@ -442,6 +463,12 @@ body {
   font-size: 10px;
   line-height: 13px;
 }
+/* text fields stay editable and selectable inside the non-selectable screen */
+input.mtext,
+.mdialog input {
+  user-select: text;
+  -webkit-user-select: text;
+}
 .mdialog input[type='text'],
 .mdialog input[type='number'],
 select.mselect,
@@ -459,7 +486,7 @@ input.mtext {
 }
 select.mselect {
   padding-right: 10px;
-  background-image: linear-gradient(45deg, transparent 50%, #000 50%), linear-gradient(135deg, #000 50%, transparent 50%);
+  background-image: linear-gradient(45deg, transparent 50%, var(--ink) 50%), linear-gradient(135deg, var(--ink) 50%, transparent 50%);
   background-position:
     calc(100% - 7px) 50%,
     calc(100% - 4px) 50%;

@@ -39,7 +39,7 @@ export class MidiAssignmentWindow {
   private sig = '';
   private parts: { update(): void }[] = [];
   constructor(private ctx: UiContext, parent: HTMLElement) {
-    this.win = new MWindow(parent, { id: 'midiassign', title: 'Midi Assignment', x: 90, y: 30, w: 470, h: 392, closable: true });
+    this.win = new MWindow(parent, { id: 'midiassign', title: 'Midi Assignment', x: 90, y: 30, w: 470, h: 392, closable: true, area: 'midi' });
     this.body = this.win.body;
     this.build();
   }
@@ -189,7 +189,7 @@ export class MonitorWindow {
   private vu: HTMLDivElement[] = [];
   private timing: HTMLDivElement;
   constructor(private ctx: UiContext, parent: HTMLElement) {
-    this.win = new MWindow(parent, { id: 'monitor', title: 'Monitor', x: 380, y: 150, w: 228, h: 210, closable: true });
+    this.win = new MWindow(parent, { id: 'monitor', title: 'Monitor', x: 380, y: 150, w: 228, h: 210, closable: true, area: 'midi' });
     const b = this.win.body;
     label(b, 4, 3, 'voice: step · pitches · vel', 'tiny');
     for (let v = 0; v < 4; v++) {
@@ -396,7 +396,7 @@ export class LibraryWindow {
     label(b, 6, 4, 'Documents kept in this browser', 'small');
     this.list = el('div', 'box', b, [6, 16, 160, 150]);
     this.list.style.overflowY = 'auto';
-    this.list.style.background = '#fff';
+    this.list.style.background = 'var(--paper)';
     this.input = el('input', 'mtext', b, [6, 174, 160, 16]);
     this.input.style.position = 'absolute';
     this.input.placeholder = 'name';
@@ -486,7 +486,10 @@ Mouse Advance · ⌘. All Notes Off · ⌘S Save · ⌘O Open.<br><br>
 Set a voice's Use to <b>C</b> to drive emmm from a MIDI keyboard: middle C (C3) Start, B2 Stop,
 B3 Hold/Do, F3 Sync, black keys + white keys select Positions.<br><br>
 <b>Seed</b> — emmm's randomness is seeded (Conducting window). Same document + seed + gestures =
-same music from Start.`;
+same music from Start.<br><br>
+<b>Colours</b> — Options ▸ Palette… changes emmm's colours (Classic, Dark, Colour or your own).
+Editing a built-in palette makes a copy; Export/Import exchange palette files. Palettes are a
+preference of this browser and never change the music or the saved document.`;
 
 export class HelpWindow {
   win: MWindow;

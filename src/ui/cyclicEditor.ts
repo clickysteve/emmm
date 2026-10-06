@@ -29,7 +29,7 @@ export class CyclicEditor {
 
   constructor(private ctx: UiContext, parent: HTMLElement) {
     const s = ctx.s;
-    this.win = new MWindow(parent, { id: 'edit-cyclic', title: 'Cyclic Editor', x: 150, y: 60, w: 300, h: 256, closable: true });
+    this.win = new MWindow(parent, { id: 'edit-cyclic', title: 'Cyclic Editor', x: 150, y: 60, w: 300, h: 256, closable: true, area: 'cyclic' });
     const b = this.win.body;
     for (let v = 0; v < NUM_VOICES; v++) {
       const y0 = 3 + v * BLOCK;
@@ -55,7 +55,7 @@ export class CyclicEditor {
       this.names[cv] = nm;
       for (let p = 0; p < NUM_POSITIONS; p++) {
         const c = el('div', 'box', b, [170, y0 + 16 + p * 9, 12, 10]);
-        c.style.background = '#fff';
+        c.style.background = 'var(--paper)';
         c.addEventListener('pointerdown', (ev) => {
           ev.preventDefault();
           const startY = ev.clientY;
@@ -97,8 +97,8 @@ export class CyclicEditor {
         setSvg(
           d,
           `<defs><pattern id="acg" width="2" height="2" patternUnits="userSpaceOnUse"><rect width="1" height="1"/><rect x="1" y="1" width="1" height="1"/></pattern></defs>` +
-            [1, 2, 3, 4].map((n, i) => `<text x="${14 + i * 14}" y="8" font-size="8" text-anchor="middle" font-family="Tiny5">${n}</text><rect x="${14 + i * 14}" y="10" width="1" height="6" fill="#000"/>`).join('') +
-            `<rect x="4" y="16" width="62" height="1" fill="#000"/><rect x="14" y="14" width="42" height="5" fill="url(#acg)" stroke="#000" stroke-width="0.5"/><text x="35" y="32" font-size="8" text-anchor="middle" font-family="Tiny5">Vel Range</text>`,
+            [1, 2, 3, 4].map((n, i) => `<text x="${14 + i * 14}" y="8" font-size="8" text-anchor="middle" font-family="Tiny5">${n}</text><rect x="${14 + i * 14}" y="10" width="1" height="6" fill="var(--ink)"/>`).join('') +
+            `<rect x="4" y="16" width="62" height="1" fill="var(--ink)"/><rect x="14" y="14" width="42" height="5" fill="url(#acg)" stroke="var(--ink)" stroke-width="0.5"/><text x="35" y="32" font-size="8" text-anchor="middle" font-family="Tiny5">Vel Range</text>`,
         );
         label(b, 222, y0 + 58, '0 = silent', 'tiny');
       }
@@ -166,39 +166,39 @@ export class CyclicEditor {
       for (let lv = 0; lv <= 4; lv++) {
         inner += `<text x="2" y="${oy + (4 - lv) * LY + 2.5}" font-size="6" font-family="Silkscreen">${lv}</text>`;
         inner += `<text x="${ox + SX * 15 + 4}" y="${oy + (4 - lv) * LY + 2.5}" font-size="6" font-family="Silkscreen">${lv}</text>`;
-        inner += `<line x1="${ox}" y1="${oy + (4 - lv) * LY + 0.5}" x2="${ox + SX * 15}" y2="${oy + (4 - lv) * LY + 0.5}" stroke="#000" stroke-dasharray="1 1"/>`;
+        inner += `<line x1="${ox}" y1="${oy + (4 - lv) * LY + 0.5}" x2="${ox + SX * 15}" y2="${oy + (4 - lv) * LY + 0.5}" stroke="var(--dim)" stroke-dasharray="1 1"/>`;
       }
       for (let st = 0; st < 16; st++) {
         const x = ox + st * SX + 0.5;
         const on = st < cyc.length;
-        inner += `<line x1="${x}" y1="${oy}" x2="${x}" y2="${oy + GH}" stroke="#000" stroke-dasharray="${on ? '0' : '1 2'}"/>`;
-        inner += `<text x="${x}" y="${oy + GH + 10}" font-size="6" text-anchor="middle" font-family="Silkscreen"${on ? '' : ' fill="#888"'}>${st + 1}</text>`;
-        if (st === cyc.length - 1) inner += `<rect x="${x - 4}" y="${oy + GH + 3}" width="9" height="9" fill="none" stroke="#000"/>`;
+        inner += `<line x1="${x}" y1="${oy}" x2="${x}" y2="${oy + GH}" stroke="var(--ink)" stroke-dasharray="${on ? '0' : '1 2'}"/>`;
+        inner += `<text x="${x}" y="${oy + GH + 10}" font-size="6" text-anchor="middle" font-family="Silkscreen"${on ? '' : ' fill="var(--dim)" fill-opacity="0.467"'}>${st + 1}</text>`;
+        if (st === cyc.length - 1) inner += `<rect x="${x - 4}" y="${oy + GH + 3}" width="9" height="9" fill="none" stroke="var(--ink)"/>`;
         if (on) {
           const c = cyc[st];
           const y1 = oy + (4 - c.hi) * LY;
           const y2 = oy + (4 - c.lo) * LY;
-          if (c.hi !== c.lo) inner += `<rect x="${x - 1.5}" y="${y1}" width="3" height="${y2 - y1}" fill="#000"/>`;
-          for (let lv = c.lo; lv <= c.hi; lv++) inner += `<rect x="${x - 2.5}" y="${oy + (4 - lv) * LY - 2}" width="5" height="5" fill="#000"/>`;
+          if (c.hi !== c.lo) inner += `<rect x="${x - 1.5}" y="${y1}" width="3" height="${y2 - y1}" fill="var(--ink)"/>`;
+          for (let lv = c.lo; lv <= c.hi; lv++) inner += `<rect x="${x - 2.5}" y="${oy + (4 - lv) * LY - 2}" width="5" height="5" fill="var(--ink)"/>`;
         }
       }
       // where the cycle is now (emmm visual aid): the step just played
       const vr = s.engine.voices[v];
       if (isActive && s.engine.state !== 'stopped' && cyc.length > 0) {
         const cur = (vr.cycle[this.which] - 1 + cyc.length) % cyc.length;
-        inner += `<rect x="${ox + cur * SX - 3.5}" y="${oy + GH + 13}" width="7" height="2" fill="#000"/>`;
+        inner += `<rect x="${ox + cur * SX - 3.5}" y="${oy + GH + 13}" width="7" height="2" fill="var(--activity)"/>`;
       }
-      if (this.ctx.flash.cycle[this.which][v] > flashNow && isActive) inner += `<rect x="${ox - 4}" y="0" width="2" height="${GH + 6}" fill="#000"/>`;
+      if (this.ctx.flash.cycle[this.which][v] > flashNow && isActive) inner += `<rect x="${ox - 4}" y="0" width="2" height="${GH + 6}" fill="var(--activity)"/>`;
       setSvg(this.grids[v], inner);
     });
     (['rhythm', 'legato', 'accent'] as CycVar[]).forEach((cv) => {
       this.names[cv].classList.toggle('on', cv === this.which);
       this.sel[cv].forEach((c, p) => {
         const edit = cv === this.which && p === this.editPos;
-        c.style.background = edit ? '#000' : '#fff';
+        c.style.background = edit ? 'var(--ink)' : 'var(--paper)';
         c.style.borderBottomWidth = s.comp[cv].active === p ? '2px' : '1px';
         c.textContent = s.comp[cv].marked[p] ? '*' : '';
-        c.style.color = edit ? '#fff' : '#000';
+        c.style.color = edit ? 'var(--paper)' : 'var(--ink)';
         c.style.fontSize = '9px';
         c.style.lineHeight = '9px';
         c.style.textAlign = 'center';

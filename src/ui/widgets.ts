@@ -6,6 +6,7 @@ import { arrowFromAngle, rotateArrow } from '../engine/conducting';
 import type { ArrowDir } from '../engine/types';
 import { clamp, el, localPoint, place, svgEl, setSvg, trackDrag, view } from './dom';
 import { arrowIcon, ICON } from './icons';
+import type { Area } from './palette';
 
 // ---------------------------------------------------------------------------- Numerical
 
@@ -323,7 +324,7 @@ export class ConductArrow {
     const a = this.o.get();
     this.el.classList.toggle('on', a.enabled);
     this.el.classList.toggle('blink', !!this.o.blink?.());
-    const c = a.enabled ? '#fff' : '#000';
+    const c = a.enabled ? 'var(--paper)' : 'var(--ink)';
     const cont = this.o.continuous?.get();
     if (cont?.on && a.enabled) {
       const rowH = (this.h - 2) / 4;
@@ -333,8 +334,8 @@ export class ConductArrow {
       });
       setSvg(this.svg, inner);
       this.bricks.forEach((b, v) => {
-        b.style.background = cont.voices[v] ? '#fff' : 'transparent';
-        b.style.border = '1px solid ' + (a.enabled ? '#fff' : '#000');
+        b.style.background = cont.voices[v] ? 'var(--paper)' : 'transparent';
+        b.style.border = '1px solid ' + (a.enabled ? 'var(--paper)' : 'var(--ink)');
         b.style.display = '';
       });
     } else {
@@ -417,6 +418,8 @@ export interface WindowOpts {
   };
   onClose?: () => void;
   inverse?: boolean;
+  /** functional area, for the colour palette (see palette.ts) */
+  area?: Area;
 }
 
 let zTop = 100;
@@ -434,10 +437,11 @@ export class MWindow {
   ) {
     this.el = el('div', 'mwin' + (o.inverse ? ' inverse' : ''), parent, [o.x, o.y, o.w, o.h]);
     this.el.dataset.win = o.id;
+    if (o.area) this.el.dataset.area = o.area;
     const tb = el('div', 'titlebar', this.el);
     if (o.closable) {
       const c = el('div', 'close', tb);
-      c.appendChild(svgEl(13, 15, `<polygon points="3.5,3.5 11.5,3.5 3.5,11.5" fill="#fff" stroke="#000"/>`));
+      c.appendChild(svgEl(13, 15, `<polygon points="3.5,3.5 11.5,3.5 3.5,11.5" fill="var(--paper)" stroke="var(--ink)"/>`));
       c.title = 'Close';
       c.addEventListener('pointerdown', (e) => {
         e.stopPropagation();
@@ -446,7 +450,7 @@ export class MWindow {
     }
     this.titleEl = el('div', 'title', tb, undefined, o.title);
     const slant = el('div', 'slant', tb);
-    slant.appendChild(svgEl(16, 16, `<polygon points="0,0 1,0 16,15.5 0,15.5" fill="#fff"/><line x1="0.5" y1="0" x2="16" y2="15.5" stroke="#000"/>`));
+    slant.appendChild(svgEl(16, 16, `<polygon points="0,0 1,0 16,15.5 0,15.5" fill="var(--paper)"/><line x1="0.5" y1="0" x2="16" y2="15.5" stroke="var(--ink)"/>`));
     el('div', 'titlefill', tb);
     if (o.positions) {
       const n = o.positions.count ?? 6;

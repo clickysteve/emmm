@@ -18,10 +18,16 @@ import { ConductingWindow, CyclicWindow, MidiWindow, PatternsWindow, SnapshotWin
 import { AboutWindow, HelpWindow, ImportWindow, LibraryWindow, MidiAssignmentWindow, MonitorWindow } from './ui/otherWindows';
 import { CcCyclesWindow, ExtendedWindow } from './ui/extendedWindow';
 import { PatternEditor } from './ui/patternEditor';
+import { applyPalette, PaletteLibrary } from './ui/palette';
+import { PaletteWindow } from './ui/paletteWindow';
 import { NoteDensityEditor, NoteOrderEditor, OrchestrationEditor, TimeDistortionEditor, TranspositionEditor, VarEditor, VelocityRangeEditor } from './ui/varEditors';
 
 const W = 720;
 const H = 470;
+
+// ------------------------------------------------------------------ colour palette (a UI preference)
+const palettes = new PaletteLibrary();
+applyPalette(palettes.selected.colors);
 
 // ------------------------------------------------------------------ document at startup
 function newDocument() {
@@ -115,7 +121,8 @@ const extendedWin = new ExtendedWindow(ctx, desktop);
 const helpWin = new HelpWindow(ctx, desktop);
 const ccWin = new CcCyclesWindow(ctx, desktop);
 extendedWin.openCc = () => ccWin.win.show();
-const floating = [...Object.values(editors), cyclic, patternEditor, midiAssign, monitorWin, about, importWin, library, extendedWin, helpWin, ccWin];
+const paletteWin = new PaletteWindow(palettes, desktop);
+const floating = [...Object.values(editors), cyclic, patternEditor, midiAssign, monitorWin, about, importWin, library, extendedWin, helpWin, ccWin, paletteWin];
 floating.forEach((f) => f.win.el.classList.add('hidden'));
 
 /** The Macintosh "zoom rects": dotted rectangles growing from the click to the window. */
@@ -134,8 +141,8 @@ function zoomRects(from: Element | undefined, to: HTMLElement): void {
       const r = r0.map((v, j) => v + (r1[j] - v) * t);
       const z = el('div', '', screen, [r[0], r[1], r[2], r[3]]);
       z.style.position = 'absolute';
-      z.style.border = '1px dotted #fff';
-      z.style.outline = '1px dotted #000';
+      z.style.border = '1px dotted var(--paper)';
+      z.style.outline = '1px dotted var(--ink)';
       z.style.zIndex = '25000';
       z.style.pointerEvents = 'none';
       setTimeout(() => z.remove(), 60);
@@ -339,6 +346,7 @@ const MENUS: { title: string; cls?: string; items: MenuItem[] }[] = [
       opt('lockMarkedVariables', 'Locked Marked Variables', '⌘L'),
       opt('noZoomRects', 'No Zoom Rects'),
       { sep: true, label: '' },
+      { label: 'Palette…', action: () => paletteWin.show() },
       { label: 'Extended…  (not Classic M)', checked: () => session.comp.extended.enabled, action: () => extendedWin.win.show() },
       { label: 'Monitor All Output (internal)', checked: () => session.monitorAll, action: () => ((session.monitorAll = !session.monitorAll), session.monitor.unlock(), session.changed('midi')) },
     ],
@@ -592,3 +600,12 @@ void session.midi.request().then((st) => {
   }
 });
 window.addEventListener('beforeunload', () => autosave(session.comp));
+
+// palette control for automation / testing (the Palette window is the user interface)
+(window as unknown as { emmmPalette: unknown }).emmmPalette = {
+  library: palettes,
+  select(id: string) {
+    applyPalette(palettes.select(id).colors);
+    paletteWin.refresh();
+  },
+};

@@ -42,8 +42,7 @@ export class VariableChoice {
       for (let v = 0; v < 4; v++) {
         const f = el('div', '', c, [0, Math.round(1 + v * ((ch - 4) / 4)), 5, Math.max(2, Math.round((ch - 4) / 4))]);
         f.style.position = 'absolute';
-        f.style.background = '#fff';
-        f.style.mixBlendMode = 'difference';
+        f.className = 'cbrick';
         f.style.display = 'none';
         fl.push(f);
       }
@@ -100,7 +99,7 @@ export class VariableChoice {
     const isCyc = this.variable === 'accent' || this.variable === 'legato' || this.variable === 'rhythm';
     for (let i = 0; i < NUM_POSITIONS; i++) {
       const on = i === active;
-      const c = on ? '#fff' : '#000';
+      const c = on ? 'var(--paper)' : 'var(--ink)';
       this.cells[i].classList.toggle('active', on);
       this.cells[i].classList.toggle('blink', pending === i);
       let flash: boolean[] = [];

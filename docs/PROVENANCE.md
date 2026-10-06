@@ -44,6 +44,11 @@ were kept in `research-sources/`, which is **git-ignored and not distributed**.
 | Vite, Vitest, TypeScript (dev only) | MIT / Apache-2.0 | Build and test tooling, not shipped in the bundle. |
 | marked (dev only) | MIT | Renders docs/QUICK-START.md into the static docs/quick-start.html page at build time; not part of the application bundle. |
 
+The colour palette layer (`src/ui/palette.ts`) adapts the approach of the theme code in two
+of the author's own projects, M8 Librarian and PT Librarian (a list of semantic colour roles
+applied as CSS custom properties, lenient hex parsing, an editor with a swatch and a hex field
+per role). It was rewritten for emmm rather than copied; no third-party code is involved.
+
 The screenshots in `docs/images/` are of emmm itself (captured from the running build in
 headless Chrome, with red annotation boxes added afterwards). They contain no M imagery.
 

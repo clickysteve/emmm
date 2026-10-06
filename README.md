@@ -113,7 +113,7 @@ Time Distortion, conducting (including continuous conducting and the Robot Condu
 Hold/Do, Snapshots, Slideshows, the Input Control System, recording modes, the Pattern Editor
 and menus, Movies (MIDI file export), MIDI file import (into Patterns or as a play-along
 Sequence), Web MIDI input and output with timestamped scheduling, save/load and seeded
-randomness. 122 automated tests (including a seeded fuzz test and worked examples) cover the
+randomness, and colour palettes (Options ▸ Palette…; Classic black-and-white by default). 150 automated tests (including a seeded fuzz test and worked examples) cover the
 engine, timing maths, persistence, session logic and Extended features.
 
 **Extended** (Options ▸ Extended…, off by default) explores what M might have become: MIDI

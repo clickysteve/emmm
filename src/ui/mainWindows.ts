@@ -90,13 +90,13 @@ export class PatternsWindow implements Updatable {
 
   constructor(private ctx: UiContext, parent: HTMLElement) {
     const s = ctx.s;
-    this.win = new MWindow(parent, { id: 'patterns', title: 'Patterns a', x: 6, y: 22, w: 272, h: 112 });
+    this.win = new MWindow(parent, { id: 'patterns', title: 'Patterns a', x: 6, y: 22, w: 272, h: 112, area: 'patterns' });
     const b = this.win.body;
     // Echo Map in the title area: two rows of channel numbers (S1 ch.11)
     const tb = this.win.el.querySelector('.titlebar') as HTMLDivElement;
     const em = el('div', '', tb, [150, 0, 120, 15]);
     em.style.position = 'absolute';
-    em.style.background = '#fff';
+    em.style.background = 'var(--paper)';
     const emi = el('div', '', em, [0, 1, 14, 13]);
     emi.style.position = 'absolute';
     emi.innerHTML = iconSvg('echomap', 13, 13);
@@ -324,7 +324,8 @@ export class PatternsWindow implements Updatable {
       r.phase.el.classList.toggle('blink', 'phase' in hv);
       const sel = s.selected[v];
       r.select.classList.toggle('inv', sel);
-      const c = sel ? '#fff' : '#000';
+      r.select.classList.toggle('selected', sel);
+      const c = sel ? 'var(--paper)' : 'var(--ink)';
       const icons = [{ single: 'note', chord: 'chord', build: 'plus' }[p.chordMode], p.insertMode, p.drumMachine ? 'repeat' : 'tick'];
       icons.forEach((ic, k) => {
         const key = ic + c;
@@ -335,7 +336,7 @@ export class PatternsWindow implements Updatable {
       });
       // a tiny "now playing" tick flashes as the voice steps (emmm visual aid)
       const f = this.ctx.flash.notes[v];
-      r.step.style.background = f.until > this.ctx.now() ? c : 'transparent';
+      r.step.style.background = f.until > this.ctx.now() ? (sel ? 'var(--paper)' : 'var(--activity)') : 'transparent';
     });
   }
 }
@@ -361,7 +362,7 @@ export class ConductingWindow implements Updatable {
 
   constructor(private ctx: UiContext, parent: HTMLElement) {
     const s = ctx.s;
-    this.win = new MWindow(parent, { id: 'conducting', title: 'Untitled', x: 282, y: 22, w: 330, h: 112 });
+    this.win = new MWindow(parent, { id: 'conducting', title: 'Untitled', x: 282, y: 22, w: 330, h: 112, area: 'conducting' });
     const b = this.win.body;
     // Two transport strips with slanted separators, as on M's Conducting window.
     const strip = (y: number, items: [string, string, string, (ev: PointerEvent) => void][]) => {
@@ -390,7 +391,7 @@ export class ConductingWindow implements Updatable {
         });
         this.btn[name] = seg;
       });
-      box.appendChild(svgEl(W, H, [40, 80].map((c) => `<line x1="${c + sl + 0.5}" y1="0" x2="${c - sl + 0.5}" y2="${H}" stroke="#000" stroke-width="1.2" shape-rendering="geometricPrecision"/>`).join('')));
+      box.appendChild(svgEl(W, H, [40, 80].map((c) => `<line x1="${c + sl + 0.5}" y1="0" x2="${c - sl + 0.5}" y2="${H}" stroke="var(--ink)" stroke-width="1.2" shape-rendering="geometricPrecision"/>`).join('')));
     };
     strip(2, [
       ['start', iconSvg('play'), 'Start (Space)', () => s.start()],
@@ -453,21 +454,21 @@ export class ConductingWindow implements Updatable {
     this.seed.el.style.fontSize = '9px';
     // conducting grid
     this.grid = el('div', 'box c-baton', b, [126, 2, 90, 90]);
-    this.grid.style.background = '#fff';
+    this.grid.style.background = 'var(--paper)';
     this.grid.appendChild(
       svgEl(
         88,
         88,
         Array.from({ length: 5 }, (_, i) => {
           const p = Math.round(((i + 1) * 88) / 6) + 0.5;
-          return `<line x1="${p}" y1="0" x2="${p}" y2="88" stroke="#000" stroke-dasharray="1 2"/><line x1="0" y1="${p}" x2="88" y2="${p}" stroke="#000" stroke-dasharray="1 2"/>`;
+          return `<line x1="${p}" y1="0" x2="${p}" y2="88" stroke="var(--dim)" stroke-dasharray="1 2"/><line x1="0" y1="${p}" x2="88" y2="${p}" stroke="var(--dim)" stroke-dasharray="1 2"/>`;
         }).join(''),
       ),
     );
     this.grid.title = 'Conducting Grid — drag the Baton (Shift quantizes, Alt-click clears continuous conducting)';
     this.dot = el('div', '', this.grid, [0, 0, 5, 5]);
     this.dot.style.position = 'absolute';
-    this.dot.style.background = '#000';
+    this.dot.style.background = 'var(--activity)';
     this.dot.style.borderRadius = '50%';
     this.grid.addEventListener('pointerdown', (ev) => this.conductDown(ev));
     // robot conductor
@@ -546,18 +547,18 @@ export class ConductingWindow implements Updatable {
     this.btn.seq.classList.toggle('blink', s.hold?.pending.sequenceEnable !== undefined && !!s.hold);
     this.btn.seq.style.opacity = s.comp.sequence ? '1' : '0.45';
     this.btn.seq.title = s.comp.sequence ? `Sequence Play-Enable: ${s.comp.sequence.name}` : 'Sequence Play-Enable (no Sequence loaded)';
-    const filmC = s.movieArmed || s.movieRecording ? '#fff' : '#000';
+    const filmC = s.movieArmed || s.movieRecording ? 'var(--paper)' : 'var(--ink)';
     const key = 'film' + filmC;
     if (this.btn.movie.dataset.v !== key) {
       this.btn.movie.innerHTML = iconSvg('film', 18, 12, filmC);
       this.btn.movie.dataset.v = key;
     }
-    const sc = st === 'playing' ? '#fff' : '#000';
+    const sc = st === 'playing' ? 'var(--paper)' : 'var(--ink)';
     if (this.btn.start.dataset.v !== sc) {
       this.btn.start.innerHTML = iconSvg('play', 12, 12, sc);
       this.btn.start.dataset.v = sc;
     }
-    const pc = st === 'paused' ? '#fff' : '#000';
+    const pc = st === 'paused' ? 'var(--paper)' : 'var(--ink)';
     if (this.btn.pause.dataset.v !== pc) {
       this.btn.pause.innerHTML = iconSvg('pause', 12, 12, pc);
       this.btn.pause.dataset.v = pc;
@@ -581,7 +582,7 @@ export class ConductingWindow implements Updatable {
     this.dot.style.top = Math.round((1 - bt.y) * 88 - 2) + 'px';
     const r = s.comp.conducting.robot;
     this.robot.classList.toggle('on', r.enabled);
-    const rc = r.enabled ? '#fff' : '#000';
+    const rc = r.enabled ? 'var(--paper)' : 'var(--ink)';
     if (this.robot.dataset.v !== rc) {
       this.robot.innerHTML = iconSvg('robot', 12, 12, rc);
       this.robot.dataset.v = rc;
@@ -609,7 +610,7 @@ export class VariablesWindow implements Updatable {
   private choices: VariableChoice[] = [];
   private arrows: ConductArrow[] = [];
   constructor(ctx: UiContext, parent: HTMLElement) {
-    this.win = new MWindow(parent, { id: 'variables', title: 'Variables', x: 6, y: 140, w: 298, h: 222 });
+    this.win = new MWindow(parent, { id: 'variables', title: 'Variables', x: 6, y: 140, w: 298, h: 222, area: 'variables' });
     const b = this.win.body;
     VAR_ROWS.forEach((v, i) => {
       const y = 3 + i * 33.5;
@@ -635,7 +636,7 @@ export class CyclicWindow implements Updatable {
   private choices: VariableChoice[] = [];
   private arrows: ConductArrow[] = [];
   constructor(ctx: UiContext, parent: HTMLElement) {
-    this.win = new MWindow(parent, { id: 'cyclic', title: 'Cyclic Variables', x: 310, y: 140, w: 302, h: 222 });
+    this.win = new MWindow(parent, { id: 'cyclic', title: 'Cyclic Variables', x: 310, y: 140, w: 302, h: 222, area: 'cyclic' });
     const b = this.win.body;
     CYC.forEach((v, i) => {
       const x = 3 + i * 99;
@@ -661,7 +662,7 @@ export class MidiWindow implements Updatable {
   private progs: Numerical[] = [];
   constructor(private ctx: UiContext, parent: HTMLElement) {
     const s = ctx.s;
-    this.win = new MWindow(parent, { id: 'midi', title: 'Midi', x: 6, y: 368, w: 606, h: 96 });
+    this.win = new MWindow(parent, { id: 'midi', title: 'Midi', x: 6, y: 368, w: 606, h: 96, area: 'midi' });
     const b = this.win.body;
     const l1 = label(b, 2, 8, VAR_LABEL.orchestration, 'small');
     l1.style.width = '40px';
@@ -723,7 +724,7 @@ export class SnapshotWindow implements Updatable {
   private ctl: Record<string, HTMLDivElement> = {};
   constructor(private ctx: UiContext, parent: HTMLElement) {
     const s = ctx.s;
-    this.win = new MWindow(parent, { id: 'snapshot', title: 'Snap', x: 618, y: 22, w: 96, h: 442 });
+    this.win = new MWindow(parent, { id: 'snapshot', title: 'Snap', x: 618, y: 22, w: 96, h: 442, area: 'snapshots' });
     const b = this.win.body;
     this.holdBtn = el('div', 'btn', b, [2, 2, 90, 24]);
     this.holdBtn.innerHTML = iconSvg('camera', 18, 14) + '&nbsp;' + iconSvg('slides', 14, 12);
@@ -808,11 +809,11 @@ export class SnapshotWindow implements Updatable {
         const rays = [0, 45, 90, 135, 180, 225, 270, 315]
           .map((a) => {
             const r = (a * Math.PI) / 180;
-            return `<line x1="${21 + Math.cos(r) * 5}" y1="${6 + Math.sin(r) * 5}" x2="${21 + Math.cos(r) * 7}" y2="${6 + Math.sin(r) * 7}" stroke="#000"/>`;
+            return `<line x1="${21 + Math.cos(r) * 5}" y1="${6 + Math.sin(r) * 5}" x2="${21 + Math.cos(r) * 7}" y2="${6 + Math.sin(r) * 7}" stroke="var(--ink)"/>`;
           })
           .join('');
         c.innerHTML = has
-          ? `<svg width="28" height="21" viewBox="0 0 28 21" shape-rendering="crispEdges">${rays}<circle cx="21" cy="6" r="3.5" fill="${cur ? '#000' : '#fff'}" stroke="#000"/><rect x="0" y="18" width="28" height="3" fill="url(#snapg)"/><text x="3" y="16" font-size="13" font-weight="700" font-family="Tiny5, sans-serif" fill="#000">${SNAPSHOT_LETTERS[i]}</text><defs><pattern id="snapg" width="2" height="2" patternUnits="userSpaceOnUse"><rect width="1" height="1"/><rect x="1" y="1" width="1" height="1"/></pattern></defs></svg>`
+          ? `<svg width="28" height="21" viewBox="0 0 28 21" shape-rendering="crispEdges">${rays}<circle cx="21" cy="6" r="3.5" fill="${cur ? 'var(--ink)' : 'var(--paper)'}" stroke="var(--ink)"/><rect x="0" y="18" width="28" height="3" fill="url(#snapg)"/><text x="3" y="16" font-size="13" font-weight="700" font-family="Tiny5, sans-serif" fill="var(--ink)">${SNAPSHOT_LETTERS[i]}</text><defs><pattern id="snapg" width="2" height="2" patternUnits="userSpaceOnUse"><rect width="1" height="1"/><rect x="1" y="1" width="1" height="1"/></pattern></defs></svg>`
           : '';
         c.dataset.v = key;
       }

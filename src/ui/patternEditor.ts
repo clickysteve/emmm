@@ -45,7 +45,7 @@ export class PatternEditor {
 
   constructor(private ctx: UiContext, parent: HTMLElement) {
     const s = ctx.s;
-    this.win = new MWindow(parent, { id: 'edit-pattern', title: 'Pattern Editor a', x: 120, y: 40, w: 420, h: 292, closable: true });
+    this.win = new MWindow(parent, { id: 'edit-pattern', title: 'Pattern Editor a', x: 120, y: 40, w: 420, h: 292, closable: true, area: 'patterns' });
     const b = this.win.body;
     // tools in the title bar area, top right
     const tb = this.win.el.querySelector('.titlebar') as HTMLDivElement;
@@ -99,7 +99,7 @@ export class PatternEditor {
     stripBox.addEventListener('pointerdown', (ev) => this.toolDown(ev, stripBox));
     // grid
     const gridBox = el('div', 'box', b, [GX, GY, COLS * CW + 2, ROWS * RH + 2]);
-    gridBox.style.background = '#fff';
+    gridBox.style.background = 'var(--paper)';
     this.grid = svgEl(COLS * CW, ROWS * RH, '');
     gridBox.appendChild(this.grid);
     gridBox.addEventListener('pointerdown', (ev) => this.gridDown(ev, gridBox));
@@ -378,24 +378,24 @@ export class PatternEditor {
     for (let c = 0; c <= COLS; c++) {
       const st = this.scroll + c;
       const x = c * CW + 0.5;
-      g += `<line x1="${x}" y1="0" x2="${x}" y2="${ROWS * RH}" stroke="#000" ${st <= len ? '' : 'stroke-dasharray="1 2"'}/>`;
+      g += `<line x1="${x}" y1="0" x2="${x}" y2="${ROWS * RH}" stroke="var(--dim)" ${st <= len ? '' : 'stroke-dasharray="1 2"'}/>`;
     }
     for (let r = 0; r <= ROWS; r++) {
       const pitch = this.low + ROWS - r;
       const y = r * RH + 0.5;
       const isC = pitch % 12 === 0;
-      g += `<line x1="0" y1="${y}" x2="${COLS * CW}" y2="${y}" stroke="#000" stroke-dasharray="${isC ? '0' : '1 3'}"/>`;
+      g += `<line x1="0" y1="${y}" x2="${COLS * CW}" y2="${y}" stroke="var(--dim)" stroke-dasharray="${isC ? '0' : '1 3'}"/>`;
     }
     // output length marker
     if (p.outputLength < len && p.outputLength >= this.scroll && p.outputLength <= this.scroll + COLS) {
       const x = (p.outputLength - this.scroll) * CW;
-      g += `<rect x="${x - 1}" y="0" width="2" height="${ROWS * RH}" fill="#000"/>`;
+      g += `<rect x="${x - 1}" y="0" width="2" height="${ROWS * RH}" fill="var(--ink)"/>`;
     }
     // region
     if (this.region && this.region[1] > this.region[0]) {
       const x0 = (this.region[0] - this.scroll) * CW;
       const x1 = (this.region[1] - this.scroll) * CW;
-      g += `<rect x="${x0}" y="0" width="${x1 - x0}" height="${ROWS * RH}" fill="#000" fill-opacity="0.15"/>`;
+      g += `<rect x="${x0}" y="0" width="${x1 - x0}" height="${ROWS * RH}" fill="var(--selection)" fill-opacity="0.15"/>`;
     }
     // ghost pattern
     if (this.ghost !== null && this.ghost !== this.voice) {
@@ -415,30 +415,30 @@ export class PatternEditor {
     for (let c = 0; c < COLS; c++) {
       const st = this.scroll + c;
       const step = p.steps[st];
-      if (st === playing) g += `<rect x="${c * CW + 1}" y="0" width="${CW - 1}" height="${ROWS * RH}" fill="url(#peg)"/>`;
+      if (st === playing) g += `<rect x="${c * CW + 1}" y="0" width="${CW - 1}" height="${ROWS * RH}" fill="url(#pea)"/>`;
       if (!step) continue;
       for (const n of step) {
         const r = this.low + ROWS - 1 - n;
-        if (r < 0) g += `<rect x="${c * CW + 2}" y="0" width="${CW - 3}" height="2" fill="#000"/>`;
-        else if (r >= ROWS) g += `<rect x="${c * CW + 2}" y="${ROWS * RH - 2}" width="${CW - 3}" height="2" fill="#000"/>`;
-        else g += `<rect x="${c * CW + 1}" y="${r * RH + 1}" width="${CW - 1}" height="${RH - 1}" fill="#000"/>`;
+        if (r < 0) g += `<rect x="${c * CW + 2}" y="0" width="${CW - 3}" height="2" fill="var(--ink)"/>`;
+        else if (r >= ROWS) g += `<rect x="${c * CW + 2}" y="${ROWS * RH - 2}" width="${CW - 3}" height="2" fill="var(--ink)"/>`;
+        else g += `<rect x="${c * CW + 1}" y="${r * RH + 1}" width="${CW - 1}" height="${RH - 1}" fill="var(--ink)"/>`;
       }
     }
     if (this.hover) {
       const c = this.hover.step - this.scroll;
       const r = this.low + ROWS - 1 - this.hover.pitch;
-      g += `<line x1="${c * CW + 4}" y1="0" x2="${c * CW + 4}" y2="${ROWS * RH}" stroke="#000" stroke-dasharray="1 1"/><line x1="0" y1="${r * RH + 3}" x2="${COLS * CW}" y2="${r * RH + 3}" stroke="#000" stroke-dasharray="1 1"/>`;
+      g += `<line x1="${c * CW + 4}" y1="0" x2="${c * CW + 4}" y2="${ROWS * RH}" stroke="var(--dim)" stroke-dasharray="1 1"/><line x1="0" y1="${r * RH + 3}" x2="${COLS * CW}" y2="${r * RH + 3}" stroke="var(--dim)" stroke-dasharray="1 1"/>`;
     }
-    g = `<defs><pattern id="peg" width="2" height="2" patternUnits="userSpaceOnUse"><rect width="1" height="1"/><rect x="1" y="1" width="1" height="1"/></pattern></defs>` + g;
+    g = `<defs><pattern id="peg" width="2" height="2" patternUnits="userSpaceOnUse"><rect width="1" height="1"/><rect x="1" y="1" width="1" height="1"/></pattern><pattern id="pea" width="2" height="2" patternUnits="userSpaceOnUse" fill="var(--activity)"><rect width="1" height="1"/><rect x="1" y="1" width="1" height="1"/></pattern></defs>` + g;
     setSvg(this.grid, g);
     // keyboard
     let k = '';
     for (let r = 0; r < ROWS; r++) {
       const pitch = this.low + ROWS - 1 - r;
       const black = [1, 3, 6, 8, 10].includes(pitch % 12);
-      k += black ? `<rect x="0" y="${r * RH}" width="12" height="${RH}" fill="#000"/>` : `<rect x="0" y="${r * RH + RH - 0.5}" width="20" height="0.5" fill="#000"/>`;
+      k += black ? `<rect x="0" y="${r * RH}" width="12" height="${RH}" fill="var(--ink)"/>` : `<rect x="0" y="${r * RH + RH - 0.5}" width="20" height="0.5" fill="var(--ink)"/>`;
       if (pitch % 12 === 0) k += `<text x="19" y="${r * RH + RH}" font-size="5" text-anchor="end" font-family="Silkscreen">${noteName(pitch)}</text>`;
-      if (this.hover && this.hover.pitch === pitch) k += `<rect x="13" y="${r * RH}" width="7" height="${RH}" fill="#000"/>`;
+      if (this.hover && this.hover.pitch === pitch) k += `<rect x="13" y="${r * RH}" width="7" height="${RH}" fill="var(--ink)"/>`;
     }
     setSvg(this.kb, k);
     // strip: step numbers, selection, pointwise triangle
@@ -446,8 +446,8 @@ export class PatternEditor {
     for (let c = 0; c < COLS; c += 4) t += `<text x="${c * CW + 1}" y="7" font-size="6" font-family="Silkscreen">${this.scroll + c + 1}</text>`;
     if (this.region) {
       const x0 = (this.region[0] - this.scroll) * CW;
-      if (this.region[1] > this.region[0]) t += `<rect x="${x0}" y="9" width="${(this.region[1] - this.region[0]) * CW}" height="5" fill="#000"/>`;
-      else t += `<polygon points="${x0 - 3},9 ${x0 + 3},9 ${x0},14" fill="#000"/>`;
+      if (this.region[1] > this.region[0]) t += `<rect x="${x0}" y="9" width="${(this.region[1] - this.region[0]) * CW}" height="5" fill="var(--selection)"/>`;
+      else t += `<polygon points="${x0 - 3},9 ${x0 + 3},9 ${x0},14" fill="var(--selection)"/>`;
     }
     setSvg(this.strip, t);
     // bottom: edit range bar, counter, scroll bar
@@ -455,16 +455,16 @@ export class PatternEditor {
     let bt = '';
     const r0 = rec.range ? rec.range.start : 0;
     const r1 = rec.range ? rec.range.end : len + 1;
-    for (let i = 0; i < 3; i++) bt += `<line x1="${(r0 - this.scroll) * CW}" y1="${1.5 + i * 2}" x2="${(r1 - this.scroll) * CW}" y2="${1.5 + i * 2}" stroke="#000"/>`;
+    for (let i = 0; i < 3; i++) bt += `<line x1="${(r0 - this.scroll) * CW}" y1="${1.5 + i * 2}" x2="${(r1 - this.scroll) * CW}" y2="${1.5 + i * 2}" stroke="var(--ink)"/>`;
     const cx = (rec.counter - this.scroll) * CW;
-    bt += `<rect x="${cx}" y="9" width="${CW}" height="7" fill="#000"/>`;
+    bt += `<rect x="${cx}" y="9" width="${CW}" height="7" fill="var(--ink)"/>`;
     const W = COLS * CW + 2;
     const span = Math.max(p.size, len) + 4;
-    bt += `<rect x="0.5" y="19.5" width="${W - 1}" height="10" fill="url(#pbg)" stroke="#000"/>`;
-    bt += `<rect x="0.5" y="19.5" width="10" height="10" fill="#fff" stroke="#000"/><polygon points="7,22 3,24.5 7,27" fill="#000"/>`;
-    bt += `<rect x="${W - 10.5}" y="19.5" width="10" height="10" fill="#fff" stroke="#000"/><polygon points="${W - 7},22 ${W - 3},24.5 ${W - 7},27" fill="#000"/>`;
+    bt += `<rect x="0.5" y="19.5" width="${W - 1}" height="10" fill="url(#pbg)" stroke="var(--ink)"/>`;
+    bt += `<rect x="0.5" y="19.5" width="10" height="10" fill="var(--paper)" stroke="var(--ink)"/><polygon points="7,22 3,24.5 7,27" fill="var(--ink)"/>`;
+    bt += `<rect x="${W - 10.5}" y="19.5" width="10" height="10" fill="var(--paper)" stroke="var(--ink)"/><polygon points="${W - 7},22 ${W - 3},24.5 ${W - 7},27" fill="var(--ink)"/>`;
     const th = 10 + (this.scroll / span) * (W - 32);
-    bt += `<rect x="${th}" y="20" width="12" height="9" fill="#fff" stroke="#000"/>`;
+    bt += `<rect x="${th}" y="20" width="12" height="9" fill="var(--paper)" stroke="var(--ink)"/>`;
     bt = `<defs><pattern id="pbg" width="2" height="2" patternUnits="userSpaceOnUse"><rect width="1" height="1"/><rect x="1" y="1" width="1" height="1"/></pattern></defs>` + bt;
     setSvg(this.bottom, bt);
     // legend
@@ -479,13 +479,13 @@ export class PatternEditor {
       this.toolEls[t].classList.toggle('on', on);
       const key = t + on;
       if (this.toolEls[t].dataset.v !== key) {
-        this.toolEls[t].innerHTML = iconSvg(t, 12, 12, on ? '#fff' : '#000');
+        this.toolEls[t].innerHTML = iconSvg(t, 12, 12, on ? 'var(--paper)' : 'var(--ink)');
         this.toolEls[t].dataset.v = key;
       }
     });
     this.viewEls.forEach((d, v) => {
       d.classList.toggle('inv', v === this.voice);
-      d.style.outline = this.ghost === v ? '1px dotted #000' : '';
+      d.style.outline = this.ghost === v ? '1px dotted var(--ink)' : '';
     });
     this.modeEls.forEach((m, v) => {
       const p = s.pattern(v);
@@ -499,7 +499,7 @@ export class PatternEditor {
     });
     const sk = this.sound ? 'on' : 'off';
     if (this.soundBtn.dataset.v !== sk) {
-      this.soundBtn.innerHTML = iconSvg('speaker', 12, 12, this.sound ? '#fff' : '#000');
+      this.soundBtn.innerHTML = iconSvg('speaker', 12, 12, this.sound ? 'var(--paper)' : 'var(--ink)');
       this.soundBtn.classList.toggle('on', this.sound);
       this.soundBtn.dataset.v = sk;
     }

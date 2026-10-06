@@ -226,17 +226,17 @@ export class CcCyclesWindow {
       const ox = 8;
       const oy = 3;
       let inner = '';
-      for (let lv = 0; lv <= 4; lv++) inner += `<line x1="${ox}" y1="${oy + (4 - lv) * LY + 0.5}" x2="${ox + SX * 15}" y2="${oy + (4 - lv) * LY + 0.5}" stroke="#000" stroke-dasharray="1 1"/>`;
+      for (let lv = 0; lv <= 4; lv++) inner += `<line x1="${ox}" y1="${oy + (4 - lv) * LY + 0.5}" x2="${ox + SX * 15}" y2="${oy + (4 - lv) * LY + 0.5}" stroke="var(--dim)" stroke-dasharray="1 1"/>`;
       for (let st = 0; st < 16; st++) {
         const x = ox + st * SX + 0.5;
         const on = st < cyc.length;
-        inner += `<line x1="${x}" y1="${oy}" x2="${x}" y2="${oy + 4 * LY}" stroke="#000" stroke-dasharray="${on ? '0' : '1 2'}"/>`;
+        inner += `<line x1="${x}" y1="${oy}" x2="${x}" y2="${oy + 4 * LY}" stroke="var(--ink)" stroke-dasharray="${on ? '0' : '1 2'}"/>`;
         inner += `<text x="${x}" y="${oy + 4 * LY + 10}" font-size="6" text-anchor="middle" font-family="Silkscreen">${st + 1}</text>`;
-        if (st === cyc.length - 1) inner += `<rect x="${x - 4}" y="${oy + 4 * LY + 3}" width="9" height="9" fill="none" stroke="#000"/>`;
+        if (st === cyc.length - 1) inner += `<rect x="${x - 4}" y="${oy + 4 * LY + 3}" width="9" height="9" fill="none" stroke="var(--ink)"/>`;
         if (on) {
           const c = cyc[st];
-          for (let lv = c.lo; lv <= c.hi; lv++) inner += `<rect x="${x - 2.5}" y="${oy + (4 - lv) * LY - 2}" width="5" height="5" fill="#000"/>`;
-          if (c.hi > c.lo) inner += `<rect x="${x - 1}" y="${oy + (4 - c.hi) * LY}" width="2" height="${(c.hi - c.lo) * LY}" fill="#000"/>`;
+          for (let lv = c.lo; lv <= c.hi; lv++) inner += `<rect x="${x - 2.5}" y="${oy + (4 - lv) * LY - 2}" width="5" height="5" fill="var(--ink)"/>`;
+          if (c.hi > c.lo) inner += `<rect x="${x - 1}" y="${oy + (4 - c.hi) * LY}" width="2" height="${(c.hi - c.lo) * LY}" fill="var(--ink)"/>`;
         }
       }
       setSvg(g, inner);

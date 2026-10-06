@@ -97,6 +97,13 @@ proportions stay those of a 1-bit Macintosh screen at any size.
 * `choice.ts` — Variable Position choice bar; `minis.ts` — miniature representations.
 * `mainWindows.ts` — the six main windows; `varEditors.ts`, `cyclicEditor.ts`,
   `patternEditor.ts`, `otherWindows.ts` — edit windows and dialogs.
+* `palette.ts` — colour palettes. All drawing uses CSS custom properties (`--desktop`,
+  `--paper`, `--ink`, `--dim`, `--activity`, `--selection`, and the dither fills); a palette is
+  turned into one `<style>` element, and windows carry a `data-area` so each functional area can
+  redefine `--ink`. Classic (the default) produces exactly the original 1-bit colours.
+  Palettes are a browser preference (`localStorage`), never part of the composition;
+  `paletteWindow.ts` is the editor. The role/variable/mix approach follows the theme code in
+  the author's M8 Librarian and PT Librarian projects.
 * The display loop consumes the Session's queue of timestamped events when their time comes
   (pattern bricks flash, cycle steps blink, monitor log) and redraws only when something
   changed.

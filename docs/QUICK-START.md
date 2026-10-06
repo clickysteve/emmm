@@ -611,6 +611,28 @@ How this differs from four sequencer tracks:
   (one Pattern per chosen channel), or, with **as Sequence**, as a separate track that plays
   along with the four Voices (enable it with the button right of the film button).
 
+## Colours (palettes)
+
+emmm starts in **Classic**, the original black-and-white look. **Options ▸ Palette…** opens the
+Palette window:
+
+- **Palettes** (left): click **Classic**, **Dark** or **Colour**, or one of your own (marked *),
+  and the whole screen changes at once.
+- **Colours** (right): one row per colour role. **Desktop** is behind the windows, **Paper** the
+  window background, **Ink** frames and text; **Patterns**, **Variables**, **Cyclic**,
+  **Conducting**, **Midi** and **Snapshots** colour their own windows (and their edit windows);
+  **Dim** is for guide lines and small labels, **Activity** for the Baton and things that flash
+  as the music plays, **Selection** for selected Patterns and highlights. Click a swatch to pick
+  a colour, or type a hex value such as `#1d6a86` and press Return. A small **!** warns that a
+  colour may be hard to see; emmm never changes it for you.
+- Editing a built-in palette makes an editable copy ("Dark copy") — the built-ins never change.
+  Type in **Name** to rename your palette. **Duplicate** copies it, **Delete** (click twice)
+  removes it, **Back to Classic** returns to black and white.
+- **Export…** downloads the palette as a small `.emmm-palette.json` file; **Import…** loads one.
+
+The palette is remembered by this browser. It is not part of your document and has no effect
+on the music or MIDI.
+
 ---
 
 ## Ten things to try

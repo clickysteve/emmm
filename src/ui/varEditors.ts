@@ -38,6 +38,7 @@ export abstract class VarEditor {
       w,
       h,
       closable: true,
+      area: variable === 'orchestration' ? 'midi' : 'variables',
       positions: {
         edit: () => this.editPos,
         active: () => s.comp[variable].active,
@@ -139,7 +140,7 @@ export class NoteDensityEditor extends VarEditor {
       this.parts.push({
         update: () => {
           const x = 4 + Math.round(((this.pos[v] as number) / 100) * 136);
-          setSvg(line, `<rect x="0" y="7" width="146" height="1" fill="#000"/><rect x="0" y="6" width="${x}" height="3" fill="#000"/><rect x="${x - 3}" y="3" width="7" height="9" fill="#000"/>`);
+          setSvg(line, `<rect x="0" y="7" width="146" height="1" fill="var(--ink)"/><rect x="0" y="6" width="${x}" height="3" fill="var(--ink)"/><rect x="${x - 3}" y="3" width="7" height="9" fill="var(--ink)"/>`);
         },
       });
     }
@@ -253,11 +254,11 @@ export class NoteOrderEditor extends VarEditor {
           setSvg(
             svg,
             `<defs><pattern id="nog${v}" width="2" height="2" patternUnits="userSpaceOnUse"><rect width="1" height="1"/><rect x="1" y="1" width="1" height="1"/></pattern><pattern id="nod${v}" width="4" height="4" patternUnits="userSpaceOnUse"><rect x="1" y="1" width="2" height="2"/></pattern></defs>` +
-              `<rect x="0.5" y="0.5" width="${W + 1}" height="14" fill="#fff" stroke="#000"/>` +
-              `<rect x="1" y="1" width="${a}" height="13" fill="#000"/>` +
+              `<rect x="0.5" y="0.5" width="${W + 1}" height="14" fill="var(--paper)" stroke="var(--ink)"/>` +
+              `<rect x="1" y="1" width="${a}" height="13" fill="var(--ink)"/>` +
               `<rect x="${1 + a}" y="1" width="${m - a}" height="13" fill="url(#nog${v})"/>` +
               `<rect x="${1 + m}" y="1" width="${W - m}" height="13" fill="url(#nod${v})"/>` +
-              `<rect x="${a}" y="0" width="2" height="15" fill="#000"/><rect x="${m}" y="0" width="2" height="15" fill="#000"/>`,
+              `<rect x="${a}" y="0" width="2" height="15" fill="var(--ink)"/><rect x="${m}" y="0" width="2" height="15" fill="var(--ink)"/>`,
           );
         },
       });
@@ -355,8 +356,8 @@ export class OrchestrationEditor extends VarEditor {
           let inner = `<defs><pattern id="oh${v}" width="4" height="4" patternUnits="userSpaceOnUse"><rect x="3" width="1" height="1"/><rect x="2" y="1" width="1" height="1"/><rect x="1" y="2" width="1" height="1"/><rect y="3" width="1" height="1"/></pattern></defs>`;
           for (let i = 0; i < 16; i++) {
             const x = Math.round(i * 12.5);
-            inner += `<rect x="${x}" y="0" width="1" height="12" fill="#000"/>`;
-            if (l.includes(i + 1)) inner += `<rect x="${x + 1}" y="0" width="${Math.round(12.5) - 1}" height="12" fill="url(#oh${v})"/><rect x="${x + 3}" y="3" width="6" height="6" fill="#000"/>`;
+            inner += `<rect x="${x}" y="0" width="1" height="12" fill="var(--ink)"/>`;
+            if (l.includes(i + 1)) inner += `<rect x="${x + 1}" y="0" width="${Math.round(12.5) - 1}" height="12" fill="url(#oh${v})"/><rect x="${x + 3}" y="3" width="6" height="6" fill="var(--ink)"/>`;
           }
           setSvg(svg, inner);
         },
@@ -439,7 +440,7 @@ export class TimeDistortionEditor extends VarEditor {
     });
     const G = 200;
     const area = el('div', 'box', b, [16, 18, G + 2, G + 2]);
-    area.style.background = '#fff';
+    area.style.background = 'var(--paper)';
     area.title = 'Click breakpoints from lower-left to upper-right; double-click to finish. Drag a breakpoint to tug it.';
     this.svg = svgEl(G, G, '');
     area.appendChild(this.svg);
@@ -516,18 +517,18 @@ export class TimeDistortionEditor extends VarEditor {
   private draw(): void {
     const G = 200;
     const pt = ([x, y]: [number, number] | number[]) => `${(x * G).toFixed(1)},${((1 - y) * G).toFixed(1)}`;
-    let inner = `<line x1="0" y1="${G}" x2="${G}" y2="0" stroke="#000" stroke-dasharray="1 3"/>`;
+    let inner = `<line x1="0" y1="${G}" x2="${G}" y2="0" stroke="var(--dim)" stroke-dasharray="1 3"/>`;
     (this.pos as TimeMap[]).forEach((m, v) => {
       if (v === this.voice && this.drawing) return;
       const pts = [[0, 0], ...m.points, [1, 1]].map(pt).join(' ');
-      inner += `<polyline points="${pts}" fill="none" stroke="#000" stroke-width="${v === this.voice ? 2.5 : 1}" shape-rendering="geometricPrecision"/>`;
-      if (v === this.voice) m.points.forEach((p) => (inner += `<rect x="${p[0] * G - 2}" y="${(1 - p[1]) * G - 2}" width="5" height="5" fill="#000"/>`));
+      inner += `<polyline points="${pts}" fill="none" stroke="var(--ink)" stroke-width="${v === this.voice ? 2.5 : 1}" shape-rendering="geometricPrecision"/>`;
+      if (v === this.voice) m.points.forEach((p) => (inner += `<rect x="${p[0] * G - 2}" y="${(1 - p[1]) * G - 2}" width="5" height="5" fill="var(--ink)"/>`));
     });
     if (this.drawing) {
       const pts = [[0, 0], ...this.drawing].map(pt).join(' ');
-      inner += `<polyline points="${pts}" fill="none" stroke="#000" stroke-width="2.5"/>`;
+      inner += `<polyline points="${pts}" fill="none" stroke="var(--ink)" stroke-width="2.5"/>`;
       const last = this.drawing[this.drawing.length - 1] ?? [0, 0];
-      if (this.cursor) inner += `<line x1="${last[0] * G}" y1="${(1 - last[1]) * G}" x2="${this.cursor[0] * G}" y2="${(1 - this.cursor[1]) * G}" stroke="#000" stroke-dasharray="2 2"/>` + `<circle cx="${this.cursor[0] * G}" cy="${(1 - this.cursor[1]) * G}" r="4" fill="none" stroke="#000"/><line x1="${this.cursor[0] * G - 7}" y1="${(1 - this.cursor[1]) * G}" x2="${this.cursor[0] * G + 7}" y2="${(1 - this.cursor[1]) * G}" stroke="#000"/><line x1="${this.cursor[0] * G}" y1="${(1 - this.cursor[1]) * G - 7}" x2="${this.cursor[0] * G}" y2="${(1 - this.cursor[1]) * G + 7}" stroke="#000"/>`;
+      if (this.cursor) inner += `<line x1="${last[0] * G}" y1="${(1 - last[1]) * G}" x2="${this.cursor[0] * G}" y2="${(1 - this.cursor[1]) * G}" stroke="var(--ink)" stroke-dasharray="2 2"/>` + `<circle cx="${this.cursor[0] * G}" cy="${(1 - this.cursor[1]) * G}" r="4" fill="none" stroke="var(--ink)"/><line x1="${this.cursor[0] * G - 7}" y1="${(1 - this.cursor[1]) * G}" x2="${this.cursor[0] * G + 7}" y2="${(1 - this.cursor[1]) * G}" stroke="var(--ink)"/><line x1="${this.cursor[0] * G}" y1="${(1 - this.cursor[1]) * G - 7}" x2="${this.cursor[0] * G}" y2="${(1 - this.cursor[1]) * G + 7}" stroke="var(--ink)"/>`;
     }
     setSvg(this.svg, inner);
     this.editBtns.forEach((d, v) => d.classList.toggle('inv', v === this.voice));

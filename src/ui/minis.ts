@@ -130,7 +130,7 @@ export function miniPatternGroup(comp: Composition, g: number, w: number, h: num
   pats.forEach((p, v) => {
     if (!hasNotes(p)) return;
     const yy = 2 + v * bh;
-    if (flash[v]) s += rect(2, Math.round(yy), 14, Math.max(2, Math.round(bh) - 1), c === '#000' ? '#000' : '#fff') + rect(4, Math.round(yy) + 1, 10, Math.max(0, Math.round(bh) - 3), c === '#000' ? '#fff' : '#000');
+    if (flash[v]) s += rect(2, Math.round(yy), 14, Math.max(2, Math.round(bh) - 1), c === 'var(--ink)' ? 'var(--ink)' : 'var(--paper)') + rect(4, Math.round(yy) + 1, 10, Math.max(0, Math.round(bh) - 3), c === 'var(--ink)' ? 'var(--paper)' : 'var(--activity)');
     else s += rect(2, Math.round(yy), 14, Math.max(2, Math.round(bh) - 1), c);
   });
   return s;
