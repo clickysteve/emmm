@@ -360,6 +360,9 @@ for (const m of MENUS) {
     closeMenu();
     me.classList.add('open');
     const drop = el('div', 'dropdown', me);
+    // a press inside the open menu must not close it (click-then-click as well as
+    // press-drag-release menu use)
+    drop.addEventListener('pointerdown', (e) => e.stopPropagation());
     for (const it of m.items) {
       if (it.sep) {
         el('div', 'sep', drop);
