@@ -259,3 +259,34 @@ channel [DOC]. Stop/Cmd-period: All Notes Off on the channels of the current orc
 Movie button captures all output during a performance; *Save Movie As Midi File* writes it
 [DOC]. MIDI Files can be imported into the current Pattern Group (per-pattern channel
 selection, chord method, rests none/dur, quantization) or as a play-along Sequence [DOC].
+
+Sequence details [emmm choices, see U21]: a Sequence plays once from Start (and restarts on
+Sync when *Sync Restarts Sequence* is on); MIDI channel *n* in the file plays on M Output
+Channel *n*; its timing is in beats, so it follows M's tempo. Sequence Play-Enable is a mute:
+the Sequence keeps running silently [DOC]. A Snapshot can include the Sequence enable [DOC].
+
+## §18 Interface conventions
+
+* **Numerical** [DOC S1 ch.2, S2]: press in the top half → +1 (auto-repeat while held),
+  bottom half → −1; drag vertically outside the box → slider gesture with the cursor hidden;
+  Shift-click → copy the last numerical value set [DOC Appendix A]. Alt with Output Length →
+  structural change applied on release [DOC].
+* **Range bar** [DOC]: drag draws a range; a click sets a single value; Tempo's midpoint
+  becomes the tempo [DOC].
+* **Choice bar / Positions** [DOC]: click selects; double-click opens the edit window; drag
+  onto another Position swaps; Option(Alt)-drag copies; Shift-click quantizes; during Hold/Do
+  clicks are collected (blinking) instead of performed.
+* **Conducting Arrow** [DOC]: click toggles; press-and-hold rotates through the four
+  directions; drag around it to point it; Velocity Range and Legato arrows open into four
+  per-voice arrows with enable "bricks" for continuous conducting.
+* **Picture Matrix** [DOC]: press, slide to an icon, release.
+* **Edit windows** [DOC]: close triangle top-left; six-box Position selector in the title bar
+  (click = edit that Position; Option-click = also make it active; Shift-Option = quantized;
+  pull down = mark *). Voice numbers 1–4 drag onto each other to swap (Option: copy).
+* **Windows** [DOC]: drag by the title; Cmd-click brings to front without acting; edit windows
+  open with zoom rects unless *No Zoom Rects*.
+* **Blinking** [DOC]: Hold/Do pending items blink; the first step of a restarting cycle blinks
+  in the active miniature (not one-step cycles; *No Cyclic Blinking*); Pattern Group bricks flash
+  when a pattern starts over.
+* **Snapshot pictures** [DOC description]: a stored Snapshot is shown as its letter "posing in
+  the sun"; the current one has a black mark in its sun.
