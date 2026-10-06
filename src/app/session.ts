@@ -18,7 +18,7 @@ import * as msg from '../midi/messages';
 import type { MovieEvent, TempoChange } from '../midi/smf';
 import { MidiManager } from '../midi/webmidi';
 import { Scheduler } from '../scheduler/scheduler';
-import { ClockFollower, sameSource, type LearnMapping, type LearnSource } from '../extended/extended';
+import { CcCycleRunner, ClockFollower, sameSource, type LearnMapping, type LearnSource } from '../extended/extended';
 
 export interface VisualEvent {
   ms: number;
@@ -186,8 +186,10 @@ export class Session {
           break;
         case 'step':
           this.followDrumMachine(ev);
+          this.extendedCc(ev, ms);
           break;
         case 'change':
+          if (ev.what === 'sync') this.ccRunner.reset();
           this.changed(ev.what);
           break;
       }
@@ -237,6 +239,7 @@ export class Session {
         this.lastMovieTempo = this.comp.tempo.value;
       }
       if (this.comp.options.sendClock && this.comp.midi.clockPort) this.midi.send(this.comp.midi.clockPort, msg.START);
+      this.ccRunner.reset(this.comp.seed);
       this.scheduler.started();
       if (this.slideshowPlay?.waiting) this.beginSlideshowPlayback();
       if (this.slideshowRec && !this.comp.options.slideshowRecordWait) this.slideshowRec.start = 0;
@@ -775,6 +778,20 @@ export class Session {
   // ------------------------------------------------------------------ EXTENDED (src/extended)
 
   readonly clockFollower = new ClockFollower();
+  readonly ccRunner = new CcCycleRunner(0);
+
+  /** EXTENDED CC Cycles: a controller value before each played note, on the voice's channels. */
+  private extendedCc(ev: StepEvent, ms: number): void {
+    const ext = this.comp.extended;
+    if (!ext.enabled || !ev.played) return;
+    const r = this.ccRunner.next(ext.ccCycles, ev.voice);
+    if (!r) return;
+    const chans = this.comp.orchestration.positions[this.comp.orchestration.active][ev.voice];
+    for (const c of chans) {
+      this.send(c, msg.controlChange(c, r.cc, r.value), ms - 0.5);
+      this.movieAdd(ev.tick, msg.controlChange(this.outTarget(c).channel, r.cc, r.value));
+    }
+  }
   /** index into comp.extended.learn waiting for a controller, or null */
   learnArmed: number | null = null;
   private learnLast = new Map<string, number>();

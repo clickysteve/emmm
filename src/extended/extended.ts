@@ -1,11 +1,14 @@
+import { Rng } from '../engine/rng';
+
 /**
  * EXTENDED mode — "what might M have become?" Everything here is OFF unless the document's
  * `extended.enabled` is true, and nothing here changes how Classic computes notes.
  *
  *   1. MIDI clock input: follow an external tempo, Start / Stop / Continue.
  *   2. MIDI Learn: map incoming controllers / notes to emmm controls.
+ *   3. CC Cycles: cyclic distributions (M's cyclic-variable model) driving MIDI controllers.
  */
-import type { VariableName } from '../engine/types';
+import type { Cycle, VariableName } from '../engine/types';
 
 export type LearnTarget =
   | { kind: 'variable'; variable: VariableName }
@@ -30,8 +33,22 @@ export interface LearnMapping {
   source: LearnSource | null;
 }
 
+/** A CC Cycle for one voice: which controller, and a cyclic distribution of levels. */
+export interface CcVoice {
+  /** controller number 0..127, or -1 = off */
+  cc: number;
+  cycle: Cycle;
+}
+export interface CcCycles {
+  active: number;
+  positions: CcVoice[][]; // 6 × 4
+  /** global table: level 0..4 → controller value */
+  values: number[];
+}
+
 export interface ExtendedSettings {
   enabled: boolean;
+  ccCycles: CcCycles;
   clockIn: {
     enabled: boolean;
     /** Web MIDI input port id, '*' = any */
@@ -60,8 +77,51 @@ export function defaultLearnTargets(): LearnMapping[] {
   return t.map((target) => ({ target, source: null }));
 }
 
+export function defaultCcCycles(): CcCycles {
+  const ramp = (): CcVoice => ({ cc: 74, cycle: [0, 1, 2, 3, 4, 3, 2, 1].map((l) => ({ lo: l, hi: l })) });
+  const off = (): CcVoice => ({ cc: -1, cycle: [{ lo: 2, hi: 2 }] });
+  return {
+    active: 0,
+    positions: [
+      [off(), off(), off(), off()],
+      [ramp(), ramp(), ramp(), ramp()],
+      Array.from({ length: 4 }, () => ({ cc: 74, cycle: [{ lo: 0, hi: 4 }] })),
+      Array.from({ length: 4 }, () => ({ cc: 1, cycle: [{ lo: 4, hi: 4 }, { lo: 0, hi: 0 }] })),
+      [off(), off(), off(), off()],
+      [off(), off(), off(), off()],
+    ],
+    values: [0, 32, 64, 96, 127],
+  };
+}
+
 export function defaultExtended(): ExtendedSettings {
-  return { enabled: false, clockIn: { enabled: false, port: '*', transport: true }, learn: defaultLearnTargets() };
+  return { enabled: false, ccCycles: defaultCcCycles(), clockIn: { enabled: false, port: '*', transport: true }, learn: defaultLearnTargets() };
+}
+
+/**
+ * Runs CC Cycles from the engine's step events, outside the Classic engine. Uses its own
+ * seeded random stream, so Classic note output is untouched.
+ */
+export class CcCycleRunner {
+  private counters = [0, 0, 0, 0];
+  private rng: Rng;
+  constructor(seed: number) {
+    this.rng = new Rng(seed, 2000);
+  }
+  reset(seed?: number): void {
+    this.counters = [0, 0, 0, 0];
+    if (seed !== undefined) this.rng.reseed(seed, 2000);
+  }
+  /** Next controller value for a voice event, or null when the voice has no CC Cycle. */
+  next(settings: CcCycles, voice: number): { cc: number; value: number } | null {
+    const vc = settings.positions[settings.active]?.[voice];
+    if (!vc || vc.cc < 0 || !vc.cycle.length) return null;
+    const i = this.counters[voice] % vc.cycle.length;
+    this.counters[voice] = (i + 1) % vc.cycle.length;
+    const st = vc.cycle[i];
+    const level = this.rng.int(Math.min(st.lo, st.hi), Math.max(st.lo, st.hi));
+    return { cc: vc.cc, value: Math.max(0, Math.min(127, Math.round(settings.values[level] ?? 64))) };
+  }
 }
 
 export function targetLabel(t: LearnTarget): string {

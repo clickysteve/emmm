@@ -16,7 +16,7 @@ import { CyclicEditor } from './ui/cyclicEditor';
 import { el, view } from './ui/dom';
 import { ConductingWindow, CyclicWindow, MidiWindow, PatternsWindow, SnapshotWindow, VariablesWindow, type Updatable } from './ui/mainWindows';
 import { AboutWindow, HelpWindow, ImportWindow, LibraryWindow, MidiAssignmentWindow, MonitorWindow } from './ui/otherWindows';
-import { ExtendedWindow } from './ui/extendedWindow';
+import { CcCyclesWindow, ExtendedWindow } from './ui/extendedWindow';
 import { PatternEditor } from './ui/patternEditor';
 import { NoteDensityEditor, NoteOrderEditor, OrchestrationEditor, TimeDistortionEditor, TranspositionEditor, VarEditor, VelocityRangeEditor } from './ui/varEditors';
 
@@ -113,7 +113,9 @@ const importWin = new ImportWindow(ctx, desktop);
 const library = new LibraryWindow(ctx, desktop);
 const extendedWin = new ExtendedWindow(ctx, desktop);
 const helpWin = new HelpWindow(ctx, desktop);
-const floating = [...Object.values(editors), cyclic, patternEditor, midiAssign, monitorWin, about, importWin, library, extendedWin, helpWin];
+const ccWin = new CcCyclesWindow(ctx, desktop);
+extendedWin.openCc = () => ccWin.win.show();
+const floating = [...Object.values(editors), cyclic, patternEditor, midiAssign, monitorWin, about, importWin, library, extendedWin, helpWin, ccWin];
 floating.forEach((f) => f.win.el.classList.add('hidden'));
 
 /** The Macintosh "zoom rects": dotted rectangles growing from the click to the window. */

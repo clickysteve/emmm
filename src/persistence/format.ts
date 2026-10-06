@@ -94,6 +94,12 @@ function restoreVariableArrays(comp: Composition, raw: Composition): void {
       pos[v] = Array.isArray(ro) ? ro.filter((c) => c >= 1 && c <= NUM_CHANNELS) : [];
     }),
   );
+  comp.extended.ccCycles.positions.forEach((pos, pi) =>
+    pos.forEach((vc, v) => {
+      const rc = raw.extended?.ccCycles?.positions?.[pi]?.[v]?.cycle;
+      if (Array.isArray(rc) && rc.length > 0) vc.cycle = rc.map((s) => ({ lo: s.lo ?? 1, hi: s.hi ?? s.lo ?? 1 }));
+    }),
+  );
   comp.snapshots = comp.snapshots.map((_, i) => (raw.snapshots?.[i] ? structuredClone(raw.snapshots[i]) : null));
   comp.slideshows = comp.slideshows.map((_, i) => (raw.slideshows?.[i] ? structuredClone(raw.slideshows[i]) : null));
 }

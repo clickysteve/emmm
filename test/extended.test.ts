@@ -93,3 +93,29 @@ describe('MIDI clock input', () => {
     expect(s.engine.state).toBe('stopped');
   });
 });
+
+describe('CC Cycles', () => {
+  it('send a controller before each played note, cycling, only in Extended mode', () => {
+    const s = mk();
+    const sent: [number, number[]][] = [];
+    (s as unknown as { send: (c: number, b: number[]) => void }).send = (c, b) => sent.push([c, b]);
+    s.comp.voices.forEach((v, i) => (v.playEnable = i === 0));
+    s.comp.extended.ccCycles.active = 1; // ramp 0,32,64,96,127,96,64,32 on CC74
+    s.start();
+    s.emitNow(s.engine.render(96 * 3));
+    expect(sent.filter((x) => (x[1][0] & 0xf0) === 0xb0)).toHaveLength(0); // Classic: nothing
+    s.stop();
+    s.comp.extended.enabled = true;
+    sent.length = 0;
+    s.start();
+    s.emitNow(s.engine.render(96 * 4));
+    const cc = sent.filter((x) => (x[1][0] & 0xf0) === 0xb0).map((x) => [x[1][1], x[1][2]]);
+    expect(cc.slice(0, 5)).toEqual([[74, 0], [74, 32], [74, 64], [74, 96], [74, 127]]);
+  });
+  it('save/load keeps CC Cycle lengths', async () => {
+    const { serialize, deserialize } = await import('../src/persistence/format');
+    const c = demoComposition(1);
+    c.extended.ccCycles.positions[2][1].cycle = [{ lo: 1, hi: 3 }];
+    expect(deserialize(serialize(c)).composition.extended.ccCycles.positions[2][1].cycle).toEqual([{ lo: 1, hi: 3 }]);
+  });
+});

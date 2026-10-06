@@ -46,12 +46,15 @@
 * **MIDI Learn**: map any CC or note to Variable Positions (CC value spreads over the six
   Positions; a key steps to the next), Tempo within its range, Baton X/Y, Start, Stop, Sync,
   Hold/Do, Play-Enable 1–4, Snapshots A–F.
+* **CC Cycles**: per voice, a cyclic distribution of levels (M's own cyclic-variable model,
+  16 steps × levels 0–4, random ranges) sends a controller value before each played note on the
+  voice's orchestrated channels; six Positions; a global level → value table. Runs in the
+  Session from the engine's step events with its own random stream.
 * Tests prove Classic note output is unchanged by Extended settings.
 
 ## Extended — further ideas (keep separate from Classic)
 
 * More voices / Pattern Groups; more Positions per Variable.
-* MIDI CC "Variables" (a cyclic variable or position set emitting controllers).
 * Tempo sharing beyond MIDI clock (e.g. Link-style network sync).
 * Learnable mappings for every on-screen control (numericals, range bars, edit windows).
 * Parameter automation lanes recorded from gestures (beyond Slideshows).
