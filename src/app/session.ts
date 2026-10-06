@@ -252,7 +252,7 @@ export class Session {
   stop(): void {
     // Note-ons up to the render frontier may already be queued in the MIDI driver with future
     // timestamps; the note-offs must not be sent before them or notes would hang.
-    const offAt = this.playing ? Math.max(performance.now(), this.scheduler.tickToMs(this.engine.tick)) : performance.now();
+    const offAt = this.afterQueued();
     const evs = this.engine.stop();
     if (evs.length) this.dispatch(evs, () => offAt);
     this.scheduler.stopped();
@@ -310,15 +310,20 @@ export class Session {
   }
 
   /** All Notes Off on the channels of the current orchestration (Cmd-period). */
+  /** Time after every note already handed to the MIDI driver (the render frontier). */
+  private afterQueued(): number {
+    return this.playing ? Math.max(performance.now(), this.scheduler.tickToMs(this.engine.tick)) : performance.now();
+  }
+
   allNotesOff(): void {
     const chans = new Set(this.comp.orchestration.positions[this.comp.orchestration.active].flat());
-    const now = performance.now();
+    const now = this.afterQueued();
     for (const c of chans) this.send(c, msg.allNotesOff(c), now);
     this.monitor.allOff();
   }
 
   panic(channels?: number[]): void {
-    const now = performance.now();
+    const now = this.afterQueued();
     for (const c of channels ?? Array.from({ length: 16 }, (_, i) => i + 1)) {
       for (let n = 0; n < 128; n++) this.send(c, msg.noteOff(c, n), now);
       this.send(c, msg.allNotesOff(c), now);
