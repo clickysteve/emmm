@@ -1,6 +1,7 @@
 {
   "version": "0.0.1",
   "configurations": [
-    { "name": "emmm", "runtimeExecutable": "npx", "runtimeArgs": ["vite", "--port", "5199", "--strictPort"], "port": 5199 }
+    { "name": "emmm", "runtimeExecutable": "npx", "runtimeArgs": ["vite", "--port", "5199", "--strictPort"], "port": 5199 },
+    { "name": "emmm-pages-preview", "runtimeExecutable": "npx", "runtimeArgs": ["vite", "preview", "--base=/emmm/", "--port", "4173", "--strictPort"], "port": 4173 }
   ]
 }

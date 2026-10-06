@@ -42,6 +42,10 @@ were kept in `research-sources/`, which is **git-ignored and not distributed**.
 | Tiny5 (via `@fontsource/tiny5`) | SIL OFL 1.1 | Main UI face; its synthetic bold stands in for the Mac system font M used. Not a copy of Chicago. Chosen over Pixelify Sans, whose small "C" read as "O". |
 | Silkscreen (via `@fontsource/silkscreen`) | SIL OFL 1.1 | Small label face. |
 | Vite, Vitest, TypeScript (dev only) | MIT / Apache-2.0 | Build and test tooling, not shipped in the bundle. |
+| marked (dev only) | MIT | Renders docs/QUICK-START.md into the static docs/quick-start.html page at build time; not part of the application bundle. |
+
+The screenshots in `docs/images/` are of emmm itself (captured from the running build in
+headless Chrome, with red annotation boxes added afterwards). They contain no M imagery.
 
 ## Words
 

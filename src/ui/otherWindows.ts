@@ -228,18 +228,24 @@ export class MonitorWindow {
 
 export class AboutWindow {
   win: MWindow;
-  constructor(ctx: UiContext, parent: HTMLElement) {
-    this.win = new MWindow(parent, { id: 'about', title: 'emmm', x: 200, y: 110, w: 320, h: 214, closable: true });
+  constructor(_ctx: UiContext, parent: HTMLElement) {
+    this.win = new MWindow(parent, { id: 'about', title: 'About emmm', x: 190, y: 96, w: 340, h: 262, closable: true });
     const b = this.win.body;
-    const t = el('div', 'label', b, [10, 8, 300, 190]);
+    const t = el('div', 'label', b, [12, 8, 316, 236]);
     t.style.whiteSpace = 'normal';
     t.style.lineHeight = '12px';
     t.style.fontSize = '10px';
+    t.style.pointerEvents = 'auto';
     t.innerHTML = `<div style="font-size:22px;font-weight:600;line-height:24px">emmm</div>
-      <div>a modern recreation and continuation of <b>M</b> — the interactive composing and performing system by David Zicarelli, Joel Chadabe, John Offenhartz and Antony Widoff (Intelligent Music, 1986–87).</div>
-      <br><div>emmm is independent, newly written code. It is not affiliated with Intelligent Music or Cycling '74.</div>
-      <br><div><b>Space</b> start/sync · <b>Return</b> stop · <b>Tab</b> pause · <b>Backspace</b> Hold/Do · <b>A–Z</b> snapshots · <b>1–9</b> slideshows · <b>0</b> stop slideshow · <b>\\</b> loop · <b>Caps Lock</b> or <b>⌘⌥</b> mouse advance · <b>⌘.</b> all notes off</div>
-      <br><div class="tiny" style="font-family:Silkscreen;font-size:7px">mode: classic · seed ${ctx.s.comp.seed}</div>`;
+      <div>An interactive composing and performing instrument for MIDI, after <b>M</b>.</div>
+      <br><div>emmm is an independent, unofficial recreation of the concepts and workflow of M, the
+      interactive composition program originally developed at Intelligent Music by Joel Chadabe,
+      David Zicarelli, John Offenhartz and Antony Widoff.</div>
+      <br><div>It is not affiliated with or endorsed by Intelligent Music, Cycling '74, David Zicarelli,
+      or the original developers or rights holders. emmm is an independently written implementation
+      and does not distribute the original M application or its original assets.</div>
+      <br><div>Runs entirely in your browser: your music and MIDI stay on this computer.</div>
+      <br><div><a href="docs/quick-start.html" target="_blank" rel="noopener" style="color:inherit">Quick Start guide</a> · emmm ▸ Help…</div>`;
   }
   update(): void {}
 }
@@ -448,6 +454,7 @@ export class LibraryWindow {
 // ---------------------------------------------------------------------------- Help (emmm)
 
 const HELP = `
+<b>New to emmm?</b> Read the <a href="docs/quick-start.html" target="_blank" rel="noopener" style="color:inherit"><b>Quick Start guide</b></a> (opens in a new tab).<br><br>
 <b>emmm in one minute</b><br>
 Four <b>Patterns</b> hold notes and chords (no rhythm). Each becomes a <b>Voice</b> through the
 <b>Variables</b>. Every Variable has six <b>Positions</b> (Sound Choice: sixteen); one is active

@@ -64,7 +64,13 @@ tabs) every 10 ms; each wake-up renders events up to *now + 60 ms* and hands the
 exact timestamps. MIDI output uses `MIDIOutput.send(data, timestamp)`, so timing accuracy is
 set by the timestamps, not by when JavaScript runs. It also generates MIDI clock (24 ppq ×
 sync ratio) and metronome clicks. `limitTick` lets Tap Conduct hold the music until the next
-tap.
+tap. The worker is created when the app loads (it can take a moment to boot on a cold page),
+and until its first tick arrives a main-thread timer stands in, so the first notes after Start
+are never held up.
+
+Rendering cost matters for timing too, because Web MIDI sends happen on the main thread: each
+window is its own compositing layer (`will-change: transform`), so a flashing control repaints
+only its window.
 
 ### MIDI (`src/midi`)
 * `webmidi.ts` — device discovery, hot-plug, input listeners, graceful fallback when Web MIDI
@@ -94,6 +100,12 @@ proportions stay those of a 1-bit Macintosh screen at any size.
 * The display loop consumes the Session's queue of timestamped events when their time comes
   (pattern bricks flash, cycle steps blink, monitor log) and redraws only when something
   changed.
+
+### Hosting
+The build is a static site. `vite.config.ts` uses a relative base by default; the GitHub Pages
+workflow builds with `--base=/<repository>/`. A small build-time plugin renders
+`docs/QUICK-START.md` (with its images) to `docs/quick-start.html`, which the in-app Help and
+About windows link to. No server, no third-party requests.
 
 ### Persistence (`src/persistence`)
 `format.ts`: `{ format: "emmm", version, mode, savedAt, composition, ui }` JSON. `migrate`

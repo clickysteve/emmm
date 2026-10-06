@@ -10,9 +10,12 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build:pages": "tsc --noEmit && vite build --base=/emmm/",
+    "preview:pages": "vite preview --base=/emmm/ --port 4173"
   },
   "devDependencies": {
+    "marked": "^18.1.0",
     "typescript": "^7.0.2",
     "vite": "^8.3.2",
     "vitest": "^4.1.11"
