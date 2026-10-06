@@ -1195,6 +1195,9 @@ export class Session {
 
   load(comp: Composition): void {
     this.stop();
+    // A document with no MIDI output assignment at all (File ▸ New, Open Demo) keeps the
+    // current routing, so loading it does not silently disconnect the user's devices.
+    if (comp.midi.outputs.every((o) => !o.port)) comp.midi = structuredClone(this.comp.midi);
     this.comp = comp;
     this.emitNow(this.engine.load(comp));
     this.editRng = new Rng(comp.seed, 500);

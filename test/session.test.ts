@@ -340,3 +340,20 @@ describe('review fixes', () => {
     expect(sent.filter((b) => (b[0] & 0xf0) === 0x90)).toHaveLength(0);
   });
 });
+
+describe('loading documents keeps MIDI routing', () => {
+  it('New / Open Demo (no output assignment) keep the current device routing', () => {
+    const s = mk();
+    s.comp.midi.outputs.forEach((o, i) => ((o.port = 'synthA'), (o.channel = i + 1)));
+    s.load(demoComposition(5));
+    expect(s.comp.midi.outputs[0]).toEqual({ port: 'synthA', channel: 1 });
+  });
+  it('a document with its own routing keeps it', () => {
+    const s = mk();
+    s.comp.midi.outputs[0].port = 'synthA';
+    const d = demoComposition(5);
+    d.midi.outputs[0].port = 'synthB';
+    s.load(d);
+    expect(s.comp.midi.outputs[0].port).toBe('synthB');
+  });
+});
