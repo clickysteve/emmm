@@ -18,7 +18,7 @@ afterEach(() => {
 describe('EXTENDED is inert unless enabled', () => {
   it('controllers do nothing in Classic mode', () => {
     const s = mk();
-    s.comp.extended.learn[0].source = { type: 'cc', channel: 1, number: 20 };
+    s.learn.push({ target: { kind: 'variable', variable: 'patternGroup' }, source: { type: 'cc', channel: 1, number: 20 } });
     s.midiIn('x', [0xb0, 20, 127], 0);
     expect(s.comp.patternGroup.active).toBe(0);
   });
@@ -48,10 +48,9 @@ describe('MIDI Learn', () => {
   it('learns a controller and maps its value onto six Positions', () => {
     const s = mk();
     s.comp.extended.enabled = true;
-    const idx = s.comp.extended.learn.findIndex((m) => m.target.kind === 'variable' && m.target.variable === 'transposition');
-    s.learnArmed = idx;
+    s.armLearn({ kind: 'variable', variable: 'transposition' });
     s.midiIn('x', [0xb2, 21, 0], 0);
-    expect(s.comp.extended.learn[idx].source).toEqual({ type: 'cc', channel: 3, number: 21 });
+    expect(s.learn).toEqual([{ target: { kind: 'variable', variable: 'transposition' }, source: { type: 'cc', channel: 3, number: 21 } }]);
     s.midiIn('x', [0xb2, 21, 127], 0);
     expect(s.comp.transposition.active).toBe(5);
     s.midiIn('x', [0xb2, 21, 50], 0);
@@ -60,8 +59,7 @@ describe('MIDI Learn', () => {
   it('a learnt key triggers Start on its rising edge', () => {
     const s = mk();
     s.comp.extended.enabled = true;
-    const idx = s.comp.extended.learn.findIndex((m) => m.target.kind === 'start');
-    s.comp.extended.learn[idx].source = { type: 'note', channel: 10, number: 36 };
+    s.learn.push({ target: { kind: 'start' }, source: { type: 'note', channel: 10, number: 36 } });
     s.midiIn('x', [0x99, 36, 100], 0);
     expect(s.engine.state).toBe('playing');
   });

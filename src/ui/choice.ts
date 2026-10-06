@@ -6,8 +6,12 @@
 import { NUM_POSITIONS } from '../engine/constants';
 import type { VariableName } from '../engine/types';
 import { EDITOR_FOR, type UiContext } from './context';
-import { el, svgEl, setSvg, trackDrag } from './dom';
+import { LOCK_DIMS, type LockDim } from '../extended/extended';
+import { el, setTip, svgEl, setSvg, trackDrag } from './dom';
+import { iconSvg } from './icons';
 import { miniFor } from './minis';
+
+const LOCKABLE = new Set<string>(LOCK_DIMS.map((d) => d.id));
 
 export class VariableChoice {
   cells: HTMLDivElement[] = [];
@@ -15,6 +19,10 @@ export class VariableChoice {
   private lastClick = { t: 0, i: -1 };
   private drawn: string[] = [];
   private flashEls: HTMLDivElement[][] = [];
+  /** EXTENDED: a padlock on the bar when Mutation may not change this Variable */
+  private lock: HTMLDivElement;
+  private frame: HTMLDivElement;
+  private lockKey = '';
 
   constructor(
     private ctx: UiContext,
@@ -26,6 +34,12 @@ export class VariableChoice {
     private ch: number,
     vertical = false,
   ) {
+    // lock marks (Extended): a padlock badge for a value lock, a dotted frame for "Positions"
+    const W = vertical ? cw : NUM_POSITIONS * (cw - 1) + 1;
+    const H = vertical ? NUM_POSITIONS * (ch - 1) + 1 : ch;
+    this.frame = el('div', 'lockframe hidden', parent, [x - 2, y - 2, W + 4, H + 4]);
+    this.lock = el('div', 'lockbadge hidden', parent, [x - 5, y - 5, 12, 12]);
+    this.lock.innerHTML = iconSvg('lock', 10, 10);
     for (let i = 0; i < NUM_POSITIONS; i++) {
       const cx = vertical ? x : x + i * (cw - 1);
       const cy = vertical ? y + i * (ch - 1) : y;
@@ -53,7 +67,7 @@ export class VariableChoice {
   private down(ev: PointerEvent, i: number): void {
     ev.preventDefault();
     const s = this.ctx.s;
-    const now = performance.now();
+    const now = ev.timeStamp; // the press's own time (robust when the screen is busy)
     const dbl = this.lastClick.i === i && now - this.lastClick.t < 350;
     this.lastClick = { t: now, i };
     if (dbl) {
@@ -90,7 +104,20 @@ export class VariableChoice {
     return -1;
   }
 
+  private updateLock(): void {
+    const ext = this.ctx.s.comp.extended;
+    const values = ext.enabled && LOCKABLE.has(this.variable) && ext.locks.dims[this.variable as LockDim];
+    const positions = ext.enabled && this.variable !== 'soundChoice' && ext.locks.dims.positions;
+    const key = `${values}|${positions}`;
+    if (key === this.lockKey) return;
+    this.lockKey = key;
+    this.lock.classList.toggle('hidden', !values);
+    this.frame.classList.toggle('hidden', !positions);
+    setTip(this.lock, 'Locked: Mutation leaves these values alone (Extended window)');
+  }
+
   update(): void {
+    this.updateLock();
     const s = this.ctx.s;
     const comp = s.comp;
     const active = (comp[this.variable] as { active: number }).active;

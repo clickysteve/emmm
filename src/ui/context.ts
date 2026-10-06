@@ -1,3 +1,4 @@
+import type { Prefs } from '../app/prefs';
 import type { Session } from '../app/session';
 import type { VariableName } from '../engine/types';
 
@@ -27,6 +28,8 @@ export interface FlashState {
 
 export interface UiContext {
   s: Session;
+  /** application preferences and editor assistance (not part of the document) */
+  prefs: Prefs;
   screen: HTMLElement;
   flash: FlashState;
   openEditor(name: EditorName, opts?: { position?: number; variable?: VariableName; voice?: number; from?: Element }): void;

@@ -3,7 +3,7 @@
  * Purely cosmetic: nothing here touches the Session or the composition.
  */
 import { downloadBytes, pickFile } from '../persistence/storage';
-import { el, label } from './dom';
+import { el, label, setTip } from './dom';
 import {
   applyPalette,
   contrastWarnings,
@@ -201,7 +201,7 @@ export class PaletteWindow {
     }
     this.name.value = sel.name;
     this.name.disabled = sel.builtIn;
-    this.name.title = sel.builtIn ? 'Built-in palettes cannot be renamed: Duplicate first' : 'Rename this palette';
+    setTip(this.name, sel.builtIn ? 'Built-in palettes cannot be renamed: Duplicate first' : 'Rename this palette');
     this.btns.delete.disabled = sel.builtIn;
     this.btns.delete.style.opacity = sel.builtIn ? '0.4' : '1';
     this.name.style.opacity = sel.builtIn ? '0.6' : '1';
@@ -214,7 +214,7 @@ export class PaletteWindow {
       if (role !== editing) r.hex.value = c;
       const w = warnings.get(role);
       r.warn.style.visibility = w ? 'visible' : 'hidden';
-      r.warn.title = w ? `Low contrast against ${ROLE_INFO[w.against].label} (${w.ratio.toFixed(1)}:1) — may be hard to see` : '';
+      setTip(r.warn, w ? `Low contrast against ${ROLE_INFO[w.against].label} (${w.ratio.toFixed(1)}:1) — may be hard to see` : '');
     }
   }
 

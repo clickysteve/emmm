@@ -199,14 +199,25 @@ Variable on Position 1. (Your MIDI routing from the previous step is kept.)
 Double-click Voice 1's **Select** box (the box with ♪ ●● · in the first row of the Patterns
 window). The **Pattern Editor** opens.
 
-![Pattern Editor with C3 E3 G3 B♭3 entered; 1 tools, 2 View (which Voice)](images/qs-pattern-editor.png)
+![Pattern Editor with C3 E3 G3 B♭3 entered; 1 tools, 2 View (which Voice), 3 Length, 4 Time Base, 5 Phase, 6 scale guide, 7 Clear Pattern](images/qs-pattern-editor.png)
 
 Pitch runs vertically (a keyboard on the left, with C2, C3, C4… marked in tiny letters);
 **steps** run left to right. As you move the mouse over the grid, the right-hand panel shows
-the note and step under the cursor. emmm, like M, calls **MIDI note 60 "C3"**.
+the note and step under the cursor. emmm, like M, calls **MIDI note 60 "C3"**. Rest the
+mouse on any control for a moment and a short tip explains it.
 
 Click once in each of these cells: **step 1 at C3, step 2 at E3, step 3 at G3, step 4 at
 A#3** (B♭ is shown as A#). Each click adds a note (clicking a note again removes it).
+
+The right-hand panel also holds this Pattern's own settings — the same controls (and the
+same values) as its row in the Patterns window:
+
+- **3 Length** — how many steps the Voice plays (M calls it *Output Length*); "/4" is how many
+  steps the Pattern has.
+- **4 T Base** and **5 Phase** — how fast the Voice steps through the Pattern, and how late it
+  starts (see *Making a Voice faster or slower* below). The line under them says it in words,
+  e.g. "step = 1/4 note · 120/min × Rhythm".
+- **6 Scale guide** and **7 Clear Pattern** — see *Pattern editing helpers* below.
 
 Now close the Pattern Editor with the triangle at its top-left corner (it covers part of
 the Patterns window).
@@ -220,7 +231,7 @@ the Patterns window).
 Press **Space**. Voice 1 plays C E G B♭ in even quarter notes, forever. The Patterns window
 shows **Output Length 4** and **Time Base 1 | 4**. Change the right-hand Time Base number
 from 4 to **8** (press the top half of that box four times: 5, 6, 7, 8): twice as fast. Set
-it back to 4.
+it back to 4. (The Pattern Editor's **T Base** boxes are the same setting.)
 
 > A Pattern always loops, because it is not a timeline — it is a *pool of material* that the
 > Voice walks through.
@@ -581,6 +592,55 @@ How this differs from four sequencer tracks:
 
 ---
 
+## Making a Voice faster or slower
+
+There is no separate "pattern speed" control in M, and none is needed: four settings, each
+with one job, decide when a Voice plays its next note.
+
+1. **Tempo** (Conducting window) — the beat for everything, in quarter notes per minute.
+2. **Time Base** `n | d` — how long one step of *this* Voice's Pattern lasts: **n/d of a whole
+   note**. `1 | 4` = quarter notes, `1 | 8` = eighths, `1 | 16` = sixteenths, `1 | 3`, `1 | 6`
+   and `1 | 12` = triplets, `3 | 8` = dotted quarters, `2 | 4` = half notes. `sa` (step
+   advance) means the Voice moves only when you play into it.
+3. **Rhythm** (a Cyclic Variable) — multiplies each step by the value of the level it picks:
+   with the standard table level 1 = ×1, level 2 = ×2 (twice as long), level 0 = ×½. The
+   Rhythm values are set at the bottom of the Cyclic Editor.
+4. **Time Distortion** — then bends the timing within a span (swing, rubato).
+
+**Phase** delays a Voice's start after Start or Sync by 0–199 ticks (96 = one quarter note),
+so two Voices at the same speed can sit off each other.
+
+Practical recipes:
+
+- **Voice 2 twice as fast:** double its Time Base's second number (`1 | 4` → `1 | 8`), in its
+  Patterns-window row or in the Pattern Editor while you edit it.
+- **Three against four:** Voice 1 at `1 | 4`, Voice 2 at `1 | 3`. Sync (Space) lines them up.
+- **Long notes now and then:** keep the Time Base; give Rhythm a cycle with an occasional
+  level 2 or 3.
+
+The Time Base, Output Length and Phase are stored **with each Pattern in its Pattern Group**,
+so selecting another Pattern Group can change the speeds too — a quick way to switch from a
+slow section to a fast one. All of these can be changed while the music plays.
+
+## Pattern editing helpers
+
+- **Length after a long note:** clicking past the end of a Pattern lengthens it (the gap fills
+  with rests). Removing that note again leaves the rests — on purpose: rests are material.
+  To shorten, drag the **Length** box down: the Voice then plays fewer steps and the rest of
+  the Pattern is kept. **Alt**-drag (or Alt-click) the Length box to really cut the Pattern
+  to that length, or to add rests at the end.
+- **Clear Pattern** (button in the Pattern Editor, or **Pattern ▸ Clear Pattern** for the
+  selected Patterns) removes every step of that Pattern. Its Time Base, Phase and Size stay.
+- **Undo / Redo:** **⌘Z** undoes and **⇧⌘Z** redoes (also in the Edit menu). Undo covers
+  editing — notes, lengths, Variable and cycle values, Clear Pattern, Mutation — and treats a
+  whole drag as one step. It never rewinds the *performance*: which Positions are active, the
+  tempo and the Baton stay where they are, so you can undo an edit without the music jumping.
+- **Scale guide** (box 6): choose a root and a scale (Major, the minor scales, the modes,
+  pentatonics, Blues, Whole Tone). Notes outside the scale are dotted grey in the grid, the
+  root's rows are tinted, and a click on a wrong note enters the nearest scale note instead.
+  It is only a guide for entering notes: it never changes notes you already have, and it has
+  no effect at all on what M plays (choose **Chromatic** to switch it off).
+
 ## Saving your work
 
 - **Save:** **File ▸ Save** or **⌘S** downloads a file named after the document
@@ -603,6 +663,9 @@ How this differs from four sequencer tracks:
   from that seed, so **the same document, seed and gestures produce the same performance**.
   Keep a seed you like (it is saved in the document); change it (press in the box, or
   **emmm ▸ New random seed**) to hear a different "take" of the same settings.
+- **Not in the document:** colour palettes, tips on/off, the scale guide and MIDI Learn
+  mappings belong to this browser (they describe you and your equipment), so they stay as
+  they are when you open someone else's file.
 - **MIDI Movie export:** click the film button (the middle of the lower transport strip in
   the Conducting window; it turns black), press Start, perform, press Stop. Then **File ▸ Save
   Movie As Midi File…** downloads a Standard MIDI File of everything emmm played — ready to
@@ -632,6 +695,62 @@ Palette window:
 
 The palette is remembered by this browser. It is not part of your document and has no effect
 on the music or MIDI.
+
+## Comfort: tips, the Windows menu, full screen
+
+- **Tips:** rest the mouse on almost anything for a short explanation. **Options ▸ Show Tips**
+  turns them off.
+- **Windows menu:** choose a window to bring it to the front (its title flashes, so you can
+  see which one even when nothing was covering it). Edit windows you have open are listed
+  too; **Close Edit Windows** (⌘0) puts them all away.
+- **Full screen:** the **⤢** at the right of the menu bar (or **Options ▸ Full Screen**).
+  Escape or **⤡** comes back. Everything works the same in full screen.
+
+---
+
+## Extended: emmm's additions (not part of M)
+
+M stopped in the early 1990s. **Extended** is emmm's idea of where it might have gone next —
+modern additions, not reconstructions of the original. Open **Options ▸ Extended…** and click
+**Extended on**; nothing here changes how Classic M generates notes, and with Extended off it
+all does nothing.
+
+- **Seed and Reroll.** All of emmm's randomness comes from the **Seed** (also in the
+  Conducting window): same document + same seed = the same performance from Start. **Reroll**
+  picks a new seed — a new "take" of exactly the same settings — at once, without restarting
+  and without touching your Patterns. Type a number in the Seed box to go back to one you liked.
+- **Locks.** "I like this — keep it while I change everything else." Lock whole **Voices**
+  (1–4) or kinds of setting (**Positions**, **Pat Group**, **Material**, **Density**,
+  **Vel Range**, **Note Order**, **Transpose**, **Time Dist**, **Rhythm**, **Legato**,
+  **Accent**, **Orch**). A padlock appears on locked Variables and Voices. Locks only hold
+  back Mutate and Reroll; you can still edit everything by hand. A locked Voice keeps its own
+  random choices through a Reroll.
+- **Mutation.** Drag the bar from **subtle** to **chaos** and press **Mutate**: emmm changes
+  the *settings* being played — values in the active Positions, cycles, which Positions are
+  active, the Cyclic Random order — not the notes in your Patterns. Subtle gives a related
+  variation; chaos can transform the piece. It follows the seed (the same document mutates
+  the same way) and every Mutate is one **⌘Z**.
+- **A / B.** **Capture A** and **Capture B** store how the music is being played (every
+  Position and which is active, cycles, tempo, Voice settings, Time Bases). **A**, **B** and
+  **A ⇄ B** recall them — safely, while playing. Your notes, MIDI routing, Snapshots, palette
+  and window layout are not part of A/B.
+- **MIDI Learn** (button, or **Options ▸ MIDI Learn…**). Choose a control in the list —
+  transport, a Variable (a knob sweeps its six Positions), any single Position, the Baton,
+  Play-Enable, Snapshots A–Z, Mutate, Mutation amount, Reroll, A/B — press **Learn**, then
+  move a knob or press a key. The list shows every mapping with **Learn** (change it) and
+  **×** (remove). One knob drives one control: learning it for something else moves it, and
+  the window says so. Escape cancels. Mappings are kept by this browser, for your equipment.
+- **MIDI clock input.** **follow clock** makes emmm follow an external MIDI clock's tempo;
+  **Start/Stop/Cont** also follows its transport; choose which input. The box at the right
+  shows **INTERNAL**, **WAITING**, **RUNNING** (with the tempo) or **LOST** — if the clock
+  stops arriving, emmm keeps the last tempo until it returns. (Sending clock is Classic:
+  **Options ▸ Send Clock** with a device chosen under Send Sync in Midi Assignment; Pause sends
+  Stop and Continue.)
+- **Performance Feedback** (**Options ▸ Performance Feedback**) opens a small inspector: for
+  each Voice, the step just played, the source note and what came out, whether Note Density
+  let it through (PASS / SKIP), the transposition, the Rhythm / Legato / Accent levels picked,
+  the velocity and the channels — plus the active Positions, Locks and A/B state.
+- **CC Cycles** drive MIDI controllers with M-style cyclic patterns, one per Voice.
 
 ---
 
@@ -718,7 +837,9 @@ how timed) → Cyclic Variables (rhythm, length, accent per note) → Orchestrat
 | Caps Lock, or ⌘⌥ + move the mouse | Mouse Advance (Voices with ◆ step only while the mouse moves) |
 | ⌘. | All Notes Off |
 | ⌘S · ⌘O · ⌘0 | Save · Open · close edit windows |
+| ⌘Z · ⇧⌘Z | Undo · Redo (editing, not performing) |
 | ⌘M | metronome on/off |
+| Escape | close a menu, pop-up or dialog; cancel MIDI Learn; leave full screen |
 
 **Mouse**
 

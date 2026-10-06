@@ -15,6 +15,7 @@
     "preview:pages": "vite preview --base=/emmm/ --port 4173"
   },
   "devDependencies": {
+    "happy-dom": "^20.14.5",
     "marked": "^18.1.0",
     "typescript": "^7.0.2",
     "vite": "^8.3.2",

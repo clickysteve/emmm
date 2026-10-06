@@ -11,24 +11,16 @@ import { deleteFromLibrary, listLibrary, loadFromLibrary, saveToLibrary } from '
 import type { UiContext } from './context';
 import { el, label } from './dom';
 import { noteValueIcon } from './icons';
+import { confirmDialog } from './dialogs';
+import { Selector, type SelectorOption } from './selector';
+
+const escapeHtml = (t: string) => t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 import { MWindow, Numerical } from './widgets';
 
-function select(parent: HTMLElement, x: number, y: number, w: number, options: { value: string; text: string }[], value: string, onChange: (v: string) => void): HTMLSelectElement {
-  const s = el('select', 'mselect', parent, [x, y, w, 13]);
-  s.style.position = 'absolute';
-  s.style.fontSize = '8px';
-  s.style.height = '13px';
-  s.style.padding = '0 10px 0 2px';
-  for (const o of options) {
-    const op = document.createElement('option');
-    op.value = o.value;
-    op.textContent = o.text;
-    s.appendChild(op);
-  }
-  s.value = value;
-  s.addEventListener('change', () => onChange(s.value));
-  s.addEventListener('pointerdown', (e) => e.stopPropagation());
-  return s;
+/** A device pop-up (shared emmm selector). Choices are read live, so devices that are
+ * connected or removed while the window is open appear at once. */
+function deviceSelector(parent: HTMLElement, x: number, y: number, w: number, label: string, options: () => SelectorOption[], value: () => string, onChange: (v: string) => void): Selector {
+  return new Selector(parent, x, y, w, 13, { options, value, onChange, label, fontSize: 8, missingText: () => 'not connected' });
 }
 
 // ---------------------------------------------------------------------------- Midi Assignment
@@ -58,8 +50,6 @@ export class MidiAssignmentWindow {
     const b = this.body;
     b.innerHTML = '';
     this.parts = [];
-    const outs = this.outputOptions();
-    const ins = this.inputOptions();
     label(b, 22, 4, '<b>Input Channels</b>');
     label(b, 22, 15, 'Port/Device', 'small');
     label(b, 122, 15, 'Chan', 'small');
@@ -71,10 +61,10 @@ export class MidiAssignmentWindow {
       const y = 26 + i * 15;
       label(b, 4, y + 3, String(i + 1), 'small');
       const ia = s.comp.midi.inputs[i];
-      select(b, 20, y, 100, ins, ia.port, (v) => ((ia.port = v), s.changed('midi')));
+      this.parts.push(deviceSelector(b, 20, y, 100, `Input Channel ${i + 1}: port / device`, () => this.inputOptions(), () => ia.port, (v) => ((ia.port = v), s.changed('midi'))));
       this.parts.push(new Numerical(b, 122, y, 22, 13, { get: () => ia.channel, set: (x) => ((ia.channel = x), s.changed('midi')), min: 1, max: 16 }));
       const oa = s.comp.midi.outputs[i];
-      select(b, 154, y, 98, outs, oa.port, (v) => ((oa.port = v), s.changed('midi')));
+      this.parts.push(deviceSelector(b, 154, y, 98, `Output Channel ${i + 1}: port / device`, () => this.outputOptions(), () => oa.port, (v) => ((oa.port = v), s.changed('midi'))));
       this.parts.push(new Numerical(b, 254, y, 22, 13, { get: () => oa.channel, set: (x) => ((oa.channel = x), s.changed('midi')), min: 1, max: 16 }));
       const fp = el('div', 'num', b, [280, y, 16, 13]);
       fp.addEventListener('pointerdown', (e) => {
@@ -86,11 +76,18 @@ export class MidiAssignmentWindow {
     }
     // quick set (emmm convenience): all 16 outputs to one device, channels 1-16
     label(b, 4, 272, '<b>All outputs →</b>', 'small');
-    select(b, 70, 270, 130, outs, '', (v) => {
-      s.comp.midi.outputs.forEach((o, i) => ((o.port = v), (o.channel = i + 1)));
-      s.changed('midi');
-      this.build();
-    });
+    this.parts.push(
+      new Selector(b, 70, 270, 130, 13, {
+        label: 'All outputs: send M Output Channels 1–16 to one device, on MIDI channels 1–16',
+        fontSize: 8,
+        options: () => [{ value: '?', text: 'choose a device…', disabled: true }, ...this.outputOptions()],
+        value: () => '?',
+        onChange: (v) => {
+          s.comp.midi.outputs.forEach((o, i) => ((o.port = v), (o.channel = i + 1)));
+          s.changed('midi');
+        },
+      }),
+    );
     const mon = el('div', 'btn', b, [206, 270, 92, 14], '');
     mon.style.fontSize = '9px';
     mon.addEventListener('pointerdown', (e) => {
@@ -131,7 +128,7 @@ export class MidiAssignmentWindow {
     label(b, RX + 76, 18, '↕', 'small');
     this.parts.push(new Numerical(b, RX + 88, 15, 26, 13, { get: () => s.comp.midi.conductCtrlY, set: (x) => ((s.comp.midi.conductCtrlY = x), s.changed('midi')), min: 0, max: 127 }));
     label(b, RX, 38, '<b>Send Sync</b> (MIDI clock)');
-    select(b, RX, 50, 150, [{ value: '', text: '— none —' }, ...s.midi.outputs().map((o) => ({ value: o.id, text: o.name }))], s.comp.midi.clockPort, (v) => ((s.comp.midi.clockPort = v), s.changed('midi')));
+    this.parts.push(deviceSelector(b, RX, 50, 150, 'Send Sync: the device that receives MIDI clock', () => [{ value: '', text: '— none —' }, ...s.midi.outputs().map((o) => ({ value: o.id, text: o.name }))], () => s.comp.midi.clockPort, (v) => ((s.comp.midi.clockPort = v), s.changed('midi'))));
     label(b, RX, 70, '<b>Latency</b>');
     this.parts.push(new Numerical(b, RX + 50, 67, 34, 13, { get: () => s.comp.midi.latencyMs, set: (x) => ((s.comp.midi.latencyMs = x), s.changed('midi')), min: 0, max: 999 }));
     label(b, RX + 88, 70, 'ms', 'small');
@@ -162,10 +159,10 @@ export class MidiAssignmentWindow {
     this.sig = this.portSig();
   }
 
-  /** Rebuild when ports change or another document is loaded (controls bind to it). */
+  /** Rebuild when another document is loaded (controls bind to it). Device lists are read
+   * live by the selectors, so connecting or removing a device needs no rebuild. */
   private portSig(): string {
-    const m = this.ctx.s.midi;
-    return m.status + m.outputs().map((o) => o.id).join() + '|' + m.inputs().map((o) => o.id).join() + '|' + this.compId();
+    return String(this.compId());
   }
   private compIds = new WeakMap<object, number>();
   private compId(): number {
@@ -414,8 +411,12 @@ export class LibraryWindow {
       }
     });
     btn(40, 'Delete', () => {
-      if (this.selected && confirm(`Delete "${this.selected}" from this browser?`)) deleteFromLibrary(this.selected);
-      this.refresh();
+      const name = this.selected;
+      if (!name) return;
+      void confirmDialog(this.ctx.screen, `Delete “${escapeHtml(name)}” from this browser?`, 'Delete').then((ok) => {
+        if (ok) deleteFromLibrary(name);
+        this.refresh();
+      });
     });
     btn(174, 'Save', () => {
       const name = this.input.value.trim() || this.ctx.s.comp.name || 'Untitled';
@@ -480,13 +481,25 @@ rests) · Time Base (n | d; sa = step advance) · Phase (ticks; 96 = a quarter n
 once, or click a Snapshot box to store them. Letters A–Z recall. Globe = Blink Everything ·
 pencil = Edit Snapshot · frames = Restore. <b>Slideshows</b> 1–9: Alt-click to record, click to play,
 0 stops, \\ loops.<br><br>
+<b>Speed of a Voice</b> — Tempo sets the beat; each Pattern's Time Base n | d makes one step last
+n/d of a whole note (1|8 = eighths); Rhythm multiplies each step; Time Distortion bends the timing;
+Phase delays the start. Also in the Pattern Editor (Length, T Base, Phase).<br>
+<b>Pattern Editor</b> — Length = steps the Voice plays (Alt: cut / extend the Pattern) · Clear
+Pattern · scale guide (helps enter notes; never changes them or what M plays).<br>
+<b>Undo</b> — ⌘Z / ⇧⌘Z undo and redo edits; the performance (active Positions, tempo, Baton) is
+never rewound.<br><br>
 <b>Keys</b> — Space Start/Sync · Return Stop · Tab Pause · Caps Lock or ⌘⌥ + moving the mouse =
-Mouse Advance · ⌘. All Notes Off · ⌘S Save · ⌘O Open.<br><br>
+Mouse Advance · ⌘. All Notes Off · ⌘S Save · ⌘O Open · ⌘Z Undo · Escape closes pop-ups.<br><br>
 <b>MIDI</b> — File ▸ Midi Assignment… maps M Output Channels to devices (or the internal monitor).
 Set a voice's Use to <b>C</b> to drive emmm from a MIDI keyboard: middle C (C3) Start, B2 Stop,
 B3 Hold/Do, F3 Sync, black keys + white keys select Positions.<br><br>
 <b>Seed</b> — emmm's randomness is seeded (Conducting window). Same document + seed + gestures =
 same music from Start.<br><br>
+<b>Extended</b> (emmm's additions, not M) — Options ▸ Extended…: Seed &amp; Reroll, Locks, Mutation
+(subtle → chaos), A/B states, MIDI clock input, MIDI Learn, CC Cycles; Options ▸ Performance
+Feedback shows what M decides for each note.<br>
+<b>Comfort</b> — rest the mouse on a control for a tip (Options ▸ Show Tips) · ⤢ in the menu bar =
+full screen.<br><br>
 <b>Colours</b> — Options ▸ Palette… changes emmm's colours (Classic, Dark, Colour or your own).
 Editing a built-in palette makes a copy; Export/Import exchange palette files. Palettes are a
 preference of this browser and never change the music or the saved document.`;

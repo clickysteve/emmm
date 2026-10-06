@@ -37,17 +37,33 @@
    edit windows is wired; check every documented modifier against Appendix A.
 4. Pattern Editor polish: right-hand reference keyboard, MIDI-edit while viewing two patterns.
 5. Voice colours (M 2.x colour option) — deliberately left monochrome for now.
-6. Undo (M had none; a modern addition would be welcome but is not Classic).
-7. Accessibility: keyboard focus for controls, screen-reader labels.
+6. Accessibility: the pop-up selectors, dialogs, menus and new controls have keyboard
+   operation and ARIA roles; the older numericals and choice bars are still mouse-only.
 8. Pattern-menu key equivalents that browsers reserve (⌘W, ⌘R, ⌘H, ⌘F) have no shortcut.
 
-## Extended — started (Options ▸ Extended…, off by default)
+## Usability additions — done (do not change M's music)
+
+* Undo / Redo of editing (not of performing), one step per gesture, bounded history.
+* Pattern Editor: Output Length (incl. Alt structural change), Time Base, Phase and a
+  plain-words speed readout, sharing the Patterns window's controls; Clear Pattern; a scale
+  guide for entering notes (14 scales × 12 roots; editing aid only).
+* emmm-style tooltips for every control (Options ▸ Show Tips), one shared pop-up selector in
+  place of every native `<select>`, emmm dialogs in place of the browser's confirm / prompt.
+* Windows menu fixed to M's documented behaviour (live list, visible bring-to-front); Full
+  Screen; colour palettes.
+
+## Extended — done (Options ▸ Extended…, off by default)
 
 * **MIDI clock input**: follow an external 24-ppq clock's tempo with gentle phase
   correction; optional Start / Stop / Continue. (`src/extended/extended.ts`, `Session.extendedRealtime`)
-* **MIDI Learn**: map any CC or note to Variable Positions (CC value spreads over the six
-  Positions; a key steps to the next), Tempo within its range, Baton X/Y, Start, Stop, Sync,
-  Hold/Do, Play-Enable 1–4, Snapshots A–F.
+* **MIDI clock status**: Internal / Waiting / Running / Lost; jitter-resistant tempo;
+  loss holds the tempo; recovery re-aligns the phase.
+* **MIDI Learn** (mappings are an application preference): transport, Variables (a CC
+  sweeps the six Positions), any single Position, Tempo, Baton X/Y, Play-Enable 1–4, Snapshots
+  A–Z, Mutate, Mutation amount, Reroll, A/B recall / capture / toggle; one source → one
+  target with clear re-assignment.
+* **Seed / Reroll**, **Locks** (Voices and twelve kinds of setting), **Mutation** (subtle →
+  chaos, seeded, undoable), **A/B performance states**, **Performance Feedback** inspector.
 * **CC Cycles**: per voice, a cyclic distribution of levels (M's own cyclic-variable model,
   16 steps × levels 0–4, random ranges) sends a controller value before each played note on the
   voice's orchestrated channels; six Positions; a global level → value table. Runs in the
@@ -59,6 +75,9 @@
 * More voices / Pattern Groups; more Positions per Variable.
 * Tempo sharing beyond MIDI clock (e.g. Link-style network sync).
 * Learnable mappings for every on-screen control (numericals, range bars, edit windows).
+* Morphing between A and B (the A/B state format is field-by-field, ready for it).
+* Scale-constrained *output* as an explicit Extended option (the current scale guide only
+  helps editing and never changes what M plays).
 * Parameter automation lanes recorded from gestures (beyond Slideshows).
 * Additional ordering schemes (e.g. Jam Factory-style transition tables) and probability
   systems.

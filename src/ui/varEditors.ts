@@ -464,7 +464,7 @@ export class TimeDistortionEditor extends VarEditor {
       ev.preventDefault();
       if (this.locked) return;
       const [x, y] = toUnit(ev);
-      const now = performance.now();
+      const now = ev.timeStamp; // the press's own time (robust when the screen is busy)
       const dbl = now - lastDown < 350 && Math.hypot((x - lastXY[0]) * G, (y - lastXY[1]) * G) < 6;
       lastDown = now;
       lastXY = [x, y];

@@ -285,6 +285,14 @@ the Sequence keeps running silently [DOC]. A Snapshot can include the Sequence e
   pull down = mark *). Voice numbers 1–4 drag onto each other to swap (Option: copy).
 * **Windows** [DOC]: drag by the title; Cmd-click brings to front without acting; edit windows
   open with zoom rects unless *No Zoom Rects*.
+* **Windows menu** [DOC S1 ch.21]: *Close Edit Windows* closes every open edit window; the
+  other commands bring the named window to the front ("if no windows are on top of each
+  other, nothing will appear to have happened"); the Conducting window heads the list, and the
+  list changes as edit windows open and close. Cmd-Number brings a main window forward and
+  Cmd-Option-Number sends it back [DOC] — not implemented in emmm, because browsers reserve
+  Cmd-1…9 for switching tabs. emmm additions: the brought-forward window's title flashes (so
+  the command is visible when nothing covered it), and the Cyclic Editor, Pattern Editor and
+  Monitor are always listed, opening them if closed.
 * **Blinking** [DOC]: Hold/Do pending items blink; the first step of a restarting cycle blinks
   in the active miniature (not one-step cycles; *No Cyclic Blinking*); Pattern Group bricks flash
   when a pattern starts over.

@@ -18,7 +18,15 @@ import * as msg from '../midi/messages';
 import type { MovieEvent, TempoChange } from '../midi/smf';
 import { MidiManager } from '../midi/webmidi';
 import { Scheduler } from '../scheduler/scheduler';
-import { CcCycleRunner, ClockFollower, sameSource, type LearnMapping, type LearnSource } from '../extended/extended';
+import { CcCycleRunner, ClockFollower, learnInto, sameSource, targetLabel, type LearnMapping, type LearnSource, type LearnTarget, type SyncStatus } from '../extended/extended';
+import { mutate, mutationRng } from '../extended/mutation';
+import { capturePerfState, recallPerfState } from '../extended/perfState';
+import { freshSeed } from '../engine/rng';
+import { assignDeep } from './assign';
+import { History } from './history';
+
+/** Changes that are about playing or viewing, not editing: they never make an Undo step. */
+const TRANSIENT = new Set(['editor', 'baton', 'tempo', 'transport', 'select', 'window', 'step', 'mouse', 'learn', 'hold', 'movie', 'sync', 'load', 'undo', 'midi', 'transpose', 'ics', 'clock', 'feedback', 'ab-recall']);
 
 export interface VisualEvent {
   ms: number;
@@ -113,7 +121,8 @@ export class Session {
     );
     this.recorders = Array.from({ length: NUM_VOICES }, () => new PatternRecorder(this.editRng, () => this.comp.options.dontScrambleRests));
     this.midi.setInputHandler((port, data, ts) => this.midiIn(port, data, ts));
-    this.midi.onChange(() => this.changed('midi'));
+    this.midi.onChange(() => this.notify('midi'));
+    this.history = new History(() => this.docState());
   }
 
   // ------------------------------------------------------------------ notifications
@@ -125,6 +134,112 @@ export class Session {
   /** Incremented on every change, so views can cache what they drew. */
   rev = 0;
   changed(what = 'state'): void {
+    this.dirty = true;
+    this.rev++;
+    if (!TRANSIENT.has(what)) this.historySoon();
+    this.listeners.forEach((f) => f(what));
+  }
+
+  // ------------------------------------------------------------------ Undo / Redo
+
+  /** Document history (see app/history.ts). Performance state is not part of it. */
+  readonly history: History;
+  /** set by the UI while a pointer is pressed: an edit gesture is not finished yet */
+  gestureActive = false;
+  private historyTimer: ReturnType<typeof setTimeout> | null = null;
+
+  private historySoon(): void {
+    if (this.historyTimer) clearTimeout(this.historyTimer);
+    this.historyTimer = setTimeout(() => {
+      this.historyTimer = null;
+      if (this.gestureActive) return; // committed when the gesture ends (gestureEnd)
+      this.history.commit();
+    }, 300);
+  }
+
+  /** The UI calls this when a pointer is released: the gesture is one undoable step. */
+  gestureEnd(): void {
+    this.gestureActive = false;
+    if (this.historyTimer) this.historySoon();
+  }
+
+  /** The document as Undo sees it: everything except performance state. */
+  docState(): string {
+    const c = this.comp;
+    const v = <T extends { active: number }>(x: T) => ({ ...x, active: 0 });
+    return JSON.stringify({
+      ...c,
+      patternGroup: { active: 0 },
+      noteDensity: v(c.noteDensity),
+      velocityRange: v(c.velocityRange),
+      noteOrder: v(c.noteOrder),
+      transposition: v(c.transposition),
+      timeDistortion: v(c.timeDistortion),
+      accent: v(c.accent),
+      legato: v(c.legato),
+      rhythm: v(c.rhythm),
+      orchestration: v(c.orchestration),
+      soundChoice: v(c.soundChoice),
+      tempo: { ...c.tempo, value: 0 },
+      voices: c.voices.map((x) => ({ ...x, playEnable: true, echoThru: false, mouseAdvance: false })),
+      conducting: { ...c.conducting, baton: null, continuousVelocity: { ...c.conducting.continuousVelocity, values: null }, continuousLegato: { ...c.conducting.continuousLegato, values: null } },
+      midi: null,
+      sequenceEnable: false,
+      extended: { ...c.extended, ccCycles: { ...c.extended.ccCycles, active: 0 }, clockIn: null, ab: { ...c.extended.ab, last: null } },
+    });
+  }
+
+  /** Put a history state into the live document, keeping the current performance state. */
+  private restoreDoc(state: string): void {
+    const c = this.comp;
+    const next = JSON.parse(state) as Composition;
+    for (const k of ['noteDensity', 'velocityRange', 'noteOrder', 'transposition', 'timeDistortion', 'accent', 'legato', 'rhythm', 'orchestration', 'soundChoice'] as const)
+      (next[k] as { active: number }).active = c[k].active;
+    next.patternGroup = { active: c.patternGroup.active };
+    next.tempo.value = c.tempo.value;
+    next.voices.forEach((x, i) => {
+      x.playEnable = c.voices[i].playEnable;
+      x.echoThru = c.voices[i].echoThru;
+      x.mouseAdvance = c.voices[i].mouseAdvance;
+    });
+    next.conducting.baton = structuredClone(c.conducting.baton);
+    next.conducting.continuousVelocity.values = [...c.conducting.continuousVelocity.values];
+    next.conducting.continuousLegato.values = [...c.conducting.continuousLegato.values];
+    next.midi = structuredClone(c.midi);
+    next.sequenceEnable = c.sequenceEnable;
+    next.extended.ccCycles.active = c.extended.ccCycles.active;
+    next.extended.clockIn = structuredClone(c.extended.clockIn);
+    next.extended.ab.last = c.extended.ab.last;
+    const dens = c.patternGroups.map((g) => g.patterns.map((p) => p.tbDen));
+    assignDeep(c, next);
+    // a step-advance voice that is no longer step-advance must be woken by the engine
+    const tick = this.scheduler.frontierTick();
+    const g = c.patternGroup.active;
+    c.patternGroups[g].patterns.forEach((p, v) => {
+      if (dens[g][v] !== p.tbDen) {
+        const den = p.tbDen;
+        p.tbDen = dens[g][v];
+        this.engine.setTimeBaseDen(v, den, tick);
+      }
+    });
+  }
+
+  undo(): boolean {
+    if (this.historyTimer) clearTimeout(this.historyTimer), (this.historyTimer = null);
+    const ok = this.history.undo((st) => this.restoreDoc(st));
+    if (ok) this.notify('undo');
+    return ok;
+  }
+
+  redo(): boolean {
+    if (this.historyTimer) clearTimeout(this.historyTimer), (this.historyTimer = null);
+    const ok = this.history.redo((st) => this.restoreDoc(st));
+    if (ok) this.notify('undo');
+    return ok;
+  }
+
+  /** Notify views without creating a history step. */
+  private notify(what: string): void {
     this.dirty = true;
     this.rev++;
     this.listeners.forEach((f) => f(what));
@@ -207,8 +322,26 @@ export class Session {
     this.dispatch(evs, (t) => (this.playing ? Math.max(now, this.scheduler.tickToMs(t)) : now));
   }
 
+  // ------------------------------------------------------------------ MIDI clock out (Send Clock)
+
+  /** The device that received Start and is being clocked; only ever one (no duplicate streams). */
+  private clockOut: string | null = null;
+
+  private clockTarget(): string | null {
+    return this.comp.options.sendClock && this.comp.midi.clockPort ? this.comp.midi.clockPort : null;
+  }
+
   private pulse(ms: number, click: boolean, down: boolean): void {
-    if (this.comp.options.sendClock && this.comp.midi.clockPort) this.midi.send(this.comp.midi.clockPort, msg.CLOCK, ms + this.comp.midi.latencyMs);
+    const target = this.clockTarget();
+    const when = ms + this.comp.midi.latencyMs;
+    if (target !== this.clockOut) {
+      // Send Clock switched off, or another device chosen, while playing: stop the old one;
+      // a newly chosen device starts with the music from here
+      if (this.clockOut) this.midi.send(this.clockOut, msg.STOP, when);
+      if (target) this.midi.send(target, msg.START, when);
+      this.clockOut = target;
+    }
+    if (target) this.midi.send(target, msg.CLOCK, when);
     if (click && this.comp.options.useMetronome) this.monitor.click(ms, down);
   }
 
@@ -230,6 +363,7 @@ export class Session {
       return;
     }
     const wasPaused = this.engine.state === 'paused';
+    this.applySeedOverrides();
     this.emitNow(this.engine.start());
     if (wasPaused) this.scheduler.pauseToggled();
     else {
@@ -240,7 +374,8 @@ export class Session {
         this.movieTempos = [{ tick: 0, bpm: this.comp.tempo.value }];
         this.lastMovieTempo = this.comp.tempo.value;
       }
-      if (this.comp.options.sendClock && this.comp.midi.clockPort) this.midi.send(this.comp.midi.clockPort, msg.START);
+      this.clockOut = this.clockTarget();
+      if (this.clockOut) this.midi.send(this.clockOut, msg.START);
       this.ccRunner.reset(this.comp.seed);
       this.scheduler.started();
       if (this.slideshowPlay?.waiting) this.beginSlideshowPlayback();
@@ -259,7 +394,9 @@ export class Session {
     this.scheduler.limitTick = Infinity;
     this.tapConduct.active = false;
     this.monitor.allOff();
-    if (this.comp.options.sendClock && this.comp.midi.clockPort) this.midi.send(this.comp.midi.clockPort, msg.STOP);
+    // after the clock pulses already queued ahead in the driver, not before them
+    if (this.clockOut) this.midi.send(this.clockOut, msg.STOP, offAt + this.comp.midi.latencyMs);
+    this.clockOut = null;
     if (this.movieRecording) {
       this.movieRecording = false;
       this.movieArmed = false;
@@ -272,8 +409,12 @@ export class Session {
 
   pause(): void {
     if (this.engine.state === 'stopped') return;
+    const pausing = this.engine.state === 'playing';
+    const at = this.afterQueued() + this.comp.midi.latencyMs;
     this.engine.pause();
     this.scheduler.pauseToggled();
+    // clocked gear pauses and resumes with emmm (Stop … Continue)
+    if (this.clockOut) this.midi.send(this.clockOut, pausing ? msg.STOP : msg.CONTINUE, pausing ? at : undefined);
     this.changed('transport');
   }
 
@@ -816,10 +957,35 @@ export class Session {
       this.movieAdd(ev.tick, msg.controlChange(this.outTarget(c).channel, r.cc, r.value));
     }
   }
-  /** index into comp.extended.learn waiting for a controller, or null */
-  learnArmed: number | null = null;
+  /** MIDI Learn mappings: an application preference (app/prefs.ts) handed in by the UI. */
+  learn: LearnMapping[] = [];
+  /** a mapping waiting for a controller or key: its target, and the row it replaces */
+  learnArmed: { target: LearnTarget; replace: number | null } | null = null;
+  /** last Learn result, for display */
+  learnNote = '';
   private learnLast = new Map<string, number>();
   extStatus = { bpm: 0 };
+
+  armLearn(target: LearnTarget, replace: number | null = null): void {
+    this.learnArmed = { target, replace };
+    this.learnNote = `Move a controller or press a key for ${targetLabel(target)}… (Esc cancels)`;
+    this.notify('learn');
+  }
+
+  cancelLearn(): void {
+    if (!this.learnArmed) return;
+    this.learnArmed = null;
+    this.learnNote = 'Learn cancelled.';
+    this.notify('learn');
+  }
+
+  removeLearn(i: number): void {
+    const m = this.learn[i];
+    if (!m) return;
+    this.learn.splice(i, 1);
+    this.learnNote = `Removed ${targetLabel(m.target)}.`;
+    this.notify('learn');
+  }
 
   /** Tempo from an external source: not rounded, widens the range if needed. */
   setTempoExact(bpm: number): void {
@@ -837,8 +1003,12 @@ export class Session {
     const f = this.clockFollower;
     switch (status) {
       case 0xf8: {
-        if (!this.playing) return true;
+        if (!this.playing) {
+          f.lastPulseMs = ts; // the clock is alive: Waiting, not Lost
+          return true;
+        }
         const bpm = f.pulse(ts);
+        if (f.recovered) f.rebase(this.scheduler.nowTick());
         if (bpm) {
           const c = f.corrected(bpm, this.scheduler.nowTick());
           this.extStatus.bpm = bpm;
@@ -870,19 +1040,22 @@ export class Session {
 
   /** MIDI Learn: arm a mapping, or apply learnt mappings. Returns true if consumed. */
   private extendedLearn(m: msg.ParsedMessage): boolean {
-    const ext = this.comp.extended;
-    if (!ext.enabled) return false;
+    if (!this.comp.extended.enabled) return false;
     if (m.type !== 'cc' && m.type !== 'noteon' && m.type !== 'noteoff') return false;
     const src: LearnSource = { type: m.type === 'cc' ? 'cc' : 'note', channel: m.channel, number: m.data1 };
-    if (this.learnArmed !== null && m.type !== 'noteoff') {
-      const map = ext.learn[this.learnArmed];
-      if (map) map.source = src;
+    if (this.learnArmed) {
+      if (m.type === 'noteoff') return true;
+      const { target, replace } = this.learnArmed;
+      const was = learnInto(this.learn, target, src, replace);
       this.learnArmed = null;
-      this.changed('learn');
+      this.learnNote = `${targetLabel(target)} ← ${src.type === 'cc' ? 'CC' : 'note'} ${src.number} ch${src.channel}` + (was && was !== targetLabel(target) ? ` (taken from ${was})` : '');
+      // the gesture that taught it must not also trigger it
+      this.learnLast.set(`${m.channel}:${m.data1}:${m.type === 'cc' ? 'cc' : 'n'}`, m.type === 'cc' ? m.data2 : 127);
+      this.notify('learn');
       return true;
     }
     let used = false;
-    for (const map of ext.learn) {
+    for (const map of this.learn) {
       if (!map.source || !sameSource(map.source, src)) continue;
       used = true;
       this.applyLearn(map, m);
@@ -933,7 +1106,111 @@ export class Session {
       case 'snapshot':
         if (rising) this.executeSnapshot(t.index);
         break;
+      case 'position':
+        if (rising || (m.type === 'cc' && val >= 64 && prev < 64)) this.clickPosition(t.variable, t.position);
+        break;
+      case 'pause':
+        if (rising) this.pause();
+        break;
+      case 'mutate':
+        if (rising) this.mutateNow();
+        break;
+      case 'mutationAmount':
+        if (m.type === 'cc') this.setMutationAmount(Math.round((val / 127) * 100));
+        break;
+      case 'reroll':
+        if (rising) this.reroll();
+        break;
+      case 'abRecall':
+        if (rising) this.abRecall(t.slot);
+        break;
+      case 'abCapture':
+        if (rising) this.abCapture(t.slot);
+        break;
+      case 'abToggle':
+        if (rising) this.abToggle();
+        break;
     }
+  }
+
+  // ------------------------------------------------------------------ EXTENDED: seed, locks, mutation, A/B
+
+  /** Seeds for the engine: per-voice overrides only count in Extended mode. */
+  private applySeedOverrides(): void {
+    const ext = this.comp.extended;
+    this.engine.seedOverride = ext.enabled ? ext.voiceSeeds.map((x) => (typeof x === 'number' ? x : null)) : [null, null, null, null];
+  }
+
+  /**
+   * Reroll (Extended): a new seed — a new "take" of the same settings. Pattern material and
+   * settings are untouched. Locked Voices keep their old seed (and keep playing exactly as
+   * before); the others switch to the new random stream at once, without restarting.
+   */
+  reroll(seed = freshSeed()): void {
+    const ext = this.comp.extended;
+    const old = this.comp.seed;
+    ext.voiceSeeds = ext.voiceSeeds.map((s, v) => (ext.locks.voices[v] ? (s ?? old) : null));
+    this.comp.seed = seed >>> 0;
+    this.applySeedOverrides();
+    if (this.engine.state !== 'stopped') this.engine.voices.forEach((_, v) => !ext.locks.voices[v] && this.engine.reseedVoice(v, this.comp.seed));
+    this.status = `Reroll: seed ${this.comp.seed}`;
+    this.changed('seed');
+  }
+
+  setMutationAmount(x: number): void {
+    this.comp.extended.mutation.amount = Math.max(0, Math.min(100, Math.round(x)));
+    this.changed('mutation');
+  }
+
+  /** Mutate the active settings by the current amount, respecting Locks (one Undo step). */
+  mutateNow(): string[] {
+    const ext = this.comp.extended;
+    this.history.commit();
+    const rng = mutationRng(this.comp.seed, ext.mutation.count);
+    ext.mutation.count++;
+    const r = mutate(this.comp, ext.mutation.amount, ext.locks, rng);
+    // (during Hold/Do a click would be collected, not performed: Positions then stay put)
+    if (!this.hold) for (const p of r.positions) this.clickPosition(p.variable, p.position);
+    this.status = r.changed.length ? `Mutated: ${r.changed.join(', ')}` : 'Mutate: nothing changed (everything locked?)';
+    this.changed('mutation');
+    this.history.commit();
+    return r.changed;
+  }
+
+  abCapture(slot: 'a' | 'b'): void {
+    this.comp.extended.ab[slot] = capturePerfState(this.comp);
+    this.comp.extended.ab.last = slot;
+    this.status = `Captured ${slot.toUpperCase()}`;
+    this.changed('ab');
+  }
+
+  /** Recall A or B — safe while playing; a different Pattern Group is selected the M way. */
+  abRecall(slot: 'a' | 'b'): void {
+    const st = this.comp.extended.ab[slot];
+    if (!st) return;
+    const tick = this.scheduler.frontierTick();
+    const r = recallPerfState(this.comp, st, (g, v, den) => {
+      if (g === this.comp.patternGroup.active) this.engine.setTimeBaseDen(v, den, tick);
+      else this.comp.patternGroups[g].patterns[v].tbDen = den;
+    });
+    if (r.patternGroup !== this.comp.patternGroup.active) this.clickPosition('patternGroup', r.patternGroup);
+    this.comp.extended.ab.last = slot;
+    this.status = `Recalled ${slot.toUpperCase()}`;
+    this.changed('ab-recall');
+  }
+
+  abToggle(): void {
+    const ab = this.comp.extended.ab;
+    const to = ab.last === 'a' ? 'b' : 'a';
+    if (ab[to]) this.abRecall(to);
+    else if (ab[to === 'a' ? 'b' : 'a']) this.abRecall(to === 'a' ? 'b' : 'a');
+  }
+
+  /** External-clock status for display. */
+  clockStatus(now = performance.now()): SyncStatus {
+    const ext = this.comp.extended;
+    if (!ext.enabled || !ext.clockIn.enabled) return 'internal';
+    return this.clockFollower.status(now, this.playing);
   }
 
   midiIn(port: string, data: ArrayLike<number>, ts: number): void {
@@ -1205,7 +1482,9 @@ export class Session {
     this.currentSnapshot = null;
     this.undoSnapshot = null;
     this.selected = [false, false, false, false];
-    this.changed('load');
+    this.applySeedOverrides();
+    this.history.reset();
+    this.notify('load');
   }
 
   setSeed(seed: number): void {

@@ -56,6 +56,7 @@ export const ICON: Record<string, (c?: string) => string> = {
   eraser: (c = 'var(--ink)') => P('M2 9 L7 3 L11 6 L7 11 H3 Z', c, 'var(--paper)') + P('M5 6 L9 9', c),
   plunger: (c = 'var(--ink)') => R(5, 1, 2, 6, c) + P('M2 11 Q6 5 10 11 Z', c, c),
   scissors: (c = 'var(--ink)') => `<circle cx="3" cy="9" r="2" fill="none" stroke="${c}"/><circle cx="9" cy="9" r="2" fill="none" stroke="${c}"/>` + P('M4 7 L9 1 M8 7 L3 1', c),
+  lock: (c = 'var(--ink)') => P('M3.5 6 V3.5 Q3.5 1.5 6 1.5 Q8.5 1.5 8.5 3.5 V6', c) + R(2, 6, 8, 5, c) + R(5, 8, 2, 2, 'var(--paper)'),
   selector: (c = 'var(--ink)') => `<rect x="1.5" y="1.5" width="9" height="9" fill="none" stroke="${c}" stroke-dasharray="1 1"/>`,
 };
 

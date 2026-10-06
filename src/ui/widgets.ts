@@ -424,6 +424,9 @@ export interface WindowOpts {
 
 let zTop = 100;
 
+/** Hooks for the app: a window that appears must be drawn at once (main.ts sets this). */
+export const windowEvents = { shown: () => {} };
+
 /** An M-style window: title in a tab with a slanted edge, optional close triangle. */
 export class MWindow {
   el: HTMLDivElement;
@@ -492,6 +495,14 @@ export class MWindow {
     this.el.style.zIndex = String(++zTop);
   }
 
+  /** Briefly highlight the title tab (Windows menu: shows which window came forward). */
+  flashTitle(): void {
+    this.titleEl.classList.remove('flash-front');
+    void this.titleEl.offsetWidth; // restart the animation
+    this.titleEl.classList.add('flash-front');
+    setTimeout(() => this.titleEl.classList.remove('flash-front'), 700);
+  }
+
   private dragStart(ev: PointerEvent): void {
     this.front();
     const x0 = this.o.x;
@@ -523,6 +534,7 @@ export class MWindow {
   show(): void {
     this.el.classList.remove('hidden');
     this.front();
+    windowEvents.shown();
   }
 
   close(): void {

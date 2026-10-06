@@ -2,14 +2,15 @@
  * The six always-open windows of M's main screen (S1 ch.2 "Screen Layout"):
  * Patterns, Conducting, Variables, Cyclic Variables, Midi and Snapshot.
  */
-import { STEP_ADVANCE, TIME_BASE_DENOMINATORS, NOTE_VALUES, NUM_SNAPSHOTS } from '../engine/constants';
+import { NOTE_VALUES, NUM_SNAPSHOTS } from '../engine/constants';
 import { clearContinuous } from '../engine/conducting';
 import { SNAPSHOT_LETTERS } from '../engine/snapshots';
 import type { ArrowDir, ConductTarget, UseMode, VariableName } from '../engine/types';
 import { VariableChoice } from './choice';
 import { VAR_LABEL, type UiContext } from './context';
-import { clamp, el, label, localPoint, svgEl, setSvg, trackDrag } from './dom';
+import { clamp, el, label, localPoint, setTip, svgEl, setSvg, trackDrag } from './dom';
 import { iconSvg, noteValueIcon } from './icons';
+import { timingControls } from './patternControls';
 import { ConductArrow, MWindow, Numerical, RangeBar, pictureMatrix } from './widgets';
 
 export interface Updatable {
@@ -85,6 +86,7 @@ export class PatternsWindow implements Updatable {
     den: Numerical;
     phase: Numerical;
     step: HTMLDivElement;
+    lock: HTMLDivElement;
   }[] = [];
   private echoCells: HTMLDivElement[] = [];
 
@@ -222,7 +224,8 @@ export class PatternsWindow implements Updatable {
       let lastSel = 0;
       select.addEventListener('pointerdown', (ev) => {
         if (ev.defaultPrevented) return;
-        const now = performance.now();
+        // the press's own time, so a busy screen cannot turn a double-click into two clicks
+        const now = ev.timeStamp;
         if (now - lastSel < 350) {
           ctx.openEditor('patternEditor', { voice: v, from: select });
           lastSel = 0;
@@ -240,47 +243,14 @@ export class PatternsWindow implements Updatable {
         });
         s.changed('select');
       });
-      const len = new Numerical(b, 156, y, 30, H, {
-        get: () => pat().outputLength,
-        set: (x, i) => {
-          if (i.alt) {
-            if (i.final) s.setOutputLength(v, x, true);
-          } else s.setOutputLength(v, x, false);
-        },
-        min: 0,
-        max: 999,
-        deferWithAlt: true,
-        intercept: hold('outputLength'),
-        title: 'Output Length (Alt: add rests / delete steps)',
-      });
-      const num = new Numerical(b, 188, y, 22, H, {
-        get: () => pat().tbNum,
-        set: (x) => s.setTimeBase(v, x, pat().tbDen),
-        min: 1,
-        max: 99,
-        intercept: hold('tbNum'),
-        title: 'Time Base numerator',
-      });
-      el('div', 'label', b, [210, y + 4, 4, 10], '|');
-      const den = new Numerical(b, 214, y, 22, H, {
-        get: () => pat().tbDen,
-        set: (x) => s.setTimeBase(v, pat().tbNum, x),
-        values: TIME_BASE_DENOMINATORS,
-        format: (x) => (x === STEP_ADVANCE ? 'sa' : String(x)),
-        intercept: hold('tbDen'),
-        title: 'Time Base denominator (sa = step advance)',
-      });
-      const phase = new Numerical(b, 240, y, 28, H, {
-        get: () => pat().phase,
-        set: (x) => ((pat().phase = x), s.changed('patterns')),
-        min: 0,
-        max: 199,
-        intercept: hold('phase'),
-        title: 'Phase (ticks)',
-      });
+      const { len, num, den, phase } = timingControls(ctx, b, () => v, { len: [156, y, 30, H], num: [188, y, 22, H], den: [214, y, 22, H], phase: [240, y, 28, H] }, hold);
       const step = el('div', '', select, [64, 3, 4, 11]);
       step.style.position = 'absolute';
-      this.rows.push({ src, use, play, echo, mouse, select, modeIcons, len, num, den, phase, step });
+      // EXTENDED: padlock when this Voice is locked against Mutation / Reroll
+      const lock = el('div', 'lockbadge hidden', b, [148, y + 3, 12, 12]);
+      lock.innerHTML = iconSvg('lock', 10, 10);
+      lock.title = `Voice ${v + 1} is locked: Mutation leaves it alone and Reroll keeps its random choices`;
+      this.rows.push({ src, use, play, echo, mouse, select, modeIcons, len, num, den, phase, step, lock });
     }
   }
 
@@ -292,6 +262,7 @@ export class PatternsWindow implements Updatable {
     this.rows.forEach((r, v) => {
       const vs = s.comp.voices[v];
       const p = s.pattern(v);
+      r.lock.classList.toggle('hidden', !(s.comp.extended.enabled && s.comp.extended.locks.voices[v]));
       r.src.update();
       r.len.update();
       r.num.update();
@@ -546,7 +517,7 @@ export class ConductingWindow implements Updatable {
     this.btn.seq.classList.toggle('on', s.comp.sequenceEnable && !!s.comp.sequence);
     this.btn.seq.classList.toggle('blink', s.hold?.pending.sequenceEnable !== undefined && !!s.hold);
     this.btn.seq.style.opacity = s.comp.sequence ? '1' : '0.45';
-    this.btn.seq.title = s.comp.sequence ? `Sequence Play-Enable: ${s.comp.sequence.name}` : 'Sequence Play-Enable (no Sequence loaded)';
+    setTip(this.btn.seq, s.comp.sequence ? `Sequence Play-Enable: ${s.comp.sequence.name}` : 'Sequence Play-Enable (no Sequence loaded)');
     const filmC = s.movieArmed || s.movieRecording ? 'var(--paper)' : 'var(--ink)';
     const key = 'film' + filmC;
     if (this.btn.movie.dataset.v !== key) {

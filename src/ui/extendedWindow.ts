@@ -1,34 +1,63 @@
 /**
- * EXTENDED window: switch Extended mode on, MIDI clock input, MIDI Learn mappings.
- * Drawn in the same visual language, but clearly labelled as not part of Classic M.
+ * EXTENDED windows — emmm's continuation of M, clearly labelled as not part of Classic M:
+ *
+ *   Extended     mode switch, Seed / Reroll, Locks, Mutation, A/B states, MIDI clock input
+ *   MIDI Learn   map controllers and keys to emmm controls (an application preference)
+ *   CC Cycles    (below) cyclic distributions driving MIDI controllers
+ *
+ * The Performance Feedback inspector lives in feedbackWindow.ts.
  */
-import { sourceLabel, targetLabel } from '../extended/extended';
+import { allLearnTargets, LOCK_DIMS, sourceLabel, targetKey, targetLabel, type LearnTarget } from '../extended/extended';
 import type { UiContext } from './context';
-import { el, label, localPoint, setSvg, svgEl, trackDrag } from './dom';
-import { MWindow, Numerical } from './widgets';
+import { el, label, localPoint, setSvg, setTip, svgEl, trackDrag } from './dom';
+import { iconSvg } from './icons';
+import { Selector } from './selector';
+import { MWindow, Numerical, RangeBar } from './widgets';
+
+const SYNC_TEXT = { internal: 'INTERNAL', waiting: 'WAITING', running: 'RUNNING', lost: 'LOST' } as const;
+const SYNC_TIP = {
+  internal: 'Internal: emmm keeps its own tempo',
+  waiting: 'External: waiting for MIDI clock (or for Start)',
+  running: 'External: following the incoming MIDI clock',
+  lost: 'External: the clock stopped arriving — emmm holds the last tempo until it returns',
+} as const;
 
 export class ExtendedWindow {
   win: MWindow;
   private parts: { update(): void }[] = [];
   private builtFor: object | null = null;
-  private portSig = '';
   openCc: (() => void) | null = null;
+  openLearn: (() => void) | null = null;
   constructor(private ctx: UiContext, parent: HTMLElement) {
-    this.win = new MWindow(parent, { id: 'extended', title: 'Extended', x: 150, y: 40, w: 300, h: 360, closable: true });
+    this.win = new MWindow(parent, { id: 'extended', title: 'Extended', x: 150, y: 20, w: 300, h: 300, closable: true });
   }
 
-  private toggle(x: number, y: number, w: number, get: () => boolean, set: (v: boolean) => void, text: string, title = ''): void {
+  private toggle(x: number, y: number, w: number, get: () => boolean, set: (v: boolean) => void, text: string, title = '', what = 'extended'): HTMLDivElement {
     const d = el('div', 'num', this.win.body, [x, y, w, 14]);
     d.style.fontSize = '9px';
     d.style.justifyContent = 'flex-start';
     d.style.paddingLeft = '3px';
-    d.title = title;
+    if (title) d.title = title;
+    d.setAttribute('role', 'switch');
     d.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       set(!get());
-      this.ctx.s.changed('extended');
+      this.ctx.s.changed(what);
     });
-    this.parts.push({ update: () => ((d.textContent = (get() ? '☒ ' : '☐ ') + text), d.classList.toggle('inv', get())) });
+    this.parts.push({ update: () => ((d.textContent = (get() ? '☒ ' : '☐ ') + text), d.classList.toggle('inv', get()), d.setAttribute('aria-checked', String(get()))) });
+    return d;
+  }
+
+  private button(x: number, y: number, w: number, text: string, title: string, f: () => void): HTMLDivElement {
+    const d = el('div', 'btn', this.win.body, [x, y, w, 14], text);
+    d.style.fontSize = '9px';
+    d.title = title;
+    d.setAttribute('role', 'button');
+    d.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      f();
+    });
+    return d;
   }
 
   private build(): void {
@@ -38,72 +67,249 @@ export class ExtendedWindow {
     b.innerHTML = '';
     this.parts = [];
     this.builtFor = s.comp;
-    const note = el('div', 'label small', b, [6, 4, 288, 22]);
+    const note = el('div', 'label small', b, [6, 3, 288, 20]);
     note.style.whiteSpace = 'normal';
     note.style.lineHeight = '10px';
-    note.innerHTML = 'Not part of Classic M — ideas for what M might have become. Nothing here changes how notes are generated.';
-    this.toggle(6, 28, 140, () => ext.enabled, (v) => (ext.enabled = v), 'Extended mode on');
-    const ccb = el('div', 'btn', b, [160, 28, 90, 14], 'CC Cycles…');
-    ccb.style.fontSize = '9px';
-    ccb.addEventListener('pointerdown', (e) => {
-      e.preventDefault();
-      this.openCc?.();
-    });
-    label(b, 6, 50, '<b>MIDI clock input</b>');
-    this.toggle(6, 62, 110, () => ext.clockIn.enabled, (v) => (ext.clockIn.enabled = v), 'follow clock', 'Follow an external MIDI clock (24 ppq) tempo');
-    this.toggle(120, 62, 120, () => ext.clockIn.transport, (v) => (ext.clockIn.transport = v), 'Start/Stop/Cont', 'Follow external Start, Stop and Continue');
-    const sel = el('select', 'mselect', b, [6, 80, 180, 14]);
-    sel.style.position = 'absolute';
-    sel.style.fontSize = '8px';
-    for (const o of [{ id: '*', name: 'any input' }, ...s.midi.inputs()]) {
-      const op = document.createElement('option');
-      op.value = o.id;
-      op.textContent = o.name;
-      sel.appendChild(op);
-    }
-    sel.value = ext.clockIn.port;
-    sel.addEventListener('change', () => ((ext.clockIn.port = sel.value), s.changed('extended')));
-    sel.addEventListener('pointerdown', (e) => e.stopPropagation());
-    const st = el('div', 'label small', b, [192, 83, 100, 10]);
-    this.parts.push({ update: () => (st.textContent = ext.enabled && ext.clockIn.enabled ? (s.extStatus.bpm ? `${s.extStatus.bpm.toFixed(1)} bpm in` : 'waiting…') : '') });
+    note.innerHTML = 'Not part of Classic M — emmm’s ideas for what M might have become. Classic note generation is never changed.';
+    this.toggle(6, 25, 112, () => ext.enabled, (v) => (ext.enabled = v), 'Extended on', 'Switch the Extended features on for this document');
+    this.button(122, 25, 84, 'MIDI Learn…', 'Map controllers and keys to emmm controls', () => this.openLearn?.());
+    this.button(210, 25, 84, 'CC Cycles…', 'Cyclic patterns of MIDI controller values, one per Voice', () => this.openCc?.());
+    const off = el('div', 'label tiny', b, [6, 43, 288, 8]);
+    this.parts.push({ update: () => (off.textContent = ext.enabled ? '' : 'Extended is off: the controls below are inactive until you switch it on.') });
 
-    label(b, 6, 104, '<b>MIDI Learn</b>');
-    label(b, 70, 105, 'click Learn, then move a knob or press a key', 'tiny');
-    ext.learn.forEach((m, i) => {
-      const col = i < 16 ? 0 : 1;
-      const x = 6 + col * 146;
-      const y = 116 + (i % 16) * 14;
-      label(b, x, y + 3, targetLabel(m.target), 'small');
-      const src = el('div', 'label tiny', b, [x + 64, y + 4, 46, 8]);
-      const learn = el('div', 'btn', b, [x + 110, y, 32, 13], 'Learn');
-      learn.style.fontSize = '8px';
-      learn.title = 'Learn: then move a controller or press a key. Alt-click clears.';
-      learn.addEventListener('pointerdown', (e) => {
+    // seed / reroll
+    label(b, 6, 56, '<b>Seed</b>');
+    const seed = el('input', 'mtext', b, [36, 53, 74, 15]);
+    seed.style.position = 'absolute';
+    seed.inputMode = 'numeric';
+    seed.title = 'The seed every random choice starts from at Start. Same document + same seed = the same performance. Type a number and press Return.';
+    seed.setAttribute('aria-label', 'Seed');
+    seed.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Enter') seed.blur();
+    });
+    seed.addEventListener('focus', () => seed.select());
+    seed.addEventListener('change', () => {
+      const n = Number(seed.value.trim());
+      if (Number.isFinite(n) && n >= 0) s.setSeed(n);
+      seed.value = String(s.comp.seed);
+    });
+    this.parts.push({ update: () => document.activeElement !== seed && seed.value !== String(s.comp.seed) && (seed.value = String(s.comp.seed)) });
+    this.button(114, 53, 84, 'Reroll', 'New Variation: a new seed — the same settings played with different random choices. Locked Voices keep theirs. Patterns are untouched.', () => ext.enabled && s.reroll());
+
+    // locks
+    label(b, 6, 76, '<b>Locks</b>');
+    label(b, 44, 77, 'keep these while Mutate and Reroll change the rest', 'tiny');
+    label(b, 6, 89, 'Voices', 'small');
+    for (let v = 0; v < 4; v++) {
+      const d = el('div', 'num', b, [44 + v * 20, 86, 18, 14]);
+      d.title = `Lock Voice ${v + 1}: Mutation leaves it alone and Reroll keeps its random choices`;
+      d.setAttribute('role', 'switch');
+      d.addEventListener('pointerdown', (e) => {
         e.preventDefault();
-        if (e.altKey) {
-          m.source = null;
-          if (s.learnArmed === i) s.learnArmed = null;
-        } else s.learnArmed = s.learnArmed === i ? null : i;
-        s.changed('learn');
+        ext.locks.voices[v] = !ext.locks.voices[v];
+        s.changed('locks');
       });
       this.parts.push({
         update: () => {
-          src.textContent = sourceLabel(m.source);
-          learn.classList.toggle('on', s.learnArmed === i);
-          learn.classList.toggle('blink', s.learnArmed === i);
+          const on = ext.locks.voices[v];
+          const key = String(on);
+          if (d.dataset.v !== key) {
+            d.innerHTML = on ? iconSvg('lock', 10, 12, 'var(--paper)') : String(v + 1);
+            d.dataset.v = key;
+          }
+          d.classList.toggle('inv', on);
+          d.setAttribute('aria-checked', String(on));
+          d.setAttribute('aria-label', `Lock Voice ${v + 1}`);
         },
+      });
+    }
+    LOCK_DIMS.forEach((dim, i) => {
+      const x = 6 + (i % 4) * 72;
+      const y = 104 + Math.floor(i / 4) * 16;
+      this.toggle(x, y, 70, () => ext.locks.dims[dim.id], (v) => (ext.locks.dims[dim.id] = v), dim.label, `Lock ${dim.help}`, 'locks');
+    });
+
+    // mutation
+    label(b, 6, 158, '<b>Mutation</b>');
+    label(b, 62, 159, 'subtle', 'tiny');
+    const bar = new RangeBar(b, 92, 156, 120, 12, {
+      min: 0,
+      max: 100,
+      get: () => [0, ext.mutation.amount],
+      set: (_lo, hi, final) => {
+        ext.mutation.amount = hi;
+        if (final) s.setMutationAmount(hi);
+      },
+      fill: 'black',
+    });
+    bar.el.title = 'Mutation strength: subtle (small, related changes) ←→ chaos (big transformations)';
+    this.parts.push(bar);
+    label(b, 216, 159, 'chaos', 'tiny');
+    const amt = el('div', 'label small', b, [240, 159, 20, 10]);
+    this.parts.push({ update: () => (amt.textContent = String(ext.mutation.amount)) });
+    this.button(254, 155, 40, 'Mutate', 'Mutate: change the active settings by this amount (not the Patterns’ notes). Locks are respected. ⌘Z undoes it.', () => ext.enabled && s.mutateNow());
+
+    // A/B
+    label(b, 6, 180, '<b>A / B</b>');
+    const ab = (x: number, slot: 'a' | 'b') => {
+      const cap = this.button(x, 177, 62, `Capture ${slot.toUpperCase()}`, `Store the current performance state (Positions, cycles, tempo, Voice settings) as ${slot.toUpperCase()}`, () => ext.enabled && s.abCapture(slot));
+      const rec = this.button(x + 64, 177, 24, slot.toUpperCase(), `Recall ${slot.toUpperCase()} (safe while playing)`, () => ext.enabled && s.abRecall(slot));
+      this.parts.push({
+        update: () => {
+          rec.classList.toggle('on', ext.ab.last === slot && !!ext.ab[slot]);
+          rec.style.opacity = ext.ab[slot] ? '1' : '0.4';
+          cap.style.opacity = ext.enabled ? '1' : '0.6';
+        },
+      });
+    };
+    ab(44, 'a');
+    ab(140, 'b');
+    this.button(236, 177, 58, 'A ⇄ B', 'Switch between A and B', () => ext.enabled && s.abToggle());
+
+    // MIDI clock input
+    label(b, 6, 202, '<b>MIDI clock input</b>');
+    const st = el('div', 'num', b, [210, 199, 84, 14]);
+    st.style.fontSize = '8px';
+    this.parts.push({
+      update: () => {
+        const k = s.clockStatus();
+        const t = SYNC_TEXT[k] + (k === 'running' || k === 'lost' ? ` ${s.extStatus.bpm.toFixed(1)}` : '');
+        if (st.textContent !== t) st.textContent = t;
+        st.classList.toggle('inv', k === 'running');
+        st.classList.toggle('blink', k === 'lost');
+        setTip(st, SYNC_TIP[k]);
+      },
+    });
+    this.toggle(6, 216, 110, () => ext.clockIn.enabled, (v) => (ext.clockIn.enabled = v), 'follow clock', 'Follow an external MIDI clock (24 pulses per quarter note) for tempo', 'clock');
+    this.toggle(120, 216, 120, () => ext.clockIn.transport, (v) => (ext.clockIn.transport = v), 'Start/Stop/Cont', 'Follow external Start, Stop and Continue messages', 'clock');
+    this.parts.push(
+      new Selector(b, 6, 234, 234, 14, {
+        label: 'MIDI clock input: which input to follow',
+        options: () => [{ value: '*', text: 'any input' }, ...s.midi.inputs().map((o) => ({ value: o.id, text: o.name }))],
+        value: () => ext.clockIn.port,
+        onChange: (v) => ((ext.clockIn.port = v), s.changed('clock')),
+        missingText: () => 'input not connected',
+      }),
+    );
+    const status = el('div', 'label small', b, [6, 256, 288, 22]);
+    status.style.whiteSpace = 'normal';
+    status.style.lineHeight = '10px';
+    status.setAttribute('aria-live', 'polite');
+    this.parts.push({ update: () => status.textContent !== s.status && (status.textContent = s.status) });
+  }
+
+  update(): void {
+    if (this.builtFor !== this.ctx.s.comp) this.build();
+    this.parts.forEach((p) => p.update());
+  }
+}
+
+// ---------------------------------------------------------------------------- MIDI Learn
+
+/** MIDI Learn (Extended): mappings are an application preference, kept by this browser. */
+export class LearnWindow {
+  win: MWindow;
+  private list: HTMLDivElement;
+  private note: HTMLDivElement;
+  private target: LearnTarget = { kind: 'variable', variable: 'noteDensity' };
+  private sig = '';
+  private rows: { update(): void }[] = [];
+  private picker: Selector;
+  constructor(private ctx: UiContext, parent: HTMLElement) {
+    const s = ctx.s;
+    this.win = new MWindow(parent, { id: 'learn', title: 'MIDI Learn', x: 200, y: 40, w: 300, h: 300, closable: true, onClose: () => s.cancelLearn() });
+    const b = this.win.body;
+    const intro = el('div', 'label small', b, [6, 3, 288, 20]);
+    intro.style.whiteSpace = 'normal';
+    intro.style.lineHeight = '10px';
+    intro.innerHTML = 'Extended. Choose a control, press <b>Learn</b>, then move a knob or press a key. A controller sweeps a Variable’s Positions; a key steps or triggers.';
+    const options = allLearnTargets().flatMap((g) => g.targets.map((t) => ({ value: targetKey(t), text: `${g.group.split(' (')[0]} · ${targetLabel(t)}` })));
+    const byKey = new Map(allLearnTargets().flatMap((g) => g.targets.map((t) => [targetKey(t), t] as const)));
+    this.picker = new Selector(b, 6, 27, 200, 14, {
+      label: 'Control to learn',
+      options: () => options,
+      value: () => targetKey(this.target),
+      onChange: (v) => (this.target = byKey.get(v) ?? this.target),
+    });
+    const learn = el('div', 'btn', b, [212, 27, 82, 14], 'Learn');
+    learn.style.fontSize = '9px';
+    learn.title = 'Learn: then move a controller or press a key (Escape cancels)';
+    learn.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      if (s.learnArmed) s.cancelLearn();
+      else s.armLearn(this.target, null);
+    });
+    this.rows.push({
+      update: () => {
+        const armed = !!s.learnArmed && s.learnArmed.replace === null;
+        learn.classList.toggle('on', armed);
+        learn.classList.toggle('blink', armed);
+        learn.textContent = armed ? 'Listening…' : 'Learn';
+      },
+    });
+    label(b, 6, 47, 'Control', 'tiny');
+    label(b, 150, 47, 'Controller / key', 'tiny');
+    this.list = el('div', 'box', b, [6, 56, 288, 186]);
+    this.list.style.overflowY = 'auto';
+    this.list.style.background = 'var(--paper)';
+    this.list.setAttribute('role', 'list');
+    this.note = el('div', 'label small', b, [6, 246, 288, 22]);
+    this.note.style.whiteSpace = 'normal';
+    this.note.style.lineHeight = '10px';
+    this.note.setAttribute('aria-live', 'polite');
+    const off = el('div', 'label tiny', b, [6, 270, 288, 8]);
+    this.rows.push({ update: () => (off.textContent = s.comp.extended.enabled ? '' : 'Extended is off: switch it on (Extended window) to use these mappings.') });
+  }
+
+  private renderList(): void {
+    const s = this.ctx.s;
+    this.list.innerHTML = '';
+    if (!s.learn.length) {
+      const e = el('div', 'label small', this.list, [6, 6, 270, 30], 'No mappings yet.');
+      e.style.whiteSpace = 'normal';
+    }
+    s.learn.forEach((m, i) => {
+      const y = 2 + i * 15;
+      const row = el('div', '', this.list, [0, y, 270, 14]);
+      row.style.position = 'absolute';
+      row.setAttribute('role', 'listitem');
+      label(row, 4, 3, targetLabel(m.target), 'small');
+      label(row, 146, 3, sourceLabel(m.source), 'small');
+      const re = el('div', 'btn', row, [206, 0, 40, 13], 'Learn');
+      re.style.fontSize = '8px';
+      re.title = `Learn a different controller for ${targetLabel(m.target)}`;
+      re.dataset.row = String(i);
+      re.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        if (s.learnArmed?.replace === i) s.cancelLearn();
+        else s.armLearn(m.target, i);
+      });
+      const x = el('div', 'btn', row, [250, 0, 16, 13], '×');
+      x.style.fontSize = '9px';
+      x.title = `Remove the mapping for ${targetLabel(m.target)}`;
+      x.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        s.removeLearn(i);
       });
     });
   }
 
   update(): void {
     const s = this.ctx.s;
-    const sig = s.midi.inputs().map((i) => i.id).join();
-    if (this.builtFor !== s.comp || sig !== this.portSig) {
-      this.portSig = sig;
-      this.build();
+    const sig = s.learn.map((m) => targetKey(m.target) + sourceLabel(m.source)).join('|');
+    if (sig !== this.sig) {
+      this.sig = sig;
+      this.renderList();
     }
-    this.parts.forEach((p) => p.update());
+    this.list.querySelectorAll<HTMLDivElement>('[data-row]').forEach((d) => {
+      const armed = s.learnArmed?.replace === Number(d.dataset.row);
+      d.classList.toggle('on', armed);
+      d.classList.toggle('blink', armed);
+    });
+    if (this.note.textContent !== s.learnNote) this.note.textContent = s.learnNote;
+    this.picker.update();
+    this.rows.forEach((r) => r.update());
   }
 }
 

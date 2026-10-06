@@ -1,18 +1,28 @@
 /**
  * The emmm document format: transparent, versioned JSON.
  *
- *   { "format": "emmm", "version": 1, "mode": "classic", "savedAt": "...",
+ *   { "format": "emmm", "version": 2, "mode": "classic", "savedAt": "...",
  *     "composition": { ...Composition... }, "ui": { ... } }
  *
  * Loading goes through `migrate`, which upgrades older versions step by step and then fills
  * any missing field from the defaults, so files survive additions to the model.
+ *
+ * Version history:
+ *   1  first release.
+ *   2  Extended gains Locks, Mutation, A/B states and per-voice seeds (filled from defaults
+ *      for older files). MIDI Learn mappings leave the document: they describe the user's
+ *      hardware and are now an application preference. A version-1 file's mappings are
+ *      returned as `legacyLearn` so the app can adopt them once.
+ *
+ * Not in the document at all: colour palettes, tooltips, Performance Feedback, the Pattern
+ * Editor's scale guide (see app/prefs.ts, ui/palette.ts).
  */
 import { NUM_CHANNELS, NUM_POSITIONS, NUM_VOICES } from '../engine/constants';
 import { defaultComposition } from '../engine/defaults';
 import type { Composition } from '../engine/types';
 
 export const FORMAT_ID = 'emmm';
-export const FORMAT_VERSION = 1;
+export const FORMAT_VERSION = 2;
 
 export interface UiState {
   windows?: Record<string, { x: number; y: number; open: boolean }>;
@@ -26,13 +36,15 @@ export interface EmmmDocument {
   savedAt: string;
   composition: Composition;
   ui?: UiState;
+  /** MIDI Learn mappings found in a version-1 document (see the version history above) */
+  legacyLearn?: unknown[];
 }
 
 export function serialize(comp: Composition, ui?: UiState): string {
   const doc: EmmmDocument = {
     format: FORMAT_ID,
     version: FORMAT_VERSION,
-    mode: 'classic',
+    mode: comp.extended.enabled ? 'extended' : 'classic',
     savedAt: new Date().toISOString(),
     composition: comp,
     ui,
@@ -41,6 +53,12 @@ export function serialize(comp: Composition, ui?: UiState): string {
 }
 
 export class FormatError extends Error {}
+
+let legacyLearnHandler: ((mappings: unknown[]) => void) | null = null;
+/** The app adopts MIDI Learn mappings found in version-1 documents, wherever they load from. */
+export function onLegacyLearn(f: ((mappings: unknown[]) => void) | null): void {
+  legacyLearnHandler = f;
+}
 
 /** Fill gaps in `value` from `template` (same shape). Arrays of fixed size are padded. */
 function fill<T>(value: unknown, template: T): T {
@@ -110,13 +128,23 @@ export function migrate(doc: Record<string, unknown>): EmmmDocument {
   let version = Number(doc.version);
   if (!Number.isFinite(version) || version < 1) throw new FormatError('Unknown emmm document version');
   if (version > FORMAT_VERSION) throw new FormatError(`This document was saved by a newer emmm (format v${version})`);
-  // Future: while (version < FORMAT_VERSION) { doc = MIGRATIONS[version](doc); version++; }
-  version = FORMAT_VERSION;
   const raw = (doc.composition ?? {}) as Composition;
+  let legacyLearn: unknown[] | undefined;
+  if (version < 2) {
+    // v1 → v2: MIDI Learn mappings move out of the document (see the version history)
+    const ext = (raw as { extended?: { learn?: unknown } }).extended;
+    if (ext && Array.isArray(ext.learn)) {
+      legacyLearn = ext.learn;
+      legacyLearnHandler?.(legacyLearn);
+    }
+    version = 2;
+  }
+  version = FORMAT_VERSION;
   const comp = fill(raw, defaultComposition(typeof raw.seed === 'number' ? raw.seed : 38291));
+  delete (comp.extended as { learn?: unknown }).learn;
   restoreVariableArrays(comp, raw);
   validate(comp);
-  return { format: FORMAT_ID, version, mode: doc.mode === 'extended' ? 'extended' : 'classic', savedAt: String(doc.savedAt ?? ''), composition: comp, ui: (doc.ui as UiState) ?? {} };
+  return { format: FORMAT_ID, version, mode: doc.mode === 'extended' ? 'extended' : 'classic', savedAt: String(doc.savedAt ?? ''), composition: comp, ui: (doc.ui as UiState) ?? {}, legacyLearn };
 }
 
 export function deserialize(text: string): EmmmDocument {
@@ -161,5 +189,9 @@ export function validate(c: Composition): void {
     }),
   );
   c.tempo.value = clamp(c.tempo.value, 10, 400);
+  const ext = c.extended;
+  ext.mutation.amount = clamp(ext.mutation.amount, 0, 100);
+  ext.mutation.count = clamp(Math.floor(ext.mutation.count), 0, 1e9);
+  ext.voiceSeeds = [0, 1, 2, 3].map((v) => (typeof ext.voiceSeeds[v] === 'number' && Number.isFinite(ext.voiceSeeds[v]) ? (ext.voiceSeeds[v] as number) >>> 0 : null));
   if (c.voices.length > NUM_VOICES) c.voices.length = NUM_VOICES;
 }

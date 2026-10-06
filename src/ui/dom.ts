@@ -41,11 +41,19 @@ export function svgEl(w: number, h: number, inner: string, cls = ''): SVGSVGElem
   s.setAttribute('shape-rendering', 'crispEdges');
   if (cls) s.setAttribute('class', cls);
   s.innerHTML = inner;
+  drawn.set(s, inner);
   return s;
 }
 
+/** What each SVG was last drawn with: comparing against this, rather than reading
+ * `innerHTML` back (which makes the browser serialise the whole drawing), keeps redraw
+ * checks cheap while the music plays. */
+const drawn = new WeakMap<SVGSVGElement, string>();
+
 export function setSvg(s: SVGSVGElement, inner: string): void {
-  if (s.innerHTML !== inner) s.innerHTML = inner;
+  if (drawn.get(s) === inner) return;
+  s.innerHTML = inner;
+  drawn.set(s, inner);
 }
 
 /** Pointer position in the element's logical coordinates. */
@@ -98,4 +106,12 @@ export function trackDrag(
 
 export function clamp(x: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, x));
+}
+
+/** Set an element's tooltip text (shown by the shared tooltip layer, see tooltip.ts).
+ * Use this for text that changes while the element is on screen. */
+export function setTip(e: Element, text: string): void {
+  const h = e as HTMLElement;
+  if (h.dataset.tip !== text) h.dataset.tip = text;
+  if (e.hasAttribute('title')) e.removeAttribute('title');
 }

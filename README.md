@@ -113,12 +113,18 @@ Time Distortion, conducting (including continuous conducting and the Robot Condu
 Hold/Do, Snapshots, Slideshows, the Input Control System, recording modes, the Pattern Editor
 and menus, Movies (MIDI file export), MIDI file import (into Patterns or as a play-along
 Sequence), Web MIDI input and output with timestamped scheduling, save/load and seeded
-randomness, and colour palettes (Options ▸ Palette…; Classic black-and-white by default). 150 automated tests (including a seeded fuzz test and worked examples) cover the
-engine, timing maths, persistence, session logic and Extended features.
+randomness, and colour palettes (Options ▸ Palette…; Classic black-and-white by default).
+Everyday comforts that do not change M's music: Undo / Redo, the Pattern's Length, Time Base
+and Phase right in the Pattern Editor, Clear Pattern, a scale guide for entering notes,
+emmm-style tooltips and pop-up menus, and full screen. 237 automated tests (including a seeded
+fuzz test, worked examples, and the whole app driven through its menus in a simulated browser)
+cover the engine, timing maths, persistence, session logic, the interface and Extended.
 
-**Extended** (Options ▸ Extended…, off by default) explores what M might have become: MIDI
-clock input, MIDI Learn for controllers, and CC Cycles. It never changes how Classic generates
-notes.
+**Extended** (Options ▸ Extended…, off by default) explores what M might have become: Seed and
+Reroll, Locks, controlled Mutation (subtle → chaos), A/B performance states, MIDI Learn for
+almost every control, MIDI clock input with sync status, Performance Feedback and CC Cycles.
+These are modern additions, not features of the original M, and they never change how Classic
+generates notes.
 
 Still to do: checking emmm against the original program in an emulator — several behaviours
 are reasoned from documentation; see [docs/UNCERTAINTIES.md](docs/UNCERTAINTIES.md) and

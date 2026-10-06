@@ -14,20 +14,37 @@ import { noteName } from './engine/constants';
 import type { EditorName, FlashState, UiContext } from './ui/context';
 import { CyclicEditor } from './ui/cyclicEditor';
 import { el, view } from './ui/dom';
+import { windowEvents, type MWindow } from './ui/widgets';
 import { ConductingWindow, CyclicWindow, MidiWindow, PatternsWindow, SnapshotWindow, VariablesWindow, type Updatable } from './ui/mainWindows';
 import { AboutWindow, HelpWindow, ImportWindow, LibraryWindow, MidiAssignmentWindow, MonitorWindow } from './ui/otherWindows';
-import { CcCyclesWindow, ExtendedWindow } from './ui/extendedWindow';
+import { CcCyclesWindow, ExtendedWindow, LearnWindow } from './ui/extendedWindow';
 import { PatternEditor } from './ui/patternEditor';
 import { applyPalette, PaletteLibrary } from './ui/palette';
 import { PaletteWindow } from './ui/paletteWindow';
+import { Prefs } from './app/prefs';
+import { cleanLearnMappings } from './extended/extended';
+import { onLegacyLearn } from './persistence/format';
+import { alertDialog, closeDialog, confirmDialog, promptDialog } from './ui/dialogs';
+import { FeedbackWindow } from './ui/feedbackWindow';
+import { closeSelectors } from './ui/selector';
+import { installTooltips } from './ui/tooltip';
 import { NoteDensityEditor, NoteOrderEditor, OrchestrationEditor, TimeDistortionEditor, TranspositionEditor, VarEditor, VelocityRangeEditor } from './ui/varEditors';
 
 const W = 720;
 const H = 470;
 
-// ------------------------------------------------------------------ colour palette (a UI preference)
+// ------------------------------------------------------------------ preferences (not part of the document)
 const palettes = new PaletteLibrary();
 applyPalette(palettes.selected.colors);
+const prefs = new Prefs();
+// MIDI Learn mappings used to live in documents (format v1): adopt them once
+onLegacyLearn((list) => {
+  const found = cleanLearnMappings(list);
+  if (found.length && !prefs.app.learn.length) {
+    prefs.app.learn.push(...found);
+    prefs.saveApp();
+  }
+});
 
 // ------------------------------------------------------------------ document at startup
 function newDocument() {
@@ -40,6 +57,7 @@ let initial = params.has('demo') ? demoComposition() : params.has('new') ? newDo
 if (params.has('seed')) initial.seed = Number(params.get('seed')) || initial.seed;
 
 const session = new Session(initial);
+session.learn = prefs.app.learn;
 (window as unknown as { emmm: unknown }).emmm = session; // for debugging / automation
 
 // ------------------------------------------------------------------ screen
@@ -66,16 +84,8 @@ const flash: FlashState = {
   notes: [0, 1, 2, 3].map(() => ({ pitches: [], until: 0, step: -1 })),
 };
 
-let dialog: HTMLDivElement | null = null;
 function alertBox(text: string): void {
-  dialog?.remove();
-  const d = el('div', 'mdialog', screen, [W / 2 - 150, 140, 300]);
-  d.innerHTML = `<div style="margin-bottom:10px">${text}</div>`;
-  const ok = el('button', 'mbutton', d, undefined, 'OK');
-  ok.style.float = 'right';
-  ok.addEventListener('click', () => d.remove());
-  d.addEventListener('pointerdown', (e) => e.stopPropagation());
-  dialog = d;
+  void alertDialog(screen, text);
 }
 
 const ctx: UiContext = {
@@ -85,6 +95,7 @@ const ctx: UiContext = {
   now: () => performance.now(),
   openEditor: (name, opts) => openEditor(name, opts),
   alert: alertBox,
+  prefs,
 };
 
 // ------------------------------------------------------------------ windows
@@ -121,9 +132,19 @@ const extendedWin = new ExtendedWindow(ctx, desktop);
 const helpWin = new HelpWindow(ctx, desktop);
 const ccWin = new CcCyclesWindow(ctx, desktop);
 extendedWin.openCc = () => ccWin.win.show();
+const learnWin = new LearnWindow(ctx, desktop);
+extendedWin.openLearn = () => learnWin.win.show();
+const feedbackWin = new FeedbackWindow(ctx, desktop);
+feedbackWin.win.o.onClose = () => {
+  prefs.app.feedback = false;
+  prefs.saveApp();
+};
 const paletteWin = new PaletteWindow(palettes, desktop);
-const floating = [...Object.values(editors), cyclic, patternEditor, midiAssign, monitorWin, about, importWin, library, extendedWin, helpWin, ccWin, paletteWin];
+// a window that appears is drawn at once (not only at the next change)
+windowEvents.shown = () => (session.dirty = true);
+const floating = [...Object.values(editors), cyclic, patternEditor, midiAssign, monitorWin, about, importWin, library, extendedWin, helpWin, ccWin, paletteWin, learnWin, feedbackWin];
 floating.forEach((f) => f.win.el.classList.add('hidden'));
+if (prefs.app.feedback) feedbackWin.win.show();
 
 /** The Macintosh "zoom rects": dotted rectangles growing from the click to the window. */
 function zoomRects(from: Element | undefined, to: HTMLElement): void {
@@ -177,6 +198,7 @@ function openEditor(name: EditorName, opts: { position?: number; variable?: Vari
 
 (window as unknown as { emmmUi: unknown }).emmmUi = {
   openEditor,
+  patternEditor,
   /** redraw everything once (used by automated checks) */
   updateAll: () => {
     for (const m of main) m.update();
@@ -214,8 +236,8 @@ async function openDocument(): Promise<void> {
   }
 }
 
-function saveAs(): void {
-  const name = prompt('Save emmm document as:', session.comp.name || 'Untitled');
+async function saveAs(): Promise<void> {
+  const name = (await promptDialog(screen, 'Save emmm document as:', session.comp.name || 'Untitled', 'Save'))?.trim();
   if (!name) return;
   session.comp.name = name;
   session.changed('name');
@@ -232,7 +254,48 @@ const opt = (k: keyof typeof session.comp.options, label: string, key?: string):
   },
 });
 
-const MENUS: { title: string; cls?: string; items: MenuItem[] }[] = [
+/**
+ * Windows menu (S1 "The Windows Menu"): "Close Edit Windows merely closes any edit windows
+ * you have open. The other commands bring the named window to the front … the top window in
+ * the list is the Conducting Window", and the list changes as edit windows open and close.
+ * Bringing a window forward also flashes its title, so the command is visible even when
+ * nothing was covering the window.
+ */
+function bringForward(w: MWindow): void {
+  w.show();
+  w.flashTitle();
+}
+function windowsMenu(): MenuItem[] {
+  const order = [main[1], main[0], main[2], main[3], main[4], main[5]]; // Conducting first, as in M
+  // the Conducting window is titled with the document's name
+  const live = (m: Updatable) => (m === main[1] ? session.comp.name || 'Untitled' : m === main[0] ? 'Patterns ' + 'abcdef'[session.comp.patternGroup.active] : m.win.titleEl.textContent || m.win.o.title);
+  const named: MenuItem[] = order.map((m) => ({ label: live(m), action: () => bringForward(m.win) }));
+  const editors: MenuItem[] = [
+    { label: 'Cyclic Editor', action: () => (openEditor('cyclic'), cyclic.win.flashTitle()) },
+    { label: 'Pattern Editor', action: () => (openEditor('patternEditor', { voice: patternEditor.voice }), patternEditor.win.flashTitle()) },
+    { label: 'Monitor', action: () => (openEditor('monitor'), monitorWin.win.flashTitle()) },
+  ];
+  const fixed = new Set<MWindow>([cyclic.win, patternEditor.win, monitorWin.win]);
+  const open: MenuItem[] = floating.filter((f) => f.win.open && !fixed.has(f.win)).map((f) => ({ label: f.win.titleEl.textContent || f.win.o.title, action: () => bringForward(f.win) }));
+  return [
+    { label: 'Close Edit Windows', key: '⌘0', enabled: () => floating.some((f) => f.win.open), action: closeEditWindows },
+    { sep: true, label: '' },
+    ...named,
+    { sep: true, label: '' },
+    ...editors,
+    ...(open.length ? [{ sep: true, label: '' }, ...open] : []),
+  ];
+}
+function closeEditWindows(): void {
+  floating.forEach((f) => f.win.open && f.win.close());
+}
+
+function toggleFullScreen(): void {
+  if (document.fullscreenElement) void document.exitFullscreen?.();
+  else void document.documentElement.requestFullscreen?.().catch(() => alertBox('This browser did not allow full screen here.'));
+}
+
+const MENUS: { title: string; cls?: string; items: MenuItem[] | (() => MenuItem[]) }[] = [
   {
     title: 'emmm',
     cls: 'logo',
@@ -247,7 +310,7 @@ const MENUS: { title: string; cls?: string; items: MenuItem[] }[] = [
   {
     title: 'File',
     items: [
-      { label: 'New', action: () => confirm('Start a new document? Unsaved changes are kept only in the autosave.') && session.load(newDocument()) },
+      { label: 'New', action: () => void confirmDialog(screen, 'Start a new document? Unsaved changes are kept only in the autosave.', 'New').then((ok) => ok && session.load(newDocument())) },
       { label: 'Open…', key: '⌘O', action: () => void openDocument() },
       { label: 'Open Demo', action: () => session.load(demoComposition()) },
       { label: 'Open Midi File…', action: async () => {
@@ -256,7 +319,7 @@ const MENUS: { title: string; cls?: string; items: MenuItem[] }[] = [
         } },
       { sep: true, label: '' },
       { label: 'Save', key: '⌘S', action: () => downloadDocument(session.comp) },
-      { label: 'Save As…', action: saveAs },
+      { label: 'Save As…', action: () => void saveAs() },
       { label: 'Browser Library…', action: () => openEditor('library') },
       { label: 'Save Movie As Midi File…', enabled: () => session.movie.length > 0 && !session.movieRecording, action: () => downloadBytes(`${session.comp.name || 'M'} Movie.mid`, writeSmf(session.movie, session.movieTempos, (session.comp.name || 'emmm') + ' movie') as BlobPart, 'audio/midi') },
       { label: 'Save State As Startup', action: () => (saveStartup(session.comp) ? alertBox('The current state (without Pattern contents and Time Distortion maps) is now what <b>New</b> gives you.') : alertBox('Could not save the startup state in this browser.')) },
@@ -268,7 +331,8 @@ const MENUS: { title: string; cls?: string; items: MenuItem[] }[] = [
   {
     title: 'Edit',
     items: [
-      { label: 'Undo', key: '⌘Z', enabled: () => false },
+      { label: 'Undo', key: '⌘Z', enabled: () => session.history.canUndo, action: () => session.undo() },
+      { label: 'Redo', key: '⇧⌘Z', enabled: () => session.history.canRedo, action: () => session.redo() },
       { sep: true, label: '' },
       { label: 'Cut', enabled: anySelected, action: editOp('cut') },
       { label: 'Copy', enabled: anySelected, action: editOp('copy') },
@@ -302,6 +366,11 @@ const MENUS: { title: string; cls?: string; items: MenuItem[] }[] = [
     title: 'Pattern',
     items: [
       { label: 'Edit…', action: () => openEditor('patternEditor', { voice: Math.max(0, session.selected.findIndex(Boolean)) }) },
+      {
+        label: 'Clear Pattern',
+        enabled: anySelected,
+        action: () => session.editOp('clear', patternEditor.win.open && !session.selected.some(Boolean) ? { voice: patternEditor.voice } : undefined),
+      },
       { sep: true, label: '' },
       { label: 'Transpose Up Half-Step', key: "⌘U", enabled: anySelected, action: patOp('transposeUp') },
       { label: 'Transpose Up Octave', enabled: anySelected, action: patOp('octaveUp') },
@@ -319,17 +388,7 @@ const MENUS: { title: string; cls?: string; items: MenuItem[] }[] = [
       { label: 'Eliminate Rests', enabled: anySelected, action: patOp('eliminateRests') },
     ],
   },
-  {
-    title: 'Windows',
-    items: [
-      { label: 'Close Edit Windows', key: '⌘0', action: () => floating.forEach((f) => f.win.open && f.win.close()) },
-      { sep: true, label: '' },
-      ...main.map((m) => ({ label: m.win.o.title.replace(/ [a-f]$/, ''), action: () => m.win.front() })),
-      { label: 'Cyclic Editor', action: () => openEditor('cyclic') },
-      { label: 'Pattern Editor', action: () => openEditor('patternEditor', { voice: patternEditor.voice }) },
-      { label: 'Monitor', action: () => openEditor('monitor') },
-    ],
-  },
+  { title: 'Windows', items: windowsMenu },
   {
     title: 'Options',
     items: [
@@ -347,7 +406,28 @@ const MENUS: { title: string; cls?: string; items: MenuItem[] }[] = [
       opt('noZoomRects', 'No Zoom Rects'),
       { sep: true, label: '' },
       { label: 'Palette…', action: () => paletteWin.show() },
+      {
+        label: 'Show Tips',
+        checked: () => prefs.app.tips,
+        action: () => {
+          prefs.app.tips = tips.enabled = !prefs.app.tips;
+          prefs.saveApp();
+        },
+      },
+      { label: 'Full Screen', checked: () => !!document.fullscreenElement, enabled: () => !!document.documentElement.requestFullscreen, action: toggleFullScreen },
+      { sep: true, label: '' },
       { label: 'Extended…  (not Classic M)', checked: () => session.comp.extended.enabled, action: () => extendedWin.win.show() },
+      {
+        label: 'Performance Feedback  (Extended)',
+        checked: () => prefs.app.feedback,
+        action: () => {
+          prefs.app.feedback = !prefs.app.feedback;
+          prefs.saveApp();
+          if (prefs.app.feedback) feedbackWin.win.show();
+          else feedbackWin.win.el.classList.add('hidden');
+        },
+      },
+      { label: 'MIDI Learn…  (Extended)', action: () => learnWin.win.show() },
       { label: 'Monitor All Output (internal)', checked: () => session.monitorAll, action: () => ((session.monitorAll = !session.monitorAll), session.monitor.unlock(), session.changed('midi')) },
     ],
   },
@@ -371,20 +451,27 @@ for (const m of MENUS) {
     // a press inside the open menu must not close it (click-then-click as well as
     // press-drag-release menu use)
     drop.addEventListener('pointerdown', (e) => e.stopPropagation());
-    for (const it of m.items) {
+    drop.setAttribute('role', 'menu');
+    closeSelectors();
+    for (const it of typeof m.items === 'function' ? m.items() : m.items) {
       if (it.sep) {
         el('div', 'sep', drop);
         continue;
       }
       const enabled = it.enabled ? it.enabled() : true;
       const d = el('div', 'item' + (enabled ? '' : ' disabled') + (it.checked?.() ? ' checked' : ''), drop);
+      d.setAttribute('role', it.checked ? 'menuitemcheckbox' : 'menuitem');
+      if (it.checked) d.setAttribute('aria-checked', String(it.checked()));
+      if (!enabled) d.setAttribute('aria-disabled', 'true');
       el('span', '', d, undefined, it.label);
       if (it.key) el('span', 'key', d, undefined, it.key);
       d.addEventListener('pointerup', (e) => {
         e.stopPropagation();
-        if (!enabled) return;
+        // as on the Macintosh, releasing over any item closes the menu; a disabled one does nothing
         closeMenu();
+        if (!enabled) return;
         it.action?.();
+        session.dirty = true; // show the result at once
       });
     }
     openMenu = { el: me, drop };
@@ -399,12 +486,32 @@ for (const m of MENUS) {
 const statusEl = el('div', 'status', menubar);
 const outEl = el('div', 'menu', menubar);
 outEl.style.fontWeight = '400';
+// a long device name is cut short here (the full name is in Midi Assignment)
+Object.assign(outEl.style, { display: 'block', lineHeight: '15px', maxWidth: '230px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' });
 outEl.title = 'Where M Output Channel 1 goes — click for Midi Assignment';
 outEl.addEventListener('pointerdown', (e) => {
   e.stopPropagation();
   openEditor('midiAssignment');
 });
 window.addEventListener('pointerdown', () => closeMenu());
+// an edit gesture (press … release) becomes one Undo step
+window.addEventListener('pointerdown', () => (session.gestureActive = true), true);
+window.addEventListener('pointerup', () => session.gestureEnd(), true);
+window.addEventListener('pointercancel', () => session.gestureEnd(), true);
+const tips = installTooltips(screen, () => view.scale, prefs.app.tips);
+session.onChange((w) => w === 'learn' && prefs.saveApp());
+// full screen: obvious way in and out at the right of the menu bar (Escape also leaves)
+const fsEl = el('div', 'menu', menubar, undefined, '⤢');
+fsEl.title = 'Full Screen (Escape leaves)';
+fsEl.setAttribute('role', 'button');
+fsEl.addEventListener('pointerdown', (e) => {
+  e.stopPropagation();
+  toggleFullScreen();
+});
+document.addEventListener('fullscreenchange', () => {
+  fsEl.textContent = document.fullscreenElement ? '⤡' : '⤢';
+  fsEl.title = document.fullscreenElement ? 'Leave Full Screen (or press Escape)' : 'Full Screen (Escape leaves)';
+});
 
 // ------------------------------------------------------------------ keyboard (S1 Appendix A)
 let capsLock = false;
@@ -415,12 +522,13 @@ window.addEventListener('keydown', (e) => {
   const cmd = e.metaKey || e.ctrlKey;
   if (cmd) {
     const k = e.key.toLowerCase();
-    if (k === '.') session.allNotesOff();
+    if (k === 'z') e.shiftKey ? session.redo() : session.undo();
+    else if (k === '.') session.allNotesOff();
     else if (k === 's') downloadDocument(session.comp);
     else if (k === 'o') void openDocument();
     else if (k === '0') floating.forEach((f) => f.win.open && f.win.close());
-    else if (k === 'm') MENUS[6].items[0].action?.();
-    else if (k === 'l') MENUS[6].items[10].action?.();
+    else if (k === 'm') opt('useMetronome', '').action?.();
+    else if (k === 'l') opt('lockMarkedVariables', '').action?.();
     else if (k === 'u' && anySelected()) patOp('transposeUp')();
     else if (k === 'd' && anySelected()) patOp('transposeDown')();
     else if (k === "'" && anySelected()) patOp('rescramble')();
@@ -453,7 +561,9 @@ window.addEventListener('keydown', (e) => {
       break;
     case 'Escape':
       closeMenu();
-      dialog?.remove();
+      closeSelectors();
+      closeDialog();
+      session.cancelLearn();
       break;
     case '`':
     case '~':

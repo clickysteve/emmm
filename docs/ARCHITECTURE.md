@@ -88,6 +88,18 @@ engine at exact ticks), movie capture, MIDI-input routing per voice (Src channel
 record / keyboard transpose / Input Control / echo map; Echo-Thru-Orchestration), tap tempo /
 tap conduct, step advance, mouse advance and output routing.
 
+It also owns **Undo / Redo** (`app/history.ts`): whole-document snapshots taken when an edit
+has settled (300 ms after the last change, or when the pointer is released), bounded to 100
+steps. `Session.docState()` defines what Undo sees — everything except performance state
+(active Positions, tempo, Baton, continuous conducting values, MIDI routing, the clock-input
+settings), so undoing never jumps the music and playing never fills the history. Undo writes
+back in place (`app/assign.ts`), keeping every object identity, so it is safe while playing.
+Changes named in `TRANSIENT` (transport, Baton, view changes…) never create history.
+
+**MIDI clock out** (`Options ▸ Send Clock`): one stream to one device; Start / clock / Stop,
+Stop on Pause and Continue on resume; Stop is stamped after the pulses already queued ahead;
+changing the device or switching Send Clock off mid-play stops the old device.
+
 ### UI (`src/ui`)
 Plain TypeScript + DOM/SVG, no framework. The whole screen is laid out in a fixed **720 × 470
 logical-pixel** space (the "M screen") and scaled with a CSS transform to fit the window, so
@@ -97,6 +109,14 @@ proportions stay those of a 1-bit Macintosh screen at any size.
 * `choice.ts` — Variable Position choice bar; `minis.ts` — miniature representations.
 * `mainWindows.ts` — the six main windows; `varEditors.ts`, `cyclicEditor.ts`,
   `patternEditor.ts`, `otherWindows.ts` — edit windows and dialogs.
+* Shared controls: `selector.ts` (the emmm pop-up selector that replaces every native
+  `<select>`: mouse, keyboard, type-ahead, live choice lists, ARIA combobox/listbox),
+  `dialogs.ts` (alert / confirm / text entry instead of the browser's), `tooltip.ts` (one
+  layer that shows every control's `title` in emmm's style and suppresses the system
+  tooltip), `patternControls.ts` (Output Length, Time Base, Phase — used by both the Patterns
+  window and the Pattern Editor, so both are the same controls on the same Pattern state).
+* `feedbackWindow.ts` — Performance Feedback: reads the engine's existing step events
+  (`Session.nowPlaying`), at most ~12 redraws a second, only while open.
 * `palette.ts` — colour palettes. All drawing uses CSS custom properties (`--desktop`,
   `--paper`, `--ink`, `--dim`, `--activity`, `--selection`, and the dither fills); a palette is
   turned into one `<style>` element, and windows carry a `data-area` so each functional area can
@@ -115,8 +135,20 @@ workflow builds with `--base=/<repository>/`. A small build-time plugin renders
 About windows link to. No server, no third-party requests.
 
 ### Persistence (`src/persistence`)
-`format.ts`: `{ format: "emmm", version, mode, savedAt, composition, ui }` JSON. `migrate`
-upgrades old versions and fills missing fields from defaults; `validate` clamps values.
+`format.ts`: `{ format: "emmm", version, mode, savedAt, composition, ui }` JSON (version 2).
+`migrate` upgrades old versions and fills missing fields from defaults; `validate` clamps
+values. Version 1 → 2: Extended gains Locks, Mutation, A/B and per-voice seeds (filled from
+defaults); MIDI Learn mappings leave the document and are handed once to the preferences.
+
+State lives in four separate places:
+
+| What | Where | Examples |
+|---|---|---|
+| Classic musical document | `Composition` (saved file) | Patterns, Variables, Positions, Snapshots, routing, seed |
+| Extended musical / performance state | `Composition.extended` (saved file) | Locks, Mutation amount, A/B states, voice seeds, CC Cycles |
+| Editor assistance | `app/prefs.ts` → `emmm.editor` | the Pattern Editor's scale guide |
+| Application preferences | `app/prefs.ts` → `emmm.prefs`; `ui/palette.ts` | tips, Performance Feedback, MIDI Learn mappings; palettes |
+
 `storage.ts`: autosave to `localStorage` (every ~1.5 s after a change), a named browser
 library, download/upload of `.emmm.json`, and the movie `.mid` download.
 
@@ -128,8 +160,23 @@ not depend on how finely `render` is called.
 
 ## Classic and Extended
 Extended features live in `src/extended/` and the `Composition.extended` settings object
-(`enabled` is false by default). The Session consults them only at the MIDI-input boundary
-(`extendedRealtime`, `extendedLearn`); the engine never reads them, so Classic note generation
-cannot be affected — a test checks this. New Extended features should follow the same rule:
+(`enabled` is false by default). The Session consults them at the MIDI-input boundary
+(`extendedRealtime`, `extendedLearn`) and in explicit actions (Reroll, Mutate, A/B); the
+engine never reads them, so Classic note generation cannot be affected — tests check this.
+The one engine hook is generic: `MEngine.seedOverride` (per-voice seeds, all `null` = the
+document seed = Classic), which the Session fills from `extended.voiceSeeds` only when
+Extended is on.
+
+* `extended.ts` — settings, MIDI Learn targets / validation / conflict rule (`learnInto`),
+  the clock follower (trimmed-mean tempo, loss after 400 ms, phase re-base on recovery, status
+  Internal / Waiting / Running / Lost).
+* `mutation.ts` — `mutate(comp, amount, locks, rng)`: changes the active Positions' values,
+  cycles, active Positions and Cyclic Random order — never Pattern notes, routing, Snapshots or
+  options — from a stream seeded by the document seed and a mutation counter.
+* `perfState.ts` — A/B capture / recall of the performance state (a plain object keyed by
+  composition field, ready for interpolation if morphing is added later).
+
+The Pattern Editor's scale guide (`app/scales.ts`) is an editing aid only: pitch-class sets
+used to shade the grid and snap new notes; nothing in the engine reads it. New Extended features should follow the same rule:
 separate modules, fields added through the migration path, inert when disabled. The Extended
 window is clearly labelled "not part of Classic M".

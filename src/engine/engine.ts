@@ -127,6 +127,9 @@ export class MEngine {
   private robotRng: Rng;
   private robotNext = 0;
   private opts: EngineOptions;
+  /** Optional per-voice seeds (EXTENDED Reroll with locked Voices). null = the document
+   * seed, which is all Classic ever uses. */
+  seedOverride: (number | null)[] = [null, null, null, null];
 
   constructor(comp: Composition, opts: EngineOptions = {}) {
     this.comp = comp;
@@ -141,7 +144,7 @@ export class MEngine {
       clock: 0,
       position: 0,
       cycle: { rhythm: 0, legato: 0, accent: 0 },
-      rng: new Rng(this.comp.seed, v + 1),
+      rng: new Rng(this.seedFor(v), v + 1),
       keyTranspose: null,
       heldStepNotes: [],
       last: null,
@@ -158,6 +161,15 @@ export class MEngine {
   }
 
   // ---------------------------------------------------------------- accessors
+
+  seedFor(v: number): number {
+    return this.seedOverride[v] ?? this.comp.seed;
+  }
+
+  /** Restart one voice's random stream from `seed` now, without restarting the music. */
+  reseedVoice(v: number, seed: number): void {
+    this.voices[v].rng.reseed(seed, v + 1);
+  }
 
   pattern(v: number): Pattern {
     return this.comp.patternGroups[this.comp.patternGroup.active].patterns[v];
@@ -198,7 +210,7 @@ export class MEngine {
     this.sounding.clear();
     this.cancelled.clear();
     this.voices.forEach((vr, v) => {
-      vr.rng.reseed(this.comp.seed, v + 1);
+      vr.rng.reseed(this.seedFor(v), v + 1);
       vr.heldStepNotes = [];
       vr.last = null;
     });

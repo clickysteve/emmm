@@ -559,3 +559,159 @@ body.dragging,
 body.dragging * {
   cursor: none !important;
 }
+
+/* ------------------------------------------------------------ pop-up selector (selector.ts) */
+.msel {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--ink);
+  box-shadow: 1px 1px 0 var(--ink);
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 9px;
+  padding: 0 11px 0 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  cursor: default;
+  outline: none;
+}
+.msel-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* the pop-up triangle */
+.msel-arrow {
+  position: absolute;
+  right: 3px;
+  top: 50%;
+  margin-top: -2px;
+  width: 5px;
+  height: 3px;
+  background: var(--ink);
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+.msel:focus-visible {
+  outline: 1px dotted var(--ink);
+  outline-offset: 1px;
+}
+.msel.open {
+  background: var(--selection);
+  color: var(--paper);
+}
+.msel.open .msel-arrow {
+  background: var(--paper);
+}
+.msel.missing .msel-text {
+  color: var(--dim);
+}
+.msel-list {
+  position: absolute;
+  z-index: 20001;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--ink);
+  box-shadow: 1px 1px 0 var(--ink);
+  padding: 1px 0;
+  font-size: 10px;
+  max-height: 260px;
+  max-width: 340px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--ink) var(--paper);
+}
+.msel-item {
+  position: relative;
+  padding: 2px 10px 2px 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.msel-item.checked::before {
+  content: '✓';
+  position: absolute;
+  left: 2px;
+}
+.msel-item.hot {
+  background: var(--selection);
+  color: var(--paper);
+}
+.msel-item.disabled {
+  color: var(--dim);
+}
+.msel-item.missing {
+  font-style: normal;
+}
+
+/* ------------------------------------------------------------ tooltips (tooltip.ts) */
+.mtip {
+  position: absolute;
+  z-index: 40000;
+  max-width: 230px;
+  padding: 2px 4px 3px;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--ink);
+  box-shadow: 1px 1px 0 var(--ink);
+  font-size: 9px;
+  line-height: 11px;
+  white-space: normal;
+  pointer-events: none;
+}
+
+/* dialogs (dialogs.ts): the default button has the thick Macintosh ring */
+.mbutton.default {
+  box-shadow: 0 0 0 2px var(--paper), 0 0 0 3px var(--ink);
+}
+.mbutton:focus-visible,
+.btn:focus-visible {
+  outline: 1px dotted var(--ink);
+  outline-offset: 2px;
+}
+.mbutton:disabled {
+  opacity: 0.4;
+}
+
+/* Windows menu: the window brought forward flashes its title twice */
+@keyframes mfront {
+  0%,
+  24%,
+  50%,
+  74% {
+    background: var(--selection);
+    color: var(--paper);
+  }
+  25%,
+  49%,
+  75%,
+  100% {
+    background: var(--paper);
+    color: var(--ink);
+  }
+}
+.mwin .title.flash-front {
+  animation: mfront 0.6s steps(1) 1;
+}
+
+/* EXTENDED lock marks on choice bars and Voices */
+.lockbadge {
+  position: absolute;
+  z-index: 3;
+  background: var(--paper);
+  border: 1px solid var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.lockbadge svg {
+  display: block;
+}
+.lockframe {
+  position: absolute;
+  z-index: 2;
+  border: 1px dotted var(--ink);
+  pointer-events: none;
+}
