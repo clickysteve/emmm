@@ -42,7 +42,8 @@ export function hasNotes(p: Pattern): boolean {
  */
 export function rescramble(p: Pattern, rng: Rng, dontScrambleRests: boolean, region?: [number, number]): void {
   const n = p.steps.length;
-  if (p.scrambled.length !== n) p.scrambled = Array.from({ length: n }, (_, i) => i);
+  // a whole-pattern scramble starts from the identity so rests (if kept) map to themselves
+  if (p.scrambled.length !== n || !region) p.scrambled = Array.from({ length: n }, (_, i) => i);
   const [a, b] = region ?? [0, n];
   const idx: number[] = [];
   for (let i = a; i < b; i++) {
