@@ -9,7 +9,7 @@ import { freshSeed } from './engine/rng';
 import type { VariableName } from './engine/types';
 import { writeSmf } from './midi/smf';
 import { deserialize } from './persistence/format';
-import { autosave, downloadBytes, downloadDocument, loadAutosave, pickFile } from './persistence/storage';
+import { autosave, clearStartup, downloadBytes, downloadDocument, loadAutosave, loadStartup, pickFile, saveStartup } from './persistence/storage';
 import { noteName } from './engine/constants';
 import type { EditorName, FlashState, UiContext } from './ui/context';
 import { CyclicEditor } from './ui/cyclicEditor';
@@ -23,8 +23,13 @@ const W = 720;
 const H = 470;
 
 // ------------------------------------------------------------------ document at startup
+function newDocument() {
+  const c = loadStartup() ?? defaultComposition();
+  c.seed = freshSeed();
+  return c;
+}
 const params = new URLSearchParams(location.search);
-let initial = params.has('demo') ? demoComposition() : params.has('new') ? defaultComposition(freshSeed()) : (loadAutosave()?.composition ?? demoComposition());
+let initial = params.has('demo') ? demoComposition() : params.has('new') ? newDocument() : (loadAutosave()?.composition ?? demoComposition());
 if (params.has('seed')) initial.seed = Number(params.get('seed')) || initial.seed;
 
 const session = new Session(initial);
@@ -197,7 +202,7 @@ const MENUS: { title: string; cls?: string; items: MenuItem[] }[] = [
   {
     title: 'File',
     items: [
-      { label: 'New', action: () => confirm('Start a new, empty document? Unsaved changes are kept only in the autosave.') && session.load(defaultComposition(freshSeed())) },
+      { label: 'New', action: () => confirm('Start a new document? Unsaved changes are kept only in the autosave.') && session.load(newDocument()) },
       { label: 'Open…', key: '⌘O', action: () => void openDocument() },
       { label: 'Open Demo', action: () => session.load(demoComposition()) },
       { label: 'Open Midi File…', action: async () => {
@@ -209,6 +214,8 @@ const MENUS: { title: string; cls?: string; items: MenuItem[] }[] = [
       { label: 'Save As…', action: saveAs },
       { label: 'Browser Library…', action: () => openEditor('library') },
       { label: 'Save Movie As Midi File…', enabled: () => session.movie.length > 0 && !session.movieRecording, action: () => downloadBytes(`${session.comp.name || 'M'} Movie.mid`, writeSmf(session.movie, session.movieTempos, (session.comp.name || 'emmm') + ' movie') as BlobPart, 'audio/midi') },
+      { label: 'Save State As Startup', action: () => (saveStartup(session.comp) ? alertBox('The current state (without Pattern contents and Time Distortion maps) is now what <b>New</b> gives you.') : alertBox('Could not save the startup state in this browser.')) },
+      { label: 'Forget Startup State', enabled: () => !!loadStartup(), action: () => clearStartup() },
       { sep: true, label: '' },
       { label: 'Midi Assignment…', action: () => openEditor('midiAssignment') },
     ],
@@ -384,6 +391,17 @@ window.addEventListener('keydown', (e) => {
       closeMenu();
       dialog?.remove();
       break;
+    case '`':
+    case '~':
+    case ',':
+    case '<': {
+      // Pattern Editor audition: ` plays the step at the MIDI Edit Counter, , the step under the cursor
+      if (!patternEditor.win.open) return;
+      const p = session.pattern(patternEditor.voice);
+      const idx = e.key === '`' || e.key === '~' ? session.recorders[patternEditor.voice].counter : patternEditor.hover?.step ?? -1;
+      if (p.steps[idx]?.length) session.auditionStep(patternEditor.voice, p.steps[idx], patternEditor.velocity);
+      break;
+    }
     default: {
       if (/^[a-zA-Z]$/.test(e.key) && !e.altKey) {
         const i = e.key.toUpperCase().charCodeAt(0) - 65;
@@ -497,6 +515,20 @@ void session.midi.request().then((st) => {
     });
     session.changed('midi');
   }
-  void st;
+  if (st === 'unsupported' || st === 'denied') {
+    let shown = false;
+    try {
+      shown = sessionStorage.getItem('emmm.midiNotice') === '1';
+      sessionStorage.setItem('emmm.midiNotice', '1');
+    } catch {
+      /* ignore */
+    }
+    if (!shown)
+      alertBox(
+        st === 'unsupported'
+          ? 'This browser has no Web MIDI, so emmm cannot reach MIDI hardware here. It will play through its internal monitor instead. For MIDI, use Chrome, Edge, Opera or Firefox.'
+          : 'MIDI access was not granted, so emmm will play through its internal monitor. Allow MIDI for this site, then use <b>File ▸ Midi Assignment…</b> ▸ Request MIDI.',
+      );
+  }
 });
 window.addEventListener('beforeunload', () => autosave(session.comp));

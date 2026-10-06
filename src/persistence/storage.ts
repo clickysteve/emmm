@@ -7,6 +7,7 @@ import type { Composition } from '../engine/types';
 import { deserialize, serialize, type EmmmDocument, type UiState } from './format';
 
 const AUTOSAVE = 'emmm.autosave';
+const STARTUP = 'emmm.startup';
 const LIBRARY = 'emmm.library.';
 
 function ls(): Storage | null {
@@ -99,4 +100,46 @@ export function pickFile(accept: string): Promise<File | null> {
     input.onchange = () => resolve(input.files?.[0] ?? null);
     input.click();
   });
+}
+
+/**
+ * Save State As Startup (S1 ch.19): the current screen becomes what New gives you —
+ * without the contents of Patterns and without Time Distortion maps, as in M.
+ */
+export function saveStartup(comp: Composition): boolean {
+  const c = structuredClone(comp);
+  c.patternGroups.forEach((g) =>
+    g.patterns.forEach((p) => {
+      p.steps = [];
+      p.scrambled = [];
+      p.outputLength = 0;
+    }),
+  );
+  c.timeDistortion.positions.forEach((pos) => pos.forEach((m) => (m.points = [])));
+  c.sequence = null;
+  c.sequenceEnable = false;
+  c.name = 'Untitled';
+  try {
+    ls()?.setItem(STARTUP, serialize(c));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function loadStartup(): Composition | null {
+  try {
+    const t = ls()?.getItem(STARTUP);
+    return t ? deserialize(t).composition : null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearStartup(): void {
+  try {
+    ls()?.removeItem(STARTUP);
+  } catch {
+    /* ignore */
+  }
 }
