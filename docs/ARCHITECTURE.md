@@ -76,10 +76,14 @@ only its window.
 * `webmidi.ts` — device discovery, hot-plug, input listeners, graceful fallback when Web MIDI
   is missing or denied.
 * `messages.ts` — encoders/parser.
+* `clockIn.ts` — the MIDI clock follower (trimmed-mean tempo, loss after 400 ms, phase re-base
+  on recovery, status Internal / Waiting / Running / Lost). Used by `Session.clockRealtime`
+  whenever `midi.clockIn.enabled` — independent of Extended (it lived in `extended/` until
+  document format 4).
 * `smf.ts` — Standard MIDI File writer (Movies, 96 ppq + tempo map) and reader (import into
   Patterns with M's chord/rest/quantize options).
 * `src/audio/monitor.ts` — a small internal WebAudio "monitor" and the metronome click. It is a
-  test aid: M Output Channels can be routed to it in Midi Assignment.
+  test aid: M Output Channels can be routed to it in MIDI Settings.
 
 ### Session (`src/app/session.ts`)
 The performance controller: everything a gesture can do. Holds Hold/Do state, the current
@@ -145,10 +149,12 @@ workflow builds with `--base=/<repository>/`. A small build-time plugin renders
 About windows link to. No server, no third-party requests.
 
 ### Persistence (`src/persistence`)
-`format.ts`: `{ format: "emmm", version, mode, savedAt, composition, ui }` JSON (version 2).
+`format.ts`: `{ format: "emmm", version, mode, savedAt, composition, ui }` JSON (version 4).
 `migrate` upgrades old versions and fills missing fields from defaults; `validate` clamps
 values. Version 1 → 2: Extended gains Locks, Mutation, A/B and per-voice seeds (filled from
 defaults); MIDI Learn mappings leave the document and are handed once to the preferences.
+2 → 3: Trajectories. 3 → 4: `extended.clockIn` moves to `midi.clockIn` (on only if it was on
+*and* Extended was on, so an old file behaves as before); `scaleLock` arrives, off.
 
 State lives in four separate places:
 
@@ -157,6 +163,7 @@ State lives in four separate places:
 | Classic musical document | `Composition` (saved file) | Patterns, Variables, Positions, Snapshots, routing, seed |
 | Extended musical / performance state | `Composition.extended` (saved file) | Locks, Mutation amount, A/B states, voice seeds, CC Cycles, Trajectories |
 | Pattern editing metadata | `Pattern.scale` (saved file, optional) | each Pattern's Root + Scale |
+| emmm Transposition Scale Lock | `Composition.scaleLock` (saved file, default off) | Transposition counts scale degrees |
 | Application preferences | `app/prefs.ts` → `emmm.prefs`; `ui/palette.ts` | tips, Performance Feedback, MIDI Learn mappings; palettes |
 
 `storage.ts`: autosave to `localStorage` (every ~1.5 s after a change), a named browser
@@ -171,15 +178,13 @@ not depend on how finely `render` is called.
 ## Classic and Extended
 Extended features live in `src/extended/` and the `Composition.extended` settings object
 (`enabled` is false by default). The Session consults them at the MIDI-input boundary
-(`extendedRealtime`, `extendedLearn`) and in explicit actions (Reroll, Mutate, A/B); the
+(`extendedLearn`) and in explicit actions (Reroll, Mutate, A/B); the
 engine never reads them, so Classic note generation cannot be affected — tests check this.
 The one engine hook is generic: `MEngine.seedOverride` (per-voice seeds, all `null` = the
 document seed = Classic), which the Session fills from `extended.voiceSeeds` only when
 Extended is on.
 
-* `extended.ts` — settings, MIDI Learn targets / validation / conflict rule (`learnInto`),
-  the clock follower (trimmed-mean tempo, loss after 400 ms, phase re-base on recovery, status
-  Internal / Waiting / Running / Lost).
+* `extended.ts` — settings, MIDI Learn targets / validation / conflict rule (`learnInto`).
 * `mutation.ts` — `mutate(comp, amount, locks, rng)`: changes the active Positions' values,
   cycles, active Positions and Cyclic Random order — never Pattern notes, routing, Snapshots or
   options — from a stream seeded by the document seed and a mutation counter.
@@ -190,7 +195,7 @@ Extended is on.
   the same mechanism), one action per step, plus Smooth updates at most every 6 ticks with
   repeated controller values suppressed. Note-level targets write `MEngine.mod` (runtime
   modulation, neutral = Classic); Tempo, Baton, Positions and Mutation strength are set the way
-  conducting sets them. Controller messages go through `Session.send` (Midi Assignment
+  conducting sets them. Controller messages go through `Session.send` (MIDI Settings
   routing) and into the Movie. Runtime state (`Session.traj`) is never saved and never makes
   Undo steps; definitions are in `extended.trajectories` (document v3).
 * `perfState.ts` — A/B capture / recall of the performance state (a plain object keyed by
@@ -199,6 +204,12 @@ Extended is on.
 A Pattern's Root + Scale (`Pattern.scale`, `app/scales.ts`) is editing metadata: pitch-class
 sets that shade the grid, snap new notes, and — when changed with `Session.setPatternScale` —
 transform the Pattern's notes by scale degree (`transformPitch` documents the exact rule;
-one Undo step). Nothing in the engine reads it: there is no real-time quantiser. New Extended features should follow the same rule:
+one Undo step). There is no real-time quantiser. The engine reads it only for the emmm
+**Transposition Scale Lock** (`Composition.scaleLock`, off by default): `MEngine.transposePitch`
+then moves each note by `shiftDegrees` (degrees of that Voice's current Pattern scale; a note
+outside the scale keeps its chromatic offset from the degree below; Chromatic = semitones)
+instead of adding semitones, so Positions, conducting, the Robot, Trajectory (`MEngine.mod`)
+and Mutation (degree-sized moves, same random draws) all count degrees. Keyboard Transpose stays
+chromatic on top. With Scale Lock off the code path is M's `raw + transposition + offset`. New Extended features should follow the same rule:
 separate modules, fields added through the migration path, inert when disabled. The Extended
 window is clearly labelled "not part of Classic M".

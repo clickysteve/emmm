@@ -88,11 +88,11 @@ workflow uses the actual repository name automatically.)
 ## First steps
 
 1. **Start** (Space, or ▶ in the Conducting window). The demo document "Jumping In" plays
-   four Voices.
+   four Voices. In emmm Space is Play / Pause; ⇧Space is Sync.
 2. Click Positions in the **Variables** and **Cyclic Variables** windows while it plays.
    Double-click a Position to open its edit window; edits are heard immediately.
-3. **File ▸ Midi Assignment…**: choose your MIDI device for the 16 output channels ("All
-   outputs →" sets them all at once).
+3. **File ▸ MIDI Settings…**: choose your MIDI device for the 16 output channels ("All
+   outputs →" sets them all at once); MIDI clock out and in are there too.
 4. **Chan Orch** (Midi window) decides which output channels each Voice plays on.
 5. Double-click a Voice's **Select** box (Patterns window) to open the **Pattern Editor** and
    click in notes — or set the Voice's **Use** to **R** and play into it from a MIDI keyboard.
@@ -116,14 +116,17 @@ Sequence), Web MIDI input and output with timestamped scheduling, save/load and 
 randomness, and colour palettes (Options ▸ Palette…; Classic black-and-white by default).
 Everyday comforts that do not change M's music: Undo / Redo, the Pattern's Length, Time Base
 and Phase right in the Pattern Editor, Clear Pattern, a Root + Scale per Pattern (changing it
-moves the notes by scale degree), typing any number directly, keyboard shortcuts,
-emmm-style tooltips and pop-up menus, and full screen. 318 automated tests (including a seeded
+moves the notes by scale degree) and an optional Transposition **Scale Lock** (Transposition
+counts degrees of each Pattern's scale), typing any number directly, keyboard shortcuts
+(Space = Play / Pause), mouse-wheel and trackpad scrolling in the Pattern Editor, MIDI clock
+in and out in one MIDI Settings window, emmm-style tooltips and pop-up menus, and full
+screen. 354 automated tests (including a seeded
 fuzz test, worked examples, and the whole app driven through its menus in a simulated browser)
 cover the engine, timing maths, persistence, session logic, the interface and Extended.
 
 **Extended** (Options ▸ Extended…, off by default) explores what M might have become: Seed and
 Reroll, Locks, controlled Mutation (subtle → chaos), A/B performance states, MIDI Learn for
-almost every control, MIDI clock input with sync status, Performance Feedback, CC Cycles and
+almost every control, Performance Feedback, CC Cycles and
 Trajectory (rows of values moved through at musical rates, driving MIDI controllers or
 parameters).
 These are modern additions, not features of the original M, and they never change how Classic

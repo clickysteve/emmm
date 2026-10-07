@@ -92,7 +92,8 @@ a bass line and a sparse high line, with every Variable on Position 1 (a "neutra
 
 2. **Start playback.** Press **Space**, or click **▶** — the leftmost part of the
    top strip in the Conducting window. The ▶ part turns black while playing. (In M the
-   middle **●** is **Stop**, not record; the right one, **❚❚**, is Pause.)
+   middle **●** is **Stop**, not record; the right one, **❚❚**, is Pause.) In emmm **Space is
+   Play / Pause**: press it again to pause, and again to carry on.
 
 3. **Hear and see what it is generating.** Look at the top-right corner of the menu bar:
    `→ monitor` means emmm is playing through its small built-in sound (used when no MIDI
@@ -101,13 +102,19 @@ a bass line and a sparse high line, with every Variable on Position 1 (a "neutra
    current step, pitches and velocity, and every outgoing note. The **Pattern Group** box
    with an inverted "a" also flashes a little brick each time a Voice's Pattern starts over.
 
-4. **Select a real MIDI output.** Choose **File ▸ Midi Assignment…**. Under the table, open
+4. **Select a real MIDI output.** Choose **File ▸ MIDI Settings…** (⌥M). Under the table, open
    the **All outputs →** menu (1 in the picture) and pick your interface or synth. All 16
    rows of **Output Channels** now point at that port, with MIDI channels 1–16 in order.
    The menu-bar indicator changes to that port's name. Close the window with the triangle
    at its top-left corner.
 
-   ![Midi Assignment: 1 All outputs, 2 Output Channel 1's port, 3 its MIDI channel](images/qs-midi-assignment.png)
+   ![MIDI Settings (M's Midi Assignment): 1 All outputs, 2 Output Channel 1's port, 3 its MIDI channel](images/qs-midi-assignment.png)
+
+   MIDI Settings is the one place for MIDI: this table is M's *Midi Assignment*; the column
+   at the right is **MIDI Clock** — **Send clock** to clock other gear from emmm (choose the
+   device under it), and **Follow clock** to take emmm's tempo, and optionally its Start /
+   Stop / Continue, from an incoming MIDI clock. Its status reads INTERNAL, WAITING, RUNNING
+   (with the tempo it hears) or LOST.
 
 5. **Route Voice 1 to MIDI channel 1.** It already is, in two layers:
    - The **Orchestration** Variable sends each Voice to one or more *M Output Channels*. In
@@ -115,7 +122,7 @@ a bass line and a sparse high line, with every Variable on Position 1 (a "neutra
      sixteen dots; in Position 1 each Voice has one filled square: Voice 1 on channel 1,
      Voice 2 on 2, and so on. Double-click that box to see it large: Voice 1's row has its
      first square hatched.
-   - **Midi Assignment** then maps each M Output Channel to a real port and MIDI channel
+   - **MIDI Settings** then maps each M Output Channel to a real port and MIDI channel
      (row 1 → your port, Chan 1).
 
 6. **Connect a hardware synth.** Set your synth to receive on MIDI channel 1. To hear only
@@ -177,7 +184,7 @@ a bass line and a sparse high line, with every Variable on Position 1 (a "neutra
     Stop sends note-offs for everything that is sounding. (**Tab** is *Pause*: it freezes
     the music and deliberately leaves held notes sounding, as M did — press Tab or Space to
     continue.) If a note ever hangs, press **⌘.** (All Notes Off), or use **Panic** in
-    File ▸ Midi Assignment… .
+    File ▸ MIDI Settings… .
 
 At this point you have heard the whole idea: *the notes never changed — everything you
 did changed how they were performed.*
@@ -297,6 +304,20 @@ the arpeggio on D) and its edit window opens. Each Voice has a **Note** box and 
 box; C3 means "no transposition". Press the top half of Voice 1's Note box until it reads
 **G** (octave 3): the arpeggio moves up a fifth as you click. Now alternate between the first
 and sixth Transposition boxes in the main window: instant modulation, played *in time*.
+
+**Scale Lock** (emmm — not in M) is the switch at the bottom of the Transposition window (also
+**Options ▸ Transposition Scale Lock**). With it on, Transposition values count **degrees of
+each Voice's own Pattern scale** instead of semitones, so harmony stays in key: in C Minor,
+C–E♭–G at **+1** becomes D–F–A♭, at **+2** E♭–G–B♭, and **+7** is exactly an octave. The boxes
+then read **Deg** and **Octave** (degree 1, octave 3 = no transposition), each row shows what
+its Voice's root moves to (e.g. *C Minor +2 → E♭*), and the Variables window marks
+Transposition **DEG**. Each Voice uses its own Pattern's Root + Scale (a Voice whose Pattern
+is Chromatic moves by semitones as before). A note outside the scale keeps its chromatic
+inflection (E natural in C Minor +1 → F♯). The Pattern's notes are never changed — the shift
+happens as each note is played — and it applies wherever Transposition comes from: Positions,
+conducting, the Robot, Trajectory, Mutation. Keyboard Transpose (a played key) stays
+chromatic. Off (the default) is M's Transposition, exactly. It is saved with the document and
+undoable.
 
 ### 9. Time Distortion: swing and rubato
 
@@ -553,6 +574,19 @@ Also useful: the **globe** (Blink Everything) collects *every* storable control 
 "snapshot of everything" — and the **pencil** (Edit Snapshot) re-opens the current Snapshot's
 contents as blinking items so you can add or remove some before storing again.
 
+**What a Snapshot does and does not hold.** It holds: which Position each included Variable
+is on (all eleven, Pattern Group letter and Sound Choice included), the conducting arrows,
+each Voice's Src, Play-Enable, Echo, Mouse Advance, Output Length, Time Base and Phase, Sync
+(as an action) and the Sequence enable — only the items that were blinking when you stored
+it. It does **not** hold what is *in* those Positions (notes, densities, transposition
+values, cycles: edit a Position later and the Snapshot plays the new contents), nor the tempo
+value, the Pattern notes, options or MIDI settings. Recalling one while playing changes those
+items at the next quantization point and leaves everything else as it is; the music never
+stops. Only Snapshots **A–F** can be conducted (the Snap window's arrow). Rest the mouse on a
+Snapshot box to see exactly what it holds; the line at the bottom of the Snap window says what
+is happening (holding, editing, *C waits for the next whole note*, or the current Snapshot),
+and a Snapshot waiting for the quantization blinks.
+
 ---
 
 ## Four Voices
@@ -566,7 +600,7 @@ Once one Voice makes sense, add the others. Example hardware setup:
 | 3 | 3 | sampler (pads, textures) |
 | 4 | 10 | drum machine |
 
-1. **File ▸ Midi Assignment… ▸ All outputs →** your interface (or set each row's port where
+1. **File ▸ MIDI Settings… ▸ All outputs →** your interface (or set each row's port where
    that instrument is connected; each row's **Chan** box sets the MIDI channel).
 2. **Orchestration:** double-click the first **Chan Orch** box. Rows 1–3 already point to
    channels 1–3. In row 4, click square **4** (off) and square **10** (on).
@@ -588,7 +622,7 @@ How this differs from four sequencer tracks:
 - Every Variable has **separate settings per Voice** inside each Position, so one click can make
   the drums sparser while the bass gets denser.
 - Voices run at **independent Time Bases** — 1|4 against 1|3 against 1|5 is normal, not a
-  special mode. Use **Sync** (Space while playing, or the **Sync** button) to realign them.
+  special mode. Use **Sync** (**⇧Space**, or the **Sync** button) to realign them.
 
 ---
 
@@ -614,7 +648,7 @@ Practical recipes:
 
 - **Voice 2 twice as fast:** double its Time Base's second number (`1 | 4` → `1 | 8`), in its
   Patterns-window row or in the Pattern Editor while you edit it.
-- **Three against four:** Voice 1 at `1 | 4`, Voice 2 at `1 | 3`. Sync (Space) lines them up.
+- **Three against four:** Voice 1 at `1 | 4`, Voice 2 at `1 | 3`. Sync (⇧Space) lines them up.
 - **Long notes now and then:** keep the Time Base; give Rhythm a cycle with an occasional
   level 2 or 3.
 
@@ -671,10 +705,15 @@ slow section to a fast one. All of these can be changed while the music plays.
 - **Not in the document:** colour palettes, tips on/off and MIDI Learn
   mappings belong to this browser (they describe you and your equipment), so they stay as
   they are when you open someone else's file.
-- **MIDI Movie export:** click the film button (the middle of the lower transport strip in
-  the Conducting window; it turns black), press Start, perform, press Stop. Then **File ▸ Save
-  Movie As Midi File…** downloads a Standard MIDI File of everything emmm played — ready to
-  drop into a DAW.
+- **MIDI Movie export:** M's *Movie* is a recording of everything emmm sends — notes,
+  program changes, controllers — with their timing; it is not played back inside emmm. Click
+  the film button (the middle of the lower transport strip in the Conducting window) **before
+  Start**: it turns black and the menu bar says **MOVIE**. Press Start (the film blinks, the
+  menu bar says **MOVIE●**), perform, press Stop. Then **File ▸ Save Movie As Midi File…**
+  (available only once a Movie exists, as in M) downloads a Standard MIDI File of everything
+  emmm played — ready to drop into a DAW, or to read back into a Pattern with **Open Midi
+  File…**. Armed while already playing, it starts filming at the next Start (M's rule: arm it
+  before Start); the film button's tip always says what it is doing.
 - **MIDI import:** **File ▸ Open Midi File…** reads a MIDI file into the current Pattern Group
   (one Pattern per chosen channel), or, with **as Sequence**, as a separate track that plays
   along with the four Voices (enable it with the button right of the film button).
@@ -731,8 +770,11 @@ so **Return** stops and **1–9** play Slideshows again, as in M.
   `40-100` (or one number).
 - **Programs** in the Midi window: type the number as shown; `-` means no program change.
 
-M's own performance keys are unchanged (Space, Return, Tab, Backspace, letters for
-Snapshots, digits for Slideshows), so emmm's shortcuts use **⌘** or **⌥**. They are shown
+**Space is Play / Pause** (emmm): stopped → Start, playing → Pause, paused → continue. In M
+Space was Start, and Sync while playing; Sync is now **⇧Space** (or the Sync button). Space
+does nothing while you are typing a number. M's other performance keys are unchanged (Return,
+Tab, Backspace, letters for Snapshots, digits for Slideshows), so emmm's shortcuts use **⌘**
+or **⌥**. They are shown
 beside the commands in the menus, and **emmm ▸ Keyboard Shortcuts…** (**⌥H**) lists them all.
 The most useful:
 
@@ -745,7 +787,7 @@ The most useful:
 | ⌥↑ · ⌥↓ | select the previous / next Voice's Pattern |
 | ⌥[ · ⌥] | previous / next Position of the Variable you clicked last |
 | ⌥K ⌥P ⌥V ⌥C | Conducting · Patterns · Variables · Cyclic Variables window |
-| ⌥Y · ⌥M | Cyclic Editor · Midi Assignment |
+| ⌥Y · ⌥M | Cyclic Editor · MIDI Settings |
 | ⌥T | metronome on/off |
 | ⌥↩ | full screen |
 | ⌥X · ⌥R · ⌥A ⌥B · ⇧⌥A ⇧⌥B · ⌥O · ⌥J | Extended: Mutate · Reroll · recall A / B · capture A / B · Performance Feedback · Trajectory |
@@ -753,6 +795,12 @@ The most useful:
 In the **Pattern Editor** (when it is the front window): **← →** move through the steps (**⇧**
 selects), **⌘A** selects all, **⌫** deletes the selected steps (with nothing selected,
 Backspace is Hold/Do as always), **Escape** clears the selection, **↑ ↓** scroll the keyboard.
+
+The **mouse wheel and trackpad** scroll the Pattern Editor too: over the grid, the wheel moves
+up and down the keyboard (pitches), and a sideways trackpad swipe, a tilting wheel or
+**⇧ + wheel** moves along the steps; over the strip above the grid or the scroll bar below it,
+the plain wheel moves along the steps. Elsewhere the wheel is left alone (⌘/Ctrl + wheel still
+zooms the browser).
 
 ---
 
@@ -788,12 +836,8 @@ all does nothing.
   move a knob or press a key. The list shows every mapping with **Learn** (change it) and
   **×** (remove). One knob drives one control: learning it for something else moves it, and
   the window says so. Escape cancels. Mappings are kept by this browser, for your equipment.
-- **MIDI clock input.** **follow clock** makes emmm follow an external MIDI clock's tempo;
-  **Start/Stop/Cont** also follows its transport; choose which input. The box at the right
-  shows **INTERNAL**, **WAITING**, **RUNNING** (with the tempo) or **LOST** — if the clock
-  stops arriving, emmm keeps the last tempo until it returns. (Sending clock is Classic:
-  **Options ▸ Send Clock** with a device chosen under Send Sync in Midi Assignment; Pause sends
-  Stop and Continue.)
+- (MIDI clock input used to be here. It is MIDI infrastructure, not an experiment, so it now
+  lives in **File ▸ MIDI Settings…** and works with Extended on or off.)
 - **Performance Feedback** (**Options ▸ Performance Feedback**) opens a small inspector: for
   each Voice, the step just played, the source note and what came out, whether Note Density
   let it through (PASS / SKIP), the transposition, the Rhythm / Legato / Accent levels picked,
@@ -821,7 +865,7 @@ and Cyclic Variables carry on as before. It is emmm's idea, not part of M.
 - **Step or Smooth:** Step jumps to each value; Smooth glides from one value to the next during
   the step (Positions always step).
 - **Targets:** a MIDI controller (on an M Output Channel, so it goes to the device and channel
-  set in Midi Assignment), Note Density (replaces the Position's %), Transposition +, Velocity +,
+  set in MIDI Settings), Note Density (replaces the Position's %), Transposition + (scale degrees with Scale Lock), Velocity +,
   Legato × (these add to what the Positions say), Tempo, the Baton (↔ ↕), Mutation strength, or
   which Position of a Variable is active (Pattern Group changes restart the Voices, as in M).
   For Voice targets the **1 2 3 4** boxes choose the Voices.
@@ -849,7 +893,7 @@ and Cyclic Variables carry on as before. It is emmm's idea, not part of M.
    (an eighth note behind) or **96** (a beat behind). Then give Voice 2 Cyclic Random order:
    a canon that drifts into counterpoint.
 4. **Anything against anything.** Same Pattern in three Voices with Time Bases **1 | 4**,
-   **1 | 5** and **1 | 6**. Press Space to Sync when you want them to meet again.
+   **1 | 5** and **1 | 6**. Press ⇧Space (Sync) when you want them to meet again.
 5. **Ghost notes.** Accent cycle **4, 1–2, 0–2, 1–3** (drag ranges). Some notes vanish (level
    0), some are ghosted, the downbeat is solid. Instant human groove from a straight line.
 6. **Overlapping clouds.** Set the Legato value for level 4 to **400** and use a cycle mostly at
@@ -886,7 +930,7 @@ how timed) → Cyclic Variables (rhythm, length, accent per note) → Orchestrat
 | Voice | one of four parallel streams that plays a Pattern |
 | Variable | one transformation (Note Density, Transposition, …) |
 | Position | one of a Variable's six stored settings (four Voices each); one is active |
-| Snapshot | a remembered combination of active Positions (A–Z) |
+| Snapshot | a remembered set of active Positions (not their contents) plus arrows and Voice settings (A–Z) |
 | Slideshow | a recorded, timed sequence of Snapshot changes (1–9) |
 
 **Variables**
@@ -897,7 +941,7 @@ how timed) → Cyclic Variables (rhythm, length, accent per note) → Orchestrat
 | Note Density | chance each note sounds (skipped notes become rests) |
 | Vel Range | lowest–highest velocity a Voice can play |
 | Note Order | Original / Cyclic Random (repeating) / Utterly Random mix |
-| Transposition | semitones up or down, relative to C3 |
+| Transposition | semitones up or down, relative to C3 (with emmm's Scale Lock: degrees of each Pattern's scale) |
 | Time Distort | swing / rubato map over a chosen length |
 | Rhythm | time to the next note: level 0–4 → ×0.5, ×1, ×2, ×3, ×4 the Time Base |
 | Legato | note length: 6 %, 25 %, 50 %, 75 %, 100 % of the gap |
@@ -909,7 +953,8 @@ how timed) → Cyclic Variables (rhythm, length, accent per note) → Orchestrat
 
 | Key | Does |
 |---|---|
-| Space | Start; while playing, Sync |
+| Space | Play / Pause: Start, then Pause / continue (emmm; in M, Start and Sync) |
+| ⇧Space | Sync |
 | Return | Stop (notes off) |
 | Tab | Pause / continue (notes held) |
 | Backspace | Hold/Do |

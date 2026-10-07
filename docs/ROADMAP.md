@@ -40,6 +40,8 @@
 6. Accessibility: the pop-up selectors, dialogs, menus and new controls have keyboard
    operation and ARIA roles; the older numericals and choice bars are still mouse-only.
 8. Pattern-menu key equivalents that browsers reserve (⌘W, ⌘R, ⌘H, ⌘F) have no shortcut.
+9. Conducted Snapshots: quantize and queue them one quantum apart, as S1 ch.9 describes (U23).
+10. Movies: decide what arming during playback should do (U24); optional event counter.
 
 ## Usability additions — done (do not change M's music)
 
@@ -54,13 +56,22 @@
   place of every native `<select>`, emmm dialogs in place of the browser's confirm / prompt.
 * Windows menu fixed to M's documented behaviour (live list, visible bring-to-front); Full
   Screen; colour palettes.
+* **Space = Play / Pause** (Sync moves to ⇧Space), from the shared shortcut table.
+* Mouse wheel / trackpad scrolling in the Pattern Editor (pitches, and sideways or ⇧ + wheel
+  for steps), never global.
+* **MIDI Settings** (File ▸ MIDI Settings…): M's Midi Assignment plus MIDI clock out and
+  clock **input** with its status — clock input is no longer Extended
+  (`src/midi/clockIn.ts`, `Session.clockRealtime`): follows an external 24-ppq clock's tempo
+  with gentle phase correction, optional Start / Stop / Continue, jitter-resistant, loss holds
+  the tempo, recovery re-aligns the phase.
+* **Transposition Scale Lock** (emmm, off by default): Transposition values count degrees of
+  each Voice's Pattern scale (Positions, conducting, Robot, Trajectory, Mutation).
+* Snapshot explanations (contents in each box's tip, a status line, pending Snapshots blink)
+  and Movie state feedback (visible film icon, state tip, MOVIE / MOVIE● in the menu bar).
 
 ## Extended — done (Options ▸ Extended…, off by default)
 
-* **MIDI clock input**: follow an external 24-ppq clock's tempo with gentle phase
-  correction; optional Start / Stop / Continue. (`src/extended/extended.ts`, `Session.extendedRealtime`)
-* **MIDI clock status**: Internal / Waiting / Running / Lost; jitter-resistant tempo;
-  loss holds the tempo; recovery re-aligns the phase.
+* (MIDI clock input and its status moved to MIDI Settings in document format 4.)
 * **MIDI Learn** (mappings are an application preference): transport, Variables (a CC
   sweeps the six Positions), any single Position, Tempo, Baton X/Y, Play-Enable 1–4, Snapshots
   A–Z, Mutate, Mutation amount, Reroll, A/B recall / capture / toggle; one source → one
@@ -85,7 +96,8 @@
 * Trajectory ideas not in version 1: per-step probability or durations, restart-on-Sync,
   Trajectories driving other Trajectories, MIDI Learn for single Trajectory values.
 * Scale-constrained *output* as an explicit Extended option (a Pattern's scale only
-  transforms its notes when you change it; M never corrects what it plays).
+  transforms its notes when you change it, and Scale Lock moves by degrees; nothing snaps
+  generated notes to a scale).
 * Parameter automation lanes recorded from gestures (beyond Slideshows).
 * Additional ordering schemes (e.g. Jam Factory-style transition tables) and probability
   systems.

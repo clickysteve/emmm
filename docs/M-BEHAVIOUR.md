@@ -199,6 +199,9 @@ Enters Rests* option: sustain pedal down records a rest.
   everything *without* releasing notes — "organ sounds sustain indefinitely" — and resumes
   where it left off [DOC]. **Sync** resets every voice to its first step and first cycle step
   (quantized to the Snapshot quantization) [DOC].
+* emmm keys: **Space is Play / Pause** (stopped → Start, playing → Pause, paused →
+  continue), a deliberate emmm change; M's Start-while-playing Sync is **⇧Space**. Return
+  and Tab are as in M. The Start *button* keeps M's behaviour (Start; while playing, Sync).
 * Metronome (Options ▸ Use Metronome) clicks at the Sync Ratio note value [DOC].
 * Send Clock: MIDI clock at 24 ppq × sync ratio [DOC].
 
@@ -214,9 +217,17 @@ Enters Rests* option: sustain pedal down records a rest.
 * **Blink Everything** (globe) selects every storable control [DOC]. **Edit Snapshot**
   (pencil) loads the current snapshot's items as blinking [DOC]. **Restore From Snapshot**
   undoes the most recent snapshot [DOC]. Capital letter / shift-click forces a Sync [DOC].
+* A Snapshot does **not** store Position contents, Pattern notes, the tempo value, options
+  or MIDI settings [DOC for contents; INF for the rest — they are not in the documented list].
 * **Quantization** (wave = none, or a note value) delays Snapshot execution, Sync,
   Slideshow start and shift-clicked Position changes to the next multiple counted from Start
-  [DOC].
+  [DOC]. Restore From Snapshot is quantized too [DOC].
+* Conducting Snapshots (first six, A–F) is quantized and successive ones are queued a quantum
+  apart in the order dragged [DOC S1 ch.9] — **emmm deviates** (executes at once unless
+  Shift is held; no queue): U23.
+* emmm explanation aids (UI only): each Snapshot box's tip lists its contents; a status line
+  in the Snap window; a Snapshot waiting for quantization blinks. Research notes: RESEARCH.md
+  "Snapshots".
 * 9 **Slideshows** record Snapshot executions and quantized Position changes with their
   times; play, stop (0), pause, loop (\\) [DOC]. *Slideshow Record Wait*: timing starts at the
   first recorded event [DOC].
@@ -254,10 +265,19 @@ sixteen M Input Channels likewise. Sound Choice program numbers display 1–128 
 channel [DOC]. Stop/Cmd-period: All Notes Off on the channels of the current orchestration
 [DOC]. Panic: note-off for every note [DOC]. Latency setting in ms [DOC].
 
+emmm calls the window **MIDI Settings** (File ▸ MIDI Settings…, ⌥M): M's Midi Assignment plus
+MIDI clock — Send Sync (the device for Options ▸ Send Clock, with the same switch) and clock
+**input** (follow tempo, optionally Start / Stop / Continue, choice of input, status). M 2.7's
+External Clock is "no longer available" [DOC]; emmm's clock input is an emmm addition, not
+part of Extended (until document format 4 it was, and needed Extended on). See U25.
+
 ## §17 Movies and MIDI Files
 
 Movie button captures all output during a performance; *Save Movie As Midi File* writes it
-[DOC]. MIDI Files can be imported into the current Pattern Group (per-pattern channel
+[DOC]. A Movie is a timed record of MIDI *output* (not of gestures — those are Slideshows);
+armed before Start, un-highlighted by Stop; held in memory with an event limit; the File menu
+item is enabled only once a Movie exists; default file name "M Movie" [DOC]. Unknowns: U24.
+Research notes: RESEARCH.md "Movies". MIDI Files can be imported into the current Pattern Group (per-pattern channel
 selection, chord method, rests none/dur, quantization) or as a play-along Sequence [DOC].
 
 Sequence details [emmm choices, see U21]: a Sequence plays once from Start (and restarts on

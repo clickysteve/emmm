@@ -27,15 +27,23 @@ conservative choice in emmm, isolated so it can be corrected. Search the code fo
 | U19 | Rounding of fractional time bases (5, 7, 9, 11, 13, 15) — integer ticks with error diffusion, or something else? | Exact fractional ticks. | engine | Emulator + MIDI timing capture. |
 | U20 | Atari ST/early "Direction" variable (backwards playback probability). | Not implemented (not in the 2.x manual). | — | Atari ST 1.x emulator. |
 | U22 | Can the Tempo Numerical go outside the Tempo Range Bar's range? | Yes — the range widens to include the new tempo (otherwise a single-value range would freeze the numerical). | `Session.setTempoFree` | Emulator. |
+| U23 | **Conducted Snapshots** — S1 ch.9: conducting Snapshots is quantized and a quick drag queues them "a whole note apart, in the order you dragged". | **Known deviation:** emmm executes a conducted Snapshot as soon as the Baton reaches its cell (quantized only with Shift held) and does not queue successive ones. Not changed in the October 2026 pass (explanatory changes only); a fix would queue conducted Snapshots through the Snapshot quantization. | `MEngine.conduct`, `Session.conduct` | Emulator: quantization = whole note, drag quickly through A–D. |
+| U24 | **Movies:** what happens when the Movie button is clicked while already playing; whether echoed MIDI input is included; the event limit; how tempo changes are written. | Armed during playback = films from the next Start (from stopped); echo-thru not included; no limit; a tempo map in the file. | `Session.toggleMovie`, `Session.movieAdd` | Emulator + MIDI file inspection. |
+| U25 | Incoming MIDI clock and the **Sync Ratio** ("the ratio between an incoming MIDI clock and M's quarter note" — External Clock is "no longer available" in 2.7). | emmm's clock input (MIDI Settings) always reads 24 pulses per quarter note. | `Session.clockRealtime` | Older M version in an emulator. |
 | U21 | Does an imported Sequence loop at its end? Which output does a file channel play on? | Plays once per Start (or Sync, with *Sync Restarts Sequence*); file channel *n* plays on M Output Channel *n*; tempo follows M's tempo (file tempo map ignored). | `MEngine.restartSequence`, `ImportWindow` | Emulator. |
 
 ## Known simplifications (not uncertainties about M)
 
 * Tempo maps inside imported MIDI files are ignored (notes are placed in beats).
 * Long main-thread stalls (> ~60 ms) can make notes late by the excess; raise *Latency* in
-  Midi Assignment to absorb this (all output is then delayed by that amount). The Monitor
+  MIDI Settings to absorb this (all output is then delayed by that amount). The Monitor
   window shows a running count of late notes.
-* MIDI clock *input* (External Clock) is not implemented — the 2.7 manual also lists it as
-  "no longer available".
+* MIDI clock *input* (External Clock) is "no longer available" in M 2.7. emmm has its own
+  (File ▸ MIDI Settings…, independent of Extended; see U25). On an external Start emmm starts
+  at once rather than waiting for the first clock pulse, and its phase correction is bounded
+  (±15 %), so a clock whose pulses begin late is caught up gradually.
+* Space is Play / Pause in emmm (stopped → Start, playing → Pause, paused → continue); in M it
+  was Start, and Sync while playing. Sync is ⇧Space. A deliberate emmm change, not an
+  uncertainty.
 * Look-ahead: gestures take effect from the scheduler's render frontier, i.e. up to ~60 ms
   after the click, and a Pause may let the last ≤60 ms of already-scheduled notes sound.
