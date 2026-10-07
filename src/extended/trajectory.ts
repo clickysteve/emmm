@@ -96,15 +96,19 @@ export interface TargetInfo {
 const POS_VARS: VariableName[] = ['patternGroup', 'noteDensity', 'velocityRange', 'noteOrder', 'transposition', 'timeDistortion', 'rhythm', 'legato', 'accent', 'orchestration'];
 const VAR_NAME: Partial<Record<VariableName, string>> = { patternGroup: 'Pattern Group', noteDensity: 'Note Density', velocityRange: 'Velocity Range', noteOrder: 'Note Order', transposition: 'Transposition', timeDistortion: 'Time Distortion', rhythm: 'Rhythm', legato: 'Legato', accent: 'Accent', orchestration: 'Orchestration' };
 
-/** The typed registry of what a Trajectory may drive. Nothing else can be reached. */
-export function targetInfo(t: TrajTarget): TargetInfo {
+/** The typed registry of what a Trajectory may drive. Nothing else can be reached.
+ * `scaleLock`: the document's Transposition Scale Lock — Transposition + then counts scale
+ * degrees (same range and values; only their meaning and labels change). */
+export function targetInfo(t: TrajTarget, scaleLock = false): TargetInfo {
   switch (t.kind) {
     case 'none':
       return { id: 'none', name: '— off —', min: 0, max: 127, kind: 'integer', mode: 'output', perVoice: false, unit: '', help: 'No target', liveSafe: true };
     case 'density':
       return { id: 'density', name: 'Note Density', min: 0, max: 100, kind: 'integer', mode: 'absolute', perVoice: true, unit: '%', help: 'Note Density in % (replaces the active Position’s value while it runs)', liveSafe: true };
     case 'transpose':
-      return { id: 'transpose', name: 'Transposition +', min: -24, max: 24, kind: 'integer', mode: 'offset', perVoice: true, unit: 'st', help: 'Semitones added to the active Transposition', liveSafe: true };
+      return scaleLock
+        ? { id: 'transpose', name: 'Transposition + (deg)', min: -24, max: 24, kind: 'integer', mode: 'offset', perVoice: true, unit: 'degrees', help: 'Scale degrees added to the active Transposition (Scale Lock: in each Voice’s Pattern scale)', liveSafe: true }
+        : { id: 'transpose', name: 'Transposition +', min: -24, max: 24, kind: 'integer', mode: 'offset', perVoice: true, unit: 'st', help: 'Semitones added to the active Transposition', liveSafe: true };
     case 'velocity':
       return { id: 'velocity', name: 'Velocity +', min: -64, max: 64, kind: 'integer', mode: 'offset', perVoice: true, unit: '', help: 'Added to every velocity (as continuous velocity conducting does)', liveSafe: true };
     case 'legato':
@@ -131,7 +135,7 @@ export function targetInfo(t: TrajTarget): TargetInfo {
         liveSafe: true,
       };
     case 'cc':
-      return { id: 'cc', name: 'MIDI controller', min: 0, max: 127, kind: 'integer', mode: 'output', perVoice: false, unit: '', help: `Controller ${t.cc} sent on M Output Channel ${t.channel} (routed by Midi Assignment)`, liveSafe: true };
+      return { id: 'cc', name: 'MIDI controller', min: 0, max: 127, kind: 'integer', mode: 'output', perVoice: false, unit: '', help: `Controller ${t.cc} sent on M Output Channel ${t.channel} (routed by MIDI Settings)`, liveSafe: true };
   }
 }
 

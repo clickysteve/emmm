@@ -107,7 +107,7 @@ export class FeedbackWindow {
     const lines: string[] = [];
     ext.trajectories.forEach((d, i) => {
       if (!d.on || d.target.kind === 'none') return;
-      const info = targetInfo(d.target);
+      const info = targetInfo(d.target, s.comp.scaleLock);
       const st = s.traj[i];
       const live = ext.enabled && s.trajLive[i] && s.playing;
       const tgt = d.target.kind === 'cc' ? `CC${d.target.cc} ON CH ${d.target.channel}` : info.name.toUpperCase();

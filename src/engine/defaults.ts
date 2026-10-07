@@ -113,6 +113,7 @@ export function defaultComposition(seed = 38291): Composition {
       [12, 7, 0, -12],
       same(2),
     ]),
+    scaleLock: false,
     timeDistortion: variable([
       same(neutralMap()),
       same<TimeMap>({ points: [[0.62, 0.5]], count: 1, unit: 4 }), // swing
@@ -197,6 +198,7 @@ export function defaultComposition(seed = 38291): Composition {
       conductCtrlX: 1,
       conductCtrlY: 2,
       clockPort: '',
+      clockIn: { enabled: false, port: '*', transport: true },
     },
     sequence: null,
     sequenceEnable: false,

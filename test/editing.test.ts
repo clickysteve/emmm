@@ -249,15 +249,20 @@ describe('scales (pitch-class sets)', () => {
     expect(cleanChoice({ root: 14, scale: 'nope' })).toEqual(CHROMATIC);
     expect(cleanChoice({ root: 2, scale: 'dorian' })).toEqual(dDorian);
   });
-  it('the engine has no notion of a scale (no real-time quantiser)', () => {
+  it('no real-time quantiser: with Scale Lock off (the default) a Pattern scale never changes the output', () => {
     const c = demoComposition(3);
-    expect(JSON.stringify(c)).not.toMatch(/scale/i);
-    const sig = () => {
-      const e = new MEngine(demoComposition(3));
+    expect(c.scaleLock).toBe(false);
+    // the default document carries no scale data apart from the (off) Scale Lock switch
+    expect(JSON.stringify(c).replace('"scaleLock":false', '')).not.toMatch(/scale/i);
+    const sig = (withScales: boolean) => {
+      const d = demoComposition(3);
+      // scale metadata only (notes not transformed): many notes are outside it
+      if (withScales) d.patternGroups.forEach((g) => g.patterns.forEach((p) => (p.scale = { root: 2, scale: 'minorPentatonic' })));
+      const e = new MEngine(d);
       e.start();
       return e.render(3000).filter((x): x is NoteOnEvent => x.kind === 'on').map((x) => x.pitch).join();
     };
-    expect(sig()).toBe(sig());
+    expect(sig(true)).toBe(sig(false));
   });
 });
 

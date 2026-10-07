@@ -1,9 +1,11 @@
 /**
- * Scale assistance for the Pattern Editor — an editing aid only.
+ * Scales (emmm, not M): each Pattern may carry a Root + Scale.
  *
  * A scale is a set of pitch classes (semitones above the root). It guides note entry in the
- * Pattern Editor; it never changes existing Pattern notes, and nothing in the engine reads
- * it, so M's generated output is never quantised to a scale.
+ * Pattern Editor, and changing it transforms the Pattern's notes (transformPitch). The engine
+ * reads it only for the optional Transposition Scale Lock (shiftDegrees), which moves notes
+ * by scale degrees instead of semitones; with Scale Lock off (the default) M's output is
+ * exactly as written and never quantised to a scale.
  */
 
 export interface Scale {
@@ -29,6 +31,24 @@ export const SCALES: readonly Scale[] = [
   { id: 'blues', name: 'Blues', steps: [0, 3, 5, 6, 7, 10] },
   { id: 'wholeTone', name: 'Whole Tone', steps: [0, 2, 4, 6, 8, 10] },
 ];
+
+/** Short scale names for tight spaces (the Transposition editor). */
+export const SHORT_SCALE_NAMES: Record<string, string> = {
+  chromatic: 'Chromatic',
+  major: 'Major',
+  minor: 'Minor',
+  harmonicMinor: 'Harm Min',
+  melodicMinor: 'Mel Min',
+  dorian: 'Dorian',
+  phrygian: 'Phrygian',
+  lydian: 'Lydian',
+  mixolydian: 'Mixolyd',
+  locrian: 'Locrian',
+  majorPentatonic: 'Maj Pent',
+  minorPentatonic: 'Min Pent',
+  blues: 'Blues',
+  wholeTone: 'Whole Tn',
+};
 
 export const ROOT_NAMES = ['C', 'C♯', 'D', 'E♭', 'E', 'F', 'F♯', 'G', 'A♭', 'A', 'B♭', 'B'];
 
@@ -121,4 +141,40 @@ export function transformPitch(from: ScaleChoice, to: ScaleChoice, pitch: number
  * chord merge (they would be the same MIDI note). */
 export function transformSteps(steps: number[][], from: ScaleChoice, to: ScaleChoice): number[][] {
   return steps.map((st) => [...new Set(st.map((p) => transformPitch(from, to, p)))]);
+}
+
+// ---------------------------------------------------------------------------- Scale Lock
+
+/** Number of scale degrees in an octave of this scale (12 for Chromatic). */
+export function degreesPerOctave(c: ScaleChoice): number {
+  return scaleById(c.scale).steps.length;
+}
+
+/**
+ * Scale-degree transposition (emmm Transposition Scale Lock): move a pitch `degrees` steps
+ * along the scale, wrapping into the next octave. The rule, exactly:
+ *
+ * 1. The pitch is read as an octave above the root and a scale degree; a pitch outside the
+ *    scale is taken as the degree just below it plus the remaining semitones (the same rule
+ *    as transformPitch rule 4) and keeps that chromatic inflection after the move.
+ * 2. The degree moves by `degrees`; every full turn of the scale is an octave, so in a
+ *    seven-note scale +7 is exactly an octave up and −1 from the root is the 7th below.
+ * 3. Chromatic (12 degrees) is simply semitones: the result equals pitch + degrees.
+ *
+ * The result is not clamped: a pitch outside MIDI 0–127 is dropped by the engine, as a
+ * chromatic transposition out of range is.
+ */
+export function shiftDegrees(c: ScaleChoice, pitch: number, degrees: number): number {
+  if (!degrees) return pitch;
+  const steps = scaleById(c.scale).steps;
+  const n = steps.length;
+  const rel = pitch - c.root;
+  const oct = Math.floor(rel / 12);
+  const pc = rel - oct * 12;
+  let d = n - 1;
+  while (d > 0 && steps[d] > pc) d--; // the degree at or just below
+  const offset = pc - steps[d];
+  const total = oct * n + d + degrees;
+  const oct2 = Math.floor(total / n);
+  return c.root + oct2 * 12 + steps[total - oct2 * n] + offset;
 }

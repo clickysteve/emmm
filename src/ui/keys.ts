@@ -1,9 +1,10 @@
 /**
  * emmm's keyboard commands — one table, one dispatcher.
  *
- * Plain keys belong to M's performance keyboard (S1 Appendix A) and stay as they were:
- * Space Start/Sync, Return Stop, Tab Pause, Backspace Hold/Do, A–Z Snapshots, 1–9
- * Slideshows, 0 / \ Slideshow stop / loop, ` and , Pattern Editor audition. So emmm's own
+ * Plain keys belong to M's performance keyboard (S1 Appendix A) and stay as they were —
+ * Return Stop, Tab Pause, Backspace Hold/Do, A–Z Snapshots, 1–9 Slideshows, 0 / \ Slideshow
+ * stop / loop, ` and , Pattern Editor audition — with one deliberate emmm change: Space is
+ * Play / Pause (M: Start, and Sync while playing; Sync is now ⇧Space). So emmm's own
  * commands use a modifier:
  *
  *   ⌘ (Ctrl on Windows / Linux) — document and editing commands, as on any desktop
@@ -34,6 +35,8 @@ export interface KeyDef {
   label: string;
   group: string;
   keys: Chord[];
+  /** a held key's auto-repeat does not run it again (transport keys) */
+  noRepeat?: boolean;
 }
 
 const c = (key: string, m: Partial<Chord> = {}): Chord => ({ key, ...m });
@@ -41,10 +44,15 @@ const mod = (key: string, m: Partial<Chord> = {}) => c(key, { mod: true, ...m })
 const alt = (key: string, m: Partial<Chord> = {}) => c(key, { alt: true, ...m });
 
 export const KEYS: KeyDef[] = [
+  // Transport (plain keys; Space is emmm's Play / Pause)
+  { id: 'playPause', label: 'Play / Pause (stopped: Start; playing: Pause; paused: Continue)', group: 'Transport', keys: [c('Space')], noRepeat: true },
+  { id: 'sync', label: 'Sync (M: Space while playing)', group: 'Transport', keys: [c('Space', { shift: true })], noRepeat: true },
+  { id: 'stop', label: 'Stop (all notes off)', group: 'Transport', keys: [c('Enter')], noRepeat: true },
+  { id: 'pause', label: 'Pause / Continue (⌥Tab: pause a Slideshow)', group: 'Transport', keys: [c('Tab')], noRepeat: true },
   // File
   { id: 'open', label: 'Open…', group: 'File', keys: [mod('KeyO')] },
   { id: 'save', label: 'Save', group: 'File', keys: [mod('KeyS')] },
-  { id: 'midiAssignment', label: 'Midi Assignment…', group: 'File', keys: [alt('KeyM')] },
+  { id: 'midiSettings', label: 'MIDI Settings…', group: 'File', keys: [alt('KeyM')] },
   // Edit
   { id: 'undo', label: 'Undo', group: 'Edit', keys: [mod('KeyZ')] },
   { id: 'redo', label: 'Redo', group: 'Edit', keys: [mod('KeyZ', { shift: true })] },
@@ -94,9 +102,6 @@ export const KEYS: KeyDef[] = [
 /** M's performance keys (plain keys) — handled by the performance keyboard, listed here for
  * the Keyboard Shortcuts window. */
 export const PERFORMANCE_KEYS: [string, string][] = [
-  ['Space', 'Start; while playing, Sync'],
-  ['Return', 'Stop (all notes off)'],
-  ['Tab', 'Pause / continue (⌥Tab: pause a Slideshow)'],
   ['⌫', 'Hold/Do (⇧⌫ quantized)'],
   ['A – Z', 'Recall Snapshot (store it while holding); ⇧ = with Sync'],
   ['1 – 9', 'Play Slideshow (⌥: record)'],
@@ -108,6 +113,7 @@ export const PERFORMANCE_KEYS: [string, string][] = [
 export const PATTERN_EDITOR_KEYS: [string, string][] = [
   ['← →', 'move the insertion point a step (⇧: extend the selection)'],
   ['↑ ↓', 'scroll the keyboard a semitone (⇧: an octave)'],
+  ['wheel / swipe', 'over the grid: ↕ pitches; ⇧ + wheel or a sideways swipe: steps; over the strip or scroll bar the wheel scrolls steps'],
   ['⌫ / Delete', 'delete the selected steps (only with steps selected)'],
   [`${IS_MAC ? '⌘' : 'Ctrl+'}A`, 'select every step'],
   ['Escape', 'clear the selection'],
@@ -163,7 +169,7 @@ export function matches(e: KeyboardEvent, ch: Chord, mac = IS_MAC): boolean {
   const modDown = mac ? e.metaKey : e.ctrlKey;
   const otherDown = mac ? e.ctrlKey : e.metaKey;
   if (!!ch.mod !== modDown || otherDown || !!ch.alt !== e.altKey || !!ch.shift !== e.shiftKey) return false;
-  return /^(Key|Digit)|^(Period|Comma|Quote|BracketLeft|BracketRight|Backslash|Slash)$/.test(ch.key) ? e.code === ch.key : e.key === ch.key;
+  return /^(Key|Digit)|^(Period|Comma|Quote|BracketLeft|BracketRight|Backslash|Slash|Space)$/.test(ch.key) ? e.code === ch.key : e.key === ch.key;
 }
 
 export function findKey(e: KeyboardEvent, mac = IS_MAC): KeyDef | undefined {
@@ -188,6 +194,7 @@ export function dispatch(e: KeyboardEvent): boolean {
   const cmd = commands.get(def.id);
   if (!cmd || (cmd.enabled && !cmd.enabled())) return false;
   e.preventDefault();
+  if (def.noRepeat && e.repeat) return true;
   cmd.run();
   return true;
 }

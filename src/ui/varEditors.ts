@@ -4,6 +4,7 @@
  * mark. Voice numbers 1–4 can be dragged onto each other to swap (Alt: copy) a voice's
  * settings.
  */
+import { CHROMATIC, degreesPerOctave, ROOT_NAMES, scaleById, SHORT_SCALE_NAMES, shiftDegrees, type ScaleChoice } from '../app/scales';
 import { NOTE_NAMES, NUM_VOICES } from '../engine/constants';
 import { neutralMap } from '../engine/defaults';
 import { sanitizePoints } from '../engine/timeDistortion';
@@ -304,12 +305,19 @@ export class NoteOrderEditor extends VarEditor {
 
 export class TranspositionEditor extends VarEditor {
   constructor(ctx: UiContext, parent: HTMLElement) {
-    super(ctx, parent, 'transposition', 'Transposition', 190, 180, 196, 106);
+    super(ctx, parent, 'transposition', 'Transposition', 190, 180, 196, 138);
     const b = this.win.body;
     const s = ctx.s;
-    label(b, 16, 3, 'Note', 'small');
+    const lock = () => s.comp.scaleLock;
+    /** the scale a voice's values count in: its Pattern's (Scale Lock), else semitones */
+    const scaleOf = (v: number): ScaleChoice => s.pattern(v).scale ?? CHROMATIC;
+    const unit = (v: number) => (lock() ? degreesPerOctave(scaleOf(v)) : 12);
+    const mod = (x: number, n: number) => ((x % n) + n) % n;
+    const head1 = label(b, 16, 3, 'Note', 'small');
     label(b, 42, 3, 'Octave', 'small');
+    this.parts.push({ update: () => head1.textContent !== (lock() ? 'Deg' : 'Note') && (head1.textContent = lock() ? 'Deg' : 'Note') });
     this.voiceNumbers(4, 16, 19);
+    const rows: HTMLDivElement[] = [];
     for (let v = 0; v < NUM_VOICES; v++) {
       const y = 13 + v * 19;
       const get = () => this.pos[v] as number;
@@ -318,27 +326,67 @@ export class TranspositionEditor extends VarEditor {
         this.pos[v] = clamp(x, -60, 60);
         s.changed('transposition');
       };
-      // Note numerical steps in semitones and carries into the octave (S1 ch.7)
+      // Note numerical steps in semitones and carries into the octave (S1 ch.7). With the
+      // emmm Scale Lock it steps in degrees of the Voice's Pattern scale (shown 1…n) and
+      // carries into the octave after n degrees.
       this.parts.push(
         new Numerical(b, 14, y, 28, 15, {
           get,
           set,
           min: -60,
           max: 60,
-          format: (x) => NOTE_NAMES[((x % 12) + 12) % 12],
+          format: (x) => (lock() ? String(mod(x, unit(v)) + 1) : NOTE_NAMES[mod(x, 12)]),
         }),
       );
       this.parts.push(
         new Numerical(b, 44, y, 22, 15, {
-          get: () => Math.floor(get() / 12) + 3,
-          set: (o) => set((o - 3) * 12 + (((get() % 12) + 12) % 12)),
+          get: () => Math.floor(get() / unit(v)) + 3,
+          set: (o) => set((o - 3) * unit(v) + mod(get(), unit(v))),
           min: -2,
           max: 8,
         }),
       );
+      // Scale Lock: what the value does to this Voice's root (e.g. "C Min +2 → E♭")
+      const r = el('div', 'label small', b, [70, y + 3, 124, 10]);
+      r.style.whiteSpace = 'nowrap';
+      rows.push(r);
+      this.parts.push({
+        update: () => {
+          const sc = scaleOf(v);
+          const x = get();
+          const t = !lock() ? '' : `${ROOT_NAMES[sc.root]} ${SHORT_SCALE_NAMES[sc.scale] ?? sc.scale} ${x > 0 ? '+' : ''}${x} → ${ROOT_NAMES[mod(shiftDegrees(sc, sc.root + 60, x), 12)]}`;
+          if (r.textContent !== t) r.textContent = t;
+          r.title = lock() ? `Voice ${v + 1}: ${x} degree${Math.abs(x) === 1 ? '' : 's'} of its Pattern’s ${ROOT_NAMES[sc.root]} ${scaleById(sc.scale).name} (the root moves to the note shown)` : '';
+        },
+      });
     }
-    label(b, 78, 34, 'Middle C = <b>C3</b>', 'small');
-    label(b, 78, 46, '(No Transposition)', 'small');
+    const c1 = label(b, 78, 34, 'Middle C = <b>C3</b>', 'small');
+    const c2 = label(b, 78, 46, '(No Transposition)', 'small');
+    this.parts.push({ update: () => [c1, c2].forEach((c) => c.classList.toggle('hidden', lock())) });
+    // emmm Scale Lock (not M): the values become scale degrees
+    const t = el('div', 'num', b, [4, 92, 96, 14]);
+    t.style.fontSize = '9px';
+    t.style.justifyContent = 'flex-start';
+    t.style.paddingLeft = '3px';
+    t.setAttribute('role', 'switch');
+    t.title =
+      'Scale Lock (emmm, not M): Transposition values count degrees of each Voice’s own Pattern scale instead of semitones, so chords keep their shape in the scale (C minor +1: C–E♭–G → D–F–A♭). Chromatic Patterns move by semitones as before. Off = M’s Transposition.';
+    t.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      s.setScaleLock(!lock());
+    });
+    const hint = el('div', 'label tiny', b, [4, 110, 188, 8]);
+    hint.style.whiteSpace = 'normal';
+    hint.style.lineHeight = '8px';
+    this.parts.push({
+      update: () => {
+        t.textContent = (lock() ? '☒ ' : '☐ ') + 'Scale Lock (emmm)';
+        t.classList.toggle('inv', lock());
+        t.setAttribute('aria-checked', String(lock()));
+        const h = lock() ? 'VALUES = DEGREES OF EACH PATTERN’S SCALE' : 'VALUES = SEMITONES (M)';
+        if (hint.textContent !== h) hint.textContent = h;
+      },
+    });
   }
 }
 

@@ -3,6 +3,7 @@
  * voice, echoing the design of the Variable's edit window. Returns SVG markup.
  * `c` is ink, `bg` is paper (they swap on the active Position).
  */
+import { CHROMATIC, degreesPerOctave } from '../app/scales';
 import { hasNotes } from '../engine/patternOps';
 import type { Composition, Cycle, VariableName } from '../engine/types';
 
@@ -144,8 +145,13 @@ export function miniFor(comp: Composition, v: VariableName, pos: number, w: numb
       return miniVelocity(comp.velocityRange.positions[pos], w, h, c);
     case 'noteOrder':
       return miniNoteOrder(comp.noteOrder.positions[pos], w, h, c);
-    case 'transposition':
-      return miniTransposition(comp.transposition.positions[pos], w, h, c);
+    case 'transposition': {
+      // emmm Scale Lock: degrees are drawn at their size in semitones (a seven-note scale's
+      // +7 looks like +12), so the picture means the same in both modes
+      const pats = comp.patternGroups[comp.patternGroup.active].patterns;
+      const vals = comp.transposition.positions[pos].map((t, v) => (comp.scaleLock ? (t * 12) / degreesPerOctave(pats[v].scale ?? CHROMATIC) : t));
+      return miniTransposition(vals, w, h, c);
+    }
     case 'timeDistortion':
       return miniTimeDistortion(comp.timeDistortion.positions[pos], w, h, c);
     case 'accent':

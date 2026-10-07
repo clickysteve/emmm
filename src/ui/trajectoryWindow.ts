@@ -83,7 +83,7 @@ export class TrajectoryWindow {
       new Selector(b, 30, y0, 118, 14, {
         label: `Trajectory ${slot + 1} target`,
         fontSize: 8,
-        options: () => choices.map((t) => ({ value: tkey(t), text: targetInfo(t).name })),
+        options: () => choices.map((t) => ({ value: tkey(t), text: targetInfo(t, s.comp.scaleLock).name })),
         value: () => tkey(d().target),
         onChange: (v) => {
           const t = choices.find((c) => tkey(c) === v) ?? { kind: 'none' };
@@ -177,7 +177,7 @@ export class TrajectoryWindow {
     const s = this.ctx.s;
     const row = this.rows[slot];
     const d = this.def(slot);
-    const info = targetInfo(d.target);
+    const info = targetInfo(d.target, s.comp.scaleLock);
     row.box.innerHTML = '';
     row.values = d.values.map((_, i) => {
       const n = new Numerical(row.box, VX + i * BOX, 0, BOX - 1, 15, {
@@ -227,7 +227,7 @@ export class TrajectoryWindow {
         set: (x) => s.setTrajectory(slot, { target: { kind: 'cc', channel: x, cc: (d().target as { cc: number }).cc } }),
         min: 1,
         max: 16,
-        title: 'M Output Channel (1–16) the controller is sent on — its device and MIDI channel come from Midi Assignment',
+        title: 'M Output Channel (1–16) the controller is sent on — its device and MIDI channel come from MIDI Settings',
       });
       label(row.extra, 38, 3, 'cc', 'tiny');
       new Numerical(row.extra, 50, 0, 26, 14, {
@@ -259,8 +259,8 @@ export class TrajectoryWindow {
     for (let slot = 0; slot < TRAJECTORY_SLOTS; slot++) {
       const row = this.rows[slot];
       const d = this.def(slot);
-      const info = targetInfo(d.target);
-      const sig = `${d.values.length}|${tkey(d.target)}`;
+      const info = targetInfo(d.target, s.comp.scaleLock);
+      const sig = `${d.values.length}|${tkey(d.target)}|${s.comp.scaleLock}`;
       if (row.sig !== sig) {
         row.sig = sig;
         this.buildValues(slot);

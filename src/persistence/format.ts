@@ -15,6 +15,10 @@
  *      returned as `legacyLearn` so the app can adopt them once.
  *   3  Extended gains four Trajectories (filled from defaults — switched off — for older
  *      files).
+ *   4  MIDI clock input moves out of Extended into the MIDI settings (`midi.clockIn`): it is
+ *      MIDI infrastructure and now works whether or not Extended is on. It only ever ran with
+ *      Extended on, so an older file's clock input is carried over switched on only if both
+ *      were on — the file behaves as it did. The emmm Transposition `scaleLock` arrives (off).
  *
  * Each Pattern may carry an emmm `scale` ({ root, scale }); files without it load as
  * Chromatic with their notes untouched (no version change was needed: it is optional).
@@ -29,7 +33,7 @@ import { cleanChoice } from '../app/scales';
 import { cleanTrajectory } from '../extended/trajectory';
 
 export const FORMAT_ID = 'emmm';
-export const FORMAT_VERSION = 3;
+export const FORMAT_VERSION = 4;
 
 export interface UiState {
   windows?: Record<string, { x: number; y: number; open: boolean }>;
@@ -140,6 +144,19 @@ export function migrate(doc: Record<string, unknown>): EmmmDocument {
   if (version > FORMAT_VERSION) throw new FormatError(`This document was saved by a newer emmm (format v${version})`);
   const raw = (doc.composition ?? {}) as Composition;
   let legacyLearn: unknown[] | undefined;
+  if (version < 4) {
+    // v3 → v4: Extended's clock input becomes the MIDI settings' clock input
+    const ext = (raw as { extended?: { enabled?: unknown; clockIn?: { enabled?: unknown; port?: unknown; transport?: unknown } } }).extended;
+    const old = ext?.clockIn;
+    if (old && typeof old === 'object') {
+      const midi = ((raw as { midi?: object }).midi ??= {}) as { clockIn?: unknown };
+      midi.clockIn = {
+        enabled: old.enabled === true && ext?.enabled === true,
+        port: typeof old.port === 'string' ? old.port : '*',
+        transport: old.transport !== false,
+      };
+    }
+  }
   if (version < 3) {
     // v2 → v3: nothing to move; Trajectories arrive from the defaults (all off)
   }
@@ -155,6 +172,7 @@ export function migrate(doc: Record<string, unknown>): EmmmDocument {
   version = FORMAT_VERSION;
   const comp = fill(raw, defaultComposition(typeof raw.seed === 'number' ? raw.seed : 38291));
   delete (comp.extended as { learn?: unknown }).learn;
+  delete (comp.extended as { clockIn?: unknown }).clockIn;
   restoreVariableArrays(comp, raw);
   validate(comp);
   return { format: FORMAT_ID, version, mode: doc.mode === 'extended' ? 'extended' : 'classic', savedAt: String(doc.savedAt ?? ''), composition: comp, ui: (doc.ui as UiState) ?? {}, legacyLearn };

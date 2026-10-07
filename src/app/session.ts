@@ -18,7 +18,8 @@ import * as msg from '../midi/messages';
 import type { MovieEvent, TempoChange } from '../midi/smf';
 import { MidiManager } from '../midi/webmidi';
 import { Scheduler } from '../scheduler/scheduler';
-import { CcCycleRunner, ClockFollower, learnInto, sameSource, targetLabel, type LearnMapping, type LearnSource, type LearnTarget, type SyncStatus } from '../extended/extended';
+import { CcCycleRunner, learnInto, sameSource, targetLabel, type LearnMapping, type LearnSource, type LearnTarget } from '../extended/extended';
+import { ClockFollower, type SyncStatus } from '../midi/clockIn';
 import { mutate, mutationRng } from '../extended/mutation';
 import { cleanTrajectory, clampTo, freshState, MAX_TRAJECTORY_VALUES, nextIndex, SMOOTH_TICKS, stepTicks, targetInfo, TRAJECTORY_SLOTS, trajRng, valueAt, type Trajectory, type TrajState, type TrajTarget } from '../extended/trajectory';
 import { neutralMod } from '../engine/engine';
@@ -194,7 +195,7 @@ export class Session {
       conducting: { ...c.conducting, baton: null, continuousVelocity: { ...c.conducting.continuousVelocity, values: null }, continuousLegato: { ...c.conducting.continuousLegato, values: null } },
       midi: null,
       sequenceEnable: false,
-      extended: { ...c.extended, ccCycles: { ...c.extended.ccCycles, active: 0 }, clockIn: null, ab: { ...c.extended.ab, last: null }, mutation: { ...c.extended.mutation, amount: 0 } },
+      extended: { ...c.extended, ccCycles: { ...c.extended.ccCycles, active: 0 }, ab: { ...c.extended.ab, last: null }, mutation: { ...c.extended.mutation, amount: 0 } },
     });
   }
 
@@ -217,7 +218,6 @@ export class Session {
     next.midi = structuredClone(c.midi);
     next.sequenceEnable = c.sequenceEnable;
     next.extended.ccCycles.active = c.extended.ccCycles.active;
-    next.extended.clockIn = structuredClone(c.extended.clockIn);
     next.extended.ab.last = c.extended.ab.last;
     next.extended.mutation.amount = c.extended.mutation.amount;
     const dens = c.patternGroups.map((g) => g.patterns.map((p) => p.tbDen));
@@ -651,8 +651,17 @@ export class Session {
       }
       return this.engine.applySnapshot(s, t, forceSync);
     };
-    this.emitNow(this.engine.perform(this.scheduler.frontierTick(), quantized, 'snapshot', run));
+    // the label names the slot, so the Snapshot window can show it waiting (quantized)
+    this.emitNow(this.engine.perform(this.scheduler.frontierTick(), quantized, index === null ? 'snapshot' : `snapshot:${index}`, run));
     this.changed('snapshot');
+  }
+
+  /** Snapshot slots waiting for the Snapshot quantization point (for display). */
+  pendingSnapshots(): number[] {
+    return this.engine
+      .pendingActions()
+      .filter((a) => a.label.startsWith('snapshot:'))
+      .map((a) => Number(a.label.slice(9)));
   }
 
   restoreFromSnapshot(): void {
@@ -798,6 +807,18 @@ export class Session {
     p.tbNum = Math.max(1, Math.min(99, num));
     this.engine.setTimeBaseDen(v, den, this.scheduler.frontierTick());
     this.changed('patterns');
+  }
+
+  /**
+   * emmm Transposition Scale Lock (not M): Transposition values (Positions, conducting, the
+   * Robot, Trajectory) count degrees of each Voice's own Pattern scale instead of semitones
+   * (MEngine.transposePitch). Part of the document; one Undo step. The stored values and the
+   * Pattern notes are not changed.
+   */
+  setScaleLock(on: boolean): void {
+    if (this.comp.scaleLock === on) return;
+    this.comp.scaleLock = on;
+    this.changed('scaleLock');
   }
 
   /**
@@ -968,7 +989,6 @@ export class Session {
 
   // ------------------------------------------------------------------ EXTENDED (src/extended)
 
-  readonly clockFollower = new ClockFollower();
   readonly ccRunner = new CcCycleRunner(0);
 
   /** EXTENDED CC Cycles: a controller value before each played note, on the voice's channels. */
@@ -990,7 +1010,6 @@ export class Session {
   /** last Learn result, for display */
   learnNote = '';
   private learnLast = new Map<string, number>();
-  extStatus = { bpm: 0 };
 
   armLearn(target: LearnTarget, replace: number | null = null): void {
     this.learnArmed = { target, replace };
@@ -1021,11 +1040,18 @@ export class Session {
     if (t.value > t.hi) t.hi = Math.ceil(t.value);
   }
 
-  /** System real-time messages for MIDI clock input. Returns true if consumed. */
-  private extendedRealtime(port: string, status: number, ts: number): boolean {
-    const ext = this.comp.extended;
-    if (!ext.enabled || !ext.clockIn.enabled) return false;
-    if (ext.clockIn.port !== '*' && ext.clockIn.port !== port) return false;
+  // ------------------------------------------------------------------ MIDI clock input (MIDI Settings)
+
+  readonly clockFollower = new ClockFollower();
+  /** the incoming clock's tempo estimate, for display */
+  clockIn = { bpm: 0 };
+
+  /** System real-time messages for MIDI clock input (whether or not Extended is on).
+   * Returns true if consumed. */
+  private clockRealtime(port: string, status: number, ts: number): boolean {
+    const ci = this.comp.midi.clockIn;
+    if (!ci.enabled) return false;
+    if (ci.port !== '*' && ci.port !== port) return false;
     const f = this.clockFollower;
     switch (status) {
       case 0xf8: {
@@ -1037,19 +1063,19 @@ export class Session {
         if (f.recovered) f.rebase(this.scheduler.nowTick());
         if (bpm) {
           const c = f.corrected(bpm, this.scheduler.nowTick());
-          this.extStatus.bpm = bpm;
+          this.clockIn.bpm = bpm;
           this.setTempoExact(c);
         }
         return true;
       }
       case 0xfa:
-        if (!ext.clockIn.transport) return true;
+        if (!ci.transport) return true;
         if (this.engine.state !== 'stopped') this.stop();
         f.reset();
         this.start();
         return true;
       case 0xfb:
-        if (!ext.clockIn.transport) return true;
+        if (!ci.transport) return true;
         if (this.engine.state === 'paused') this.pause();
         else if (this.engine.state === 'stopped') {
           f.reset();
@@ -1057,7 +1083,7 @@ export class Session {
         }
         return true;
       case 0xfc:
-        if (!ext.clockIn.transport) return true;
+        if (!ci.transport) return true;
         this.stop();
         return true;
     }
@@ -1506,13 +1532,12 @@ export class Session {
 
   /** External-clock status for display. */
   clockStatus(now = performance.now()): SyncStatus {
-    const ext = this.comp.extended;
-    if (!ext.enabled || !ext.clockIn.enabled) return 'internal';
+    if (!this.comp.midi.clockIn.enabled) return 'internal';
     return this.clockFollower.status(now, this.playing);
   }
 
   midiIn(port: string, data: ArrayLike<number>, ts: number): void {
-    if ((data[0] ?? 0) >= 0xf8 && this.extendedRealtime(port, data[0], ts)) return;
+    if ((data[0] ?? 0) >= 0xf8 && this.clockRealtime(port, data[0], ts)) return;
     const m = msg.parse(data);
     if (this.extendedLearn(m)) {
       this.changed('learn');

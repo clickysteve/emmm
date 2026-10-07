@@ -15,6 +15,7 @@ import { Rng } from '../engine/rng';
 import { sanitizePoints } from '../engine/timeDistortion';
 import type { Composition, Cycle, VariableName } from '../engine/types';
 import type { Locks, LockDim } from './extended';
+import { CHROMATIC, degreesPerOctave } from '../app/scales';
 
 export interface MutationResult {
   /** which dimensions actually changed */
@@ -81,7 +82,17 @@ export function mutate(comp: Composition, amount: number, locks: Locks, rng: Rng
     for (const v of voices)
       if (rng.next() < 0.15 + 0.55 * a) {
         const pool = a < 0.34 ? small : a < 0.67 ? [...small, ...mid] : [...small, ...mid, ...big];
-        const nv = clamp(pos[v] + pool[rng.int(0, pool.length - 1)], -36, 36);
+        let step = pool[rng.int(0, pool.length - 1)];
+        let lim = 36;
+        if (comp.scaleLock) {
+          // emmm Scale Lock: the values are scale degrees — the same musical moves (a step, a
+          // 4th or 5th, an octave…) counted in this Voice's scale; the random draws are as
+          // without Scale Lock, so a seed mutates the same way in both
+          const n = degreesPerOctave(comp.patternGroups[comp.patternGroup.active].patterns[v].scale ?? CHROMATIC);
+          if (Math.abs(step) > 2) step = Math.sign(step) * Math.max(1, Math.round((Math.abs(step) * n) / 12));
+          lim = 3 * n;
+        }
+        const nv = clamp(pos[v] + step, -lim, lim);
         if (nv !== pos[v]) (pos[v] = nv), changed.add('transposition');
       }
   }

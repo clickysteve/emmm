@@ -11,7 +11,7 @@ export type EditorName =
   | 'orchestration'
   | 'cyclic'
   | 'patternEditor'
-  | 'midiAssignment'
+  | 'midiSettings'
   | 'monitor'
   | 'about'
   | 'library'

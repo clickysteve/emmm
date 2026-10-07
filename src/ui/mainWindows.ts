@@ -4,12 +4,13 @@
  */
 import { NOTE_VALUES, NUM_SNAPSHOTS } from '../engine/constants';
 import { clearContinuous } from '../engine/conducting';
-import { SNAPSHOT_LETTERS } from '../engine/snapshots';
+import { describeSnapshot, SNAPSHOT_LETTERS, snapshotSize } from '../engine/snapshots';
 import type { ArrowDir, ConductTarget, UseMode, VariableName } from '../engine/types';
 import { VariableChoice } from './choice';
 import { VAR_LABEL, type UiContext } from './context';
 import { clamp, el, label, localPoint, setTip, svgEl, setSvg, trackDrag } from './dom';
 import { iconSvg, noteValueIcon } from './icons';
+import { keyLabel } from './keys';
 import { timingControls } from './patternControls';
 import { ConductArrow, MWindow, Numerical, RangeBar, pictureMatrix } from './widgets';
 
@@ -367,12 +368,12 @@ export class ConductingWindow implements Updatable {
       box.appendChild(svgEl(W, H, [40, 80].map((c) => `<line x1="${c + sl + 0.5}" y1="0" x2="${c - sl + 0.5}" y2="${H}" stroke="var(--ink)" stroke-width="1.2" shape-rendering="geometricPrecision"/>`).join('')));
     };
     strip(2, [
-      ['start', iconSvg('play'), 'Start (Space)', () => s.start()],
-      ['stop', iconSvg('stop'), 'Stop (Return)', () => s.stop()],
-      ['pause', iconSvg('pause'), 'Pause (Tab)', () => s.pause()],
+      ['start', iconSvg('play'), `Start — while playing, Sync (keys: ${keyLabel('playPause')} Play / Pause)`, () => s.start()],
+      ['stop', iconSvg('stop'), `Stop (${keyLabel('stop')})`, () => s.stop()],
+      ['pause', iconSvg('pause'), `Pause / Continue (${keyLabel('pause')}, or ${keyLabel('playPause')})`, () => s.pause()],
     ]);
     strip(22, [
-      ['sync', '<span style="font-size:10px">Sync</span>', 'Sync (Shift-click in Snapshots also syncs)', () => s.sync()],
+      ['sync', '<span style="font-size:10px">Sync</span>', `Sync (${keyLabel('sync')}; Shift-click in Snapshots also syncs)`, () => s.sync()],
       ['movie', iconSvg('film', 18, 12), 'Movie: capture the performance', () => s.toggleMovie()],
       [
         'seq',
@@ -517,6 +518,20 @@ export class ConductingWindow implements Updatable {
     this.btn.pause.classList.toggle('on', st === 'paused');
     this.btn.movie.classList.toggle('on', s.movieArmed || s.movieRecording);
     this.btn.movie.classList.toggle('blink', s.movieRecording);
+    // what the Movie is doing, in words: M only showed the button and, after Stop, an enabled
+    // File ▸ Save Movie As Midi File… (S1 ch.12)
+    setTip(
+      this.btn.movie,
+      s.movieRecording
+        ? `Movie: recording everything emmm plays (${s.movie.length} events so far). Stop ends it; then File ▸ Save Movie As Midi File…`
+        : s.movieArmed
+          ? st === 'stopped'
+            ? 'Movie: armed — recording starts when you press Start. (Click again to disarm.)'
+            : 'Movie: armed — recording starts at the next Start from stopped (as in M, arm it before Start). Stop, then Start, to film.'
+          : s.movie.length
+            ? `Movie: ${s.movie.length} events captured — File ▸ Save Movie As Midi File… writes them. Click to arm a new Movie (it replaces this one at the next Start).`
+            : 'Movie: click before Start to capture the performance as MIDI; after Stop, File ▸ Save Movie As Midi File… saves it',
+    );
     this.btn.sync.classList.toggle('blink', !!s.hold?.pending.sync);
     this.btn.seq.classList.toggle('on', s.comp.sequenceEnable && !!s.comp.sequence);
     this.btn.seq.classList.toggle('blink', s.hold?.pending.sequenceEnable !== undefined && !!s.hold);
@@ -594,11 +609,20 @@ export class VariablesWindow implements Updatable {
       lab.style.textAlign = 'right';
       this.arrows.push(arrowFor(ctx, b, v === 'velocityRange' ? 44 : 48, y + (v === 'velocityRange' ? 0 : 8), v, v === 'velocityRange' ? 30 : 13));
       this.choices.push(new VariableChoice(ctx, b, v, 66, y, 38, 31));
+      if (v === 'transposition') {
+        // emmm Scale Lock: the values are scale degrees, not semitones — say so where they are
+        const tag = el('div', 'label tiny inv', b, [20, y + 24, 22, 8], 'DEG');
+        Object.assign(tag.style, { textAlign: 'center', color: 'var(--paper)', lineHeight: '8px' });
+        tag.title = 'Scale Lock is on (Transposition editor): Transposition values are degrees of each Voice’s Pattern scale, not semitones';
+        this.tags.push(() => tag.classList.toggle('hidden', !ctx.s.comp.scaleLock));
+      }
     });
   }
+  private tags: (() => void)[] = [];
   update(): void {
     this.choices.forEach((c) => c.update());
     this.arrows.forEach((a) => a.update());
+    this.tags.forEach((t) => t());
   }
 }
 
@@ -697,6 +721,9 @@ export class MidiWindow implements Updatable {
 
 // ============================================================================ Snapshot
 
+/** Snapshot quantization values in words, for the Snapshot window's status line. */
+const QUANT_WORDS: Record<number, string> = { 1: 'whole note', 2: 'half note', 3: 'half-note triplet', 4: 'quarter note', 6: 'quarter triplet', 8: 'eighth note', 12: 'eighth triplet', 16: 'sixteenth', 24: 'sixteenth triplet', 32: '32nd note' };
+
 export class SnapshotWindow implements Updatable {
   win: MWindow;
   private slots: HTMLDivElement[] = [];
@@ -705,13 +732,14 @@ export class SnapshotWindow implements Updatable {
   private arrow: ConductArrow;
   private quant: Numerical;
   private ctl: Record<string, HTMLDivElement> = {};
+  private info: HTMLDivElement;
   constructor(private ctx: UiContext, parent: HTMLElement) {
     const s = ctx.s;
     this.win = new MWindow(parent, { id: 'snapshot', title: 'Snap', x: 618, y: 22, w: 96, h: 442, area: 'snapshots' });
     const b = this.win.body;
     this.holdBtn = el('div', 'btn', b, [2, 2, 90, 24]);
     this.holdBtn.innerHTML = iconSvg('camera', 18, 14) + '&nbsp;' + iconSvg('slides', 14, 12);
-    this.holdBtn.title = 'Hold/Do (Backspace)';
+    this.holdBtn.title = 'Hold/Do (⌫): press it, then click Positions and other controls — they blink instead of changing. Press it again to make them all happen at once (Do; ⇧⌫ quantized), or click a Snapshot letter to store them there.';
     this.holdBtn.addEventListener('pointerdown', (ev) => {
       ev.preventDefault();
       s.holdDo(ev.shiftKey);
@@ -722,7 +750,7 @@ export class SnapshotWindow implements Updatable {
       set: (x) => ((s.comp.quantization = x), s.changed('quant')),
       values: [0, ...NOTE_VALUES.filter((x) => x <= 16)],
       format: () => '',
-      title: 'Snapshot Quantization (wave = none)',
+      title: 'Snapshot Quantization: Snapshots, Sync, Slideshow starts and ⇧-clicked Positions wait for the next multiple of this note value, counted from Start (wave = at once)',
     });
     // slideshow controls
     const ctl = (name: string, x: number, icon: string, title: string, fn: (ev: PointerEvent) => void) => {
@@ -742,7 +770,7 @@ export class SnapshotWindow implements Updatable {
       const col = i < 13 ? 0 : 1;
       const row = i % 13;
       const c = el('div', 'num', b, [2 + col * 29, 46 + row * 22, 30, 23]);
-      c.title = `Snapshot ${SNAPSHOT_LETTERS[i]} (Shift: force Sync)`;
+      c.title = `Snapshot ${SNAPSHOT_LETTERS[i]}`; // the full tip is set in update(), from its contents
       c.addEventListener('pointerdown', (ev) => {
         ev.preventDefault();
         s.clickSnapshot(i, { shift: ev.shiftKey });
@@ -768,11 +796,47 @@ export class SnapshotWindow implements Updatable {
       });
       return d;
     };
-    tool(62, 248, 30, 20, iconSvg('pencil', 16, 15), 'Edit Snapshot', () => s.editSnapshot());
-    tool(62, 267, 30, 20, iconSvg('restore', 16, 14), 'Restore From Snapshot', () => s.restoreFromSnapshot());
-    tool(62, 286, 30, 46, iconSvg('globe', 18, 18), 'Blink Everything', () => s.blinkEverything());
+    tool(62, 248, 30, 20, iconSvg('pencil', 16, 15), 'Edit Snapshot: the current Snapshot’s items (dark sun) blink; click one to remove it or click other controls to add them, then click a letter to store (Hold/Do cancels)', () => s.editSnapshot());
+    tool(62, 267, 30, 20, iconSvg('restore', 16, 14), 'Restore From Snapshot: put back what the last Snapshot changed (quantized, like a Snapshot)', () => s.restoreFromSnapshot());
+    tool(62, 286, 30, 46, iconSvg('globe', 18, 18), 'Blink Everything: select every control a Snapshot can hold — all Variable Positions, the conducting arrows, each Voice’s Patterns-window settings, Sync and the Sequence enable — then click a letter to store (click an item first to leave it out)', () => s.blinkEverything());
     label(b, 4, 342, 'emmm', '');
     label(b, 4, 354, 'classic', 'tiny');
+    // what is happening, in words (emmm): holding, editing, waiting for the quantization, or
+    // what the current Snapshot holds
+    this.info = el('div', 'label tiny', b, [2, 366, 90, 56]);
+    this.info.style.whiteSpace = 'normal';
+    this.info.style.lineHeight = '8px';
+    this.info.setAttribute('aria-live', 'polite');
+  }
+
+  /** The tooltip of a Snapshot slot: what it holds and what a click does now. */
+  private slotTip(i: number): string {
+    const s = this.ctx.s;
+    const L = SNAPSHOT_LETTERS[i];
+    const snap = s.comp.snapshots[i];
+    if (s.hold) return snap ? `Click (or type ${L}) to store the blinking controls here, replacing Snapshot ${L}.` : `Click (or type ${L}) to store the blinking controls here as Snapshot ${L}.`;
+    if (!snap) return `Snapshot ${L}: empty. To store one: press Hold/Do (⌫), click the Positions and controls to include (they blink), then click here (or type ${L}). Blink Everything (globe) selects them all.`;
+    const items = describeSnapshot(snap);
+    const shown = items.slice(0, 8).join(' · ') + (items.length > 8 ? ` · and ${items.length - 8} more` : '');
+    return `Snapshot ${L}: ${shown}. Click or type ${L} to recall (⇧ / capital ${L}: also Sync). It moves Variables to these Positions — it does not store what is in them (notes, values).${s.comp.quantization ? ' Waits for the Snapshot quantization.' : ''}`;
+  }
+
+  private infoText(): string {
+    const s = this.ctx.s;
+    const q = s.comp.quantization;
+    const pending = s.pendingSnapshots();
+    if (s.hold?.mode === 'edit') return `EDITING ${s.currentSnapshot !== null ? SNAPSHOT_LETTERS[s.currentSnapshot] : ''}: CLICK BLINKING ITEMS TO REMOVE THEM; A LETTER STORES; HOLD/DO CANCELS`;
+    if (s.hold) {
+      const n = snapshotSize(s.hold.pending);
+      return `HOLDING ${n} ITEM${n === 1 ? '' : 'S'}. HOLD/DO = DO THEM NOW; A LETTER = STORE THEM`;
+    }
+    if (pending.length) return `${pending.map((i) => SNAPSHOT_LETTERS[i]).join(' ')} WAITS FOR THE NEXT ${(QUANT_WORDS[q] ?? '1/' + q).toUpperCase()} (QUANTIZATION)`;
+    const cur = s.currentSnapshot;
+    if (cur !== null && s.comp.snapshots[cur]) {
+      const n = snapshotSize(s.comp.snapshots[cur]!);
+      return `CURRENT: ${SNAPSHOT_LETTERS[cur]} (${n} ITEM${n === 1 ? '' : 'S'})`;
+    }
+    return s.comp.snapshots.some(Boolean) ? 'CLICK OR TYPE A LETTER TO RECALL' : 'NO SNAPSHOTS YET: HOLD/DO, CLICK CONTROLS, THEN A LETTER';
   }
 
   update(): void {
@@ -783,7 +847,15 @@ export class SnapshotWindow implements Updatable {
       this.quant.el.innerHTML = s.comp.quantization ? noteValueIcon(s.comp.quantization, 12, 12) : iconSvg('wave', 12, 12);
       this.quant.el.dataset.v = String(s.comp.quantization);
     }
+    const pending = s.pendingSnapshots();
+    const info = this.infoText();
+    if (this.info.textContent !== info) this.info.textContent = info;
     this.slots.forEach((c, i) => {
+      const tip = this.slotTip(i);
+      if (c.dataset.tipv !== tip) {
+        setTip(c, tip);
+        c.dataset.tipv = tip;
+      }
       const has = !!s.comp.snapshots[i];
       const cur = s.currentSnapshot === i;
       const key = `${has}${cur}`;
@@ -801,7 +873,9 @@ export class SnapshotWindow implements Updatable {
         c.dataset.v = key;
       }
       c.style.position = 'absolute';
-      c.classList.toggle('blink', !!s.hold && s.hold.mode === 'edit' && s.currentSnapshot === i);
+      // blinking = pending, as everywhere in M: the Snapshot being edited, or one waiting for
+      // the quantization point
+      c.classList.toggle('blink', (!!s.hold && s.hold.mode === 'edit' && s.currentSnapshot === i) || pending.includes(i));
     });
     this.shows.forEach((c, i) => {
       const show = s.comp.slideshows[i];

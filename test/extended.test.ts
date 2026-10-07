@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { Session } from '../src/app/session';
 import { demoComposition } from '../src/engine/defaults';
 import { MEngine, type NoteOnEvent } from '../src/engine/engine';
-import { ClockFollower } from '../src/extended/extended';
+import { ClockFollower } from '../src/midi/clockIn';
 
 let sessions: Session[] = [];
 const mk = () => {
@@ -22,11 +22,14 @@ describe('EXTENDED is inert unless enabled', () => {
     s.midiIn('x', [0xb0, 20, 127], 0);
     expect(s.comp.patternGroup.active).toBe(0);
   });
-  it('clock messages are ignored in Classic mode', () => {
+  it('MIDI clock input is not Extended: it follows Start with Extended off, and is ignored only when switched off', () => {
     const s = mk();
-    s.comp.extended.clockIn.enabled = true; // but extended.enabled is false
-    s.midiIn('x', [0xfa], 0);
+    expect(s.comp.extended.enabled).toBe(false);
+    s.midiIn('x', [0xfa], 0); // clock input off (the default): ignored
     expect(s.engine.state).toBe('stopped');
+    s.comp.midi.clockIn.enabled = true;
+    s.midiIn('x', [0xfa], 0);
+    expect(s.engine.state).toBe('playing');
   });
   it('Classic note output is identical whatever the Extended settings', () => {
     const sig = (mutate: (c: ReturnType<typeof demoComposition>) => void) => {
@@ -83,8 +86,7 @@ describe('MIDI clock input', () => {
   });
   it('Start / Stop messages drive the transport when enabled', () => {
     const s = mk();
-    s.comp.extended.enabled = true;
-    s.comp.extended.clockIn.enabled = true;
+    s.comp.midi.clockIn.enabled = true;
     s.midiIn('x', [0xfa], 0);
     expect(s.engine.state).toBe('playing');
     s.midiIn('x', [0xfc], 0);

@@ -119,7 +119,7 @@ describe('typing never triggers performance keys', () => {
 });
 
 describe('shortcuts', () => {
-  it('while stopped: ⌥P ⌥V ⌥C ⌥K bring windows forward; ⌥G opens the Pattern Editor; ⌥M Midi Assignment', () => {
+  it('while stopped: ⌥P ⌥V ⌥C ⌥K bring windows forward; ⌥G opens the Pattern Editor; ⌥M MIDI Settings', () => {
     blur();
     for (const [k, id] of [
       ['p', 'patterns'],
@@ -236,5 +236,157 @@ describe('menus show the keys', () => {
     expect(items('Windows')).toMatchObject({ Variables: keyLabel('variablesWindow'), 'Cyclic Editor': keyLabel('cyclicEditor') });
     expect(items('Options')).toMatchObject({ 'Use Metronome': keyLabel('metronome'), 'Full Screen': keyLabel('fullScreen') });
     expect(items('emmm')).toMatchObject({ 'Keyboard Shortcuts…': keyLabel('shortcuts') });
+  });
+});
+
+describe('Space = Play / Pause (emmm; M had Start / Sync)', () => {
+  it('stopped → Start, playing → Pause, paused → Continue; Return stops', () => {
+    blur();
+    s.stop();
+    key(' ');
+    expect(s.engine.state).toBe('playing');
+    key(' ');
+    expect(s.engine.state).toBe('paused');
+    key(' ');
+    expect(s.engine.state).toBe('playing');
+    key(' ');
+    expect(s.engine.state).toBe('paused');
+    key('Enter');
+    expect(s.engine.state).toBe('stopped');
+  });
+  it('uses the existing transport: a paused Continue keeps the position (no restart)', () => {
+    blur();
+    key(' ');
+    s.scheduler.wake();
+    s.emitNow(s.engine.render(s.engine.tick + 300));
+    const at = s.engine.tick;
+    key(' ');
+    key(' ');
+    expect(s.engine.state).toBe('playing');
+    expect(s.engine.tick).toBeGreaterThanOrEqual(at);
+    key('Enter');
+  });
+  it('a held Space (auto-repeat) does not toggle again', () => {
+    blur();
+    key(' ');
+    key(' ', { repeat: true });
+    key(' ', { repeat: true });
+    expect(s.engine.state).toBe('playing');
+    key('Enter');
+  });
+  it('⇧Space is Sync (M’s Start-while-playing); it does not pause', () => {
+    blur();
+    key(' ');
+    let synced = 0;
+    const orig = s.sync.bind(s);
+    s.sync = () => (synced++, orig());
+    key(' ', { shiftKey: true });
+    s.sync = orig;
+    expect(synced).toBe(1);
+    expect(s.engine.state).toBe('playing');
+    key('Enter');
+  });
+  it('never while typing: Space goes into a number being typed', () => {
+    const t = box('[data-win="conducting"]', /^Tempo/);
+    t.focus();
+    key('Enter'); // edit
+    key(' ');
+    expect(s.engine.state).toBe('stopped');
+    key('Escape');
+    blur();
+  });
+  it('one source of truth: the Start / Pause tooltips and Keyboard Shortcuts show the registry keys', () => {
+    expect(keyLabel('playPause')).toBe('Space');
+    const tips = [...document.querySelectorAll<HTMLElement>('[data-win="conducting"] [title], [data-win="conducting"] [data-tip]')].map((e) => e.title || e.dataset.tip || '');
+    expect(tips.some((t) => t.startsWith('Start') && t.includes(keyLabel('playPause')))).toBe(true);
+    expect(tips.some((t) => t.startsWith('Pause') && t.includes(keyLabel('pause')))).toBe(true);
+    key('h', { altKey: true });
+    expect(win('shortcuts').textContent).toContain('Play / Pause');
+  });
+});
+
+describe('MIDI Settings', () => {
+  it('File ▸ MIDI Settings… (⌥M) — the old name is gone', () => {
+    const t = [...document.querySelectorAll('#menubar .menu')].find((m) => m.firstChild?.textContent === 'File')!;
+    t.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+    const labels = [...document.querySelectorAll('.dropdown .item')].map((i) => i.children[0]?.textContent);
+    const keys = Object.fromEntries([...document.querySelectorAll('.dropdown .item')].map((i) => [i.children[0]?.textContent, i.children[1]?.textContent ?? '']));
+    window.dispatchEvent(new PointerEvent('pointerdown'));
+    expect(labels).toContain('MIDI Settings…');
+    expect(labels).not.toContain('Midi Assignment…');
+    expect(keys['MIDI Settings…']).toBe(keyLabel('midiSettings'));
+    blur();
+    key('m', { altKey: true });
+    expect(win('midiassign').classList.contains('hidden')).toBe(false);
+    expect(win('midiassign').querySelector('.titlebar')?.textContent).toContain('MIDI Settings');
+  });
+  it('holds clock out and clock input, which work with Extended off; the Extended window has no clock', () => {
+    const w = win('midiassign');
+    const sw = (txt: string) => [...w.querySelectorAll<HTMLElement>('[role="switch"]')].find((e) => e.textContent!.includes(txt))!;
+    s.comp.extended.enabled = false;
+    s.comp.options.sendClock = false;
+    ui.updateAll();
+    pd(sw('Send clock'));
+    expect(s.comp.options.sendClock).toBe(true); // the same setting as Options ▸ Send Clock
+    pd(sw('Follow clock'));
+    expect(s.comp.midi.clockIn.enabled).toBe(true);
+    ui.updateAll();
+    expect(w.textContent).toContain('Tempo: WAITING');
+    s.midiIn('any', [0xfa], performance.now());
+    expect(s.engine.state).toBe('playing');
+    s.midiIn('any', [0xfc], performance.now());
+    expect(s.engine.state).toBe('stopped');
+    pd(sw('Follow clock'));
+    pd(sw('Send clock'));
+    expect(win('extended').textContent).not.toMatch(/clock/i);
+  });
+});
+
+describe('mouse wheel and trackpad in the Pattern Editor', () => {
+  const pe = () => ui.patternEditor as unknown as { scroll: number; low: number };
+  const area = (n: number) => [...win('edit-pattern').querySelectorAll<HTMLElement>('.box')][n]; // 0 keyboard, 1 grid
+  const wheel = (e: Element, init: WheelEventInit) => {
+    const ev = new WheelEvent('wheel', { bubbles: true, cancelable: true, ...init });
+    // happy-dom's WheelEvent drops the modifier keys; a browser's has them
+    for (const k of ['shiftKey', 'ctrlKey', 'metaKey', 'altKey'] as const) Object.defineProperty(ev, k, { value: !!init[k] });
+    e.dispatchEvent(ev);
+    return ev;
+  };
+  it('sideways → steps; plain wheel over the grid → pitches; ⇧ + wheel → steps; small deltas add up', () => {
+    const p = s.pattern(0);
+    p.steps = Array.from({ length: 80 }, (_, i) => [60 + (i % 7)]);
+    p.scrambled = p.steps.map((_, i) => i);
+    p.outputLength = 80;
+    ui.openEditor('patternEditor', { voice: 0 });
+    pe().scroll = 0;
+    const low = pe().low;
+    expect(wheel(area(1), { deltaX: 120 }).defaultPrevented).toBe(true);
+    expect(pe().scroll).toBe(10);
+    expect(pe().low).toBe(low);
+    wheel(area(1), { deltaY: 100 });
+    expect(pe().low).toBe(low - 5); // down = lower notes
+    expect(pe().scroll).toBe(10);
+    wheel(area(1), { deltaY: -120, shiftKey: true });
+    expect(pe().scroll).toBe(0);
+    for (let i = 0; i < 8; i++) wheel(area(1), { deltaX: 3 });
+    expect(pe().scroll).toBe(2); // 24 px = two steps
+    wheel(area(0), { deltaY: -40 }); // over the keyboard: pitches
+    expect(pe().low).toBe(low - 3);
+  });
+  it('over the scroll bar the plain wheel scrolls the steps; lines (Firefox) are converted', () => {
+    const bar = win('edit-pattern').querySelector<HTMLElement>('[title^="MIDI edit range"]')!;
+    pe().scroll = 0;
+    wheel(bar, { deltaY: 3, deltaMode: 1 }); // 3 lines
+    expect(pe().scroll).toBe(4);
+  });
+  it('the wheel is not taken globally: ⌘/Ctrl-wheel (zoom) and other windows are left alone', () => {
+    const before = { ...pe() };
+    expect(wheel(area(1), { deltaY: 100, ctrlKey: true }).defaultPrevented).toBe(false);
+    const tempo = box('[data-win="conducting"]', /^Tempo/);
+    const t0 = s.comp.tempo.value;
+    expect(wheel(tempo, { deltaY: 100 }).defaultPrevented).toBe(false);
+    expect(wheel(win('variables'), { deltaX: 100 }).defaultPrevented).toBe(false);
+    expect(s.comp.tempo.value).toBe(t0);
+    expect({ ...pe() }).toEqual(before);
   });
 });

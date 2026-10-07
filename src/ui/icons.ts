@@ -40,7 +40,9 @@ export const ICON: Record<string, (c?: string) => string> = {
   stop: (c = 'var(--ink)') => `<circle cx="6" cy="6" r="4.5" fill="${c}"/>`,
   pause: (c = 'var(--ink)') => R(2, 1, 3, 10, c) + R(7, 1, 3, 10, c),
   sync: (c = 'var(--ink)') => `<text x="0" y="10" font-size="10" font-weight="700" fill="${c}" font-family="Tiny5, sans-serif">Sync</text>`,
-  film: (c = 'var(--ink)') => R(0, 2, 18, 9, c) + [1, 4, 7, 10, 13, 16].map((x) => R(x, 3, 1, 1, 'var(--paper)') + R(x, 9, 1, 1, 'var(--paper)')).join('') + R(2, 5, 4, 3, 'var(--paper)') + R(7, 5, 4, 3, 'var(--paper)') + R(12, 5, 4, 3, 'var(--paper)'),
+  // the holes and frames contrast with the strip, so the film stays visible when the Movie
+  // button is highlighted (drawn in paper on ink)
+  film: (c = 'var(--ink)', h = c === 'var(--paper)' ? 'var(--ink)' : 'var(--paper)') => R(0, 2, 18, 9, c) + [1, 4, 7, 10, 13, 16].map((x) => R(x, 3, 1, 1, h) + R(x, 9, 1, 1, h)).join('') + R(2, 5, 4, 3, h) + R(7, 5, 4, 3, h) + R(12, 5, 4, 3, h),
   seq: (c = 'var(--ink)') => P('M2 0.5 h6 l3 3 v8 h-9 z', c, 'var(--paper)') + `<circle cx="6.5" cy="7" r="2" fill="${c}"/>`,
   robot: (c = 'var(--ink)') => R(3, 1, 6, 5, c) + R(4, 2, 1, 1, 'var(--paper)') + R(7, 2, 1, 1, 'var(--paper)') + R(4, 4, 4, 1, 'var(--paper)') + R(5, 0, 2, 1, c) + R(2, 7, 8, 4, c) + R(0, 7, 1, 3, c) + R(11, 7, 1, 3, c) + R(5, 8, 2, 1, 'var(--paper)'),
   camera: (c = 'var(--ink)') => R(1, 4, 16, 9, c) + R(4, 2, 4, 2, c) + `<circle cx="9" cy="8.5" r="3" fill="var(--paper)"/><circle cx="9" cy="8.5" r="1.5" fill="${c}"/>` + R(14, 5, 2, 1, 'var(--paper)'),

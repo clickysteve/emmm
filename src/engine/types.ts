@@ -198,7 +198,19 @@ export interface MidiConfig {
   latencyMs: number;
   conductCtrlX: number;
   conductCtrlY: number;
+  /** Send Sync: the device that receives MIDI clock (sent when Options ▸ Send Clock is on) */
   clockPort: string;
+  /** MIDI clock input (emmm; MIDI Settings). Until format v4 this was Extended's `clockIn`. */
+  clockIn: ClockInput;
+}
+
+export interface ClockInput {
+  /** follow the incoming MIDI clock's tempo */
+  enabled: boolean;
+  /** Web MIDI input port id, '*' = any */
+  port: string;
+  /** follow Start / Stop / Continue messages */
+  transport: boolean;
 }
 
 /** An imported MIDI file played along with the four voices (M-BEHAVIOUR §17). */
@@ -226,6 +238,12 @@ export interface Composition {
   velocityRange: Variable<VelocityRange[]>;
   noteOrder: Variable<NoteOrder[]>;
   transposition: Variable<number[]>;
+  /**
+   * emmm Transposition Scale Lock (not M; off = M's chromatic Transposition). When on, the
+   * Transposition values (Positions, conducting, Trajectory) count degrees of each Voice's
+   * own Pattern scale instead of semitones (app/scales.ts shiftDegrees).
+   */
+  scaleLock: boolean;
   timeDistortion: Variable<TimeMap[]>;
   accent: Variable<Cycle[]>;
   legato: Variable<Cycle[]>;

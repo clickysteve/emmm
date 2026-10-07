@@ -75,6 +75,7 @@ export class PatternEditor {
     this.kb = svgEl(20, ROWS * RH, '');
     kbBox.appendChild(this.kb);
     kbBox.title = 'Keyboard: click a key to hear it through this Voice’s channels';
+    this.onWheel(kbBox, false);
     kbBox.addEventListener('pointerdown', (ev) => {
       ev.preventDefault();
       const p = localPoint(kbBox, ev);
@@ -108,6 +109,7 @@ export class PatternEditor {
     stripBox.appendChild(this.strip);
     stripBox.title = 'Tool strip: the tool chosen at the top right (Selector, Eraser, Plunger, Scissors) works here';
     stripBox.addEventListener('pointerdown', (ev) => this.toolDown(ev, stripBox));
+    this.onWheel(stripBox, true);
     // grid
     const gridBox = el('div', 'box', b, [GX, GY, COLS * CW + 2, ROWS * RH + 2]);
     gridBox.style.background = 'var(--paper)';
@@ -119,8 +121,9 @@ export class PatternEditor {
     this.grid = svgEl(COLS * CW, ROWS * RH, '');
     this.grid.style.position = 'relative';
     gridBox.appendChild(this.grid);
-    gridBox.title = 'Click: add or remove a note · drag →: repeat it along the steps · drag ↕: a chord cluster. Columns are steps (no durations: Rhythm times them). Keys: ← → select steps, ↑ ↓ scroll, ⌫ delete selected steps.';
+    gridBox.title = 'Click: add or remove a note · drag →: repeat it along the steps · drag ↕: a chord cluster. Columns are steps (no durations: Rhythm times them). Keys: ← → select steps, ↑ ↓ scroll, ⌫ delete selected steps. Wheel: ↕ pitches; ⇧ + wheel or a sideways swipe: steps.';
     gridBox.addEventListener('pointerdown', (ev) => this.gridDown(ev, gridBox));
+    this.onWheel(gridBox, false);
     gridBox.addEventListener('pointermove', (ev) => {
       const p = localPoint(gridBox, ev);
       const step = this.scroll + Math.floor((p.x - 1) / CW);
@@ -144,7 +147,9 @@ export class PatternEditor {
     bot.style.position = 'absolute';
     this.bottom = svgEl(COLS * CW + 2, 30, '');
     bot.appendChild(this.bottom);
+    bot.title = 'MIDI edit range and counter; scroll bar (drag, click its arrows, or use the wheel or a sideways swipe)';
     bot.addEventListener('pointerdown', (ev) => this.bottomDown(ev, bot));
+    this.onWheel(bot, true);
     // right panel: View 1-4, Chd Ins Dr, Size
     const RX = GX + COLS * CW + 8;
     label(b, RX, 2, 'View', 'small');
@@ -599,6 +604,56 @@ export class PatternEditor {
     const rec = s.recorders[this.voice];
     if (rec.counter >= this.scroll + COLS) this.scroll = rec.counter - COLS + 1;
     this.parts.forEach((p) => p.update());
+  }
+
+  // ------------------------------------------------------------------ mouse wheel / trackpad
+
+  private wheelAcc = { x: 0, y: 0, at: 0 };
+
+  /**
+   * Wheel and trackpad scrolling, only over the editor's own areas (never global):
+   *   sideways (a trackpad swipe, a tilting wheel) or ⇧ + wheel → scroll the steps;
+   *   the plain wheel over the strip and the scroll bar (horizontal areas) → the steps too;
+   *   the plain wheel over the grid and the keyboard → the pitches (as ↑ ↓).
+   * ⌘ / Ctrl + wheel (pinch zoom) is left to the browser. Small trackpad deltas add up, so a
+   * slow swipe moves a step at a time. The event is only cancelled when it scrolled something
+   * or was meant for this view (this also stops a sideways swipe from going Back a page).
+   */
+  private onWheel(box: HTMLElement, horizontalArea: boolean): void {
+    box.addEventListener(
+      'wheel',
+      (e) => {
+        if (e.ctrlKey || e.metaKey) return;
+        let dx = e.deltaX;
+        let dy = e.deltaY;
+        if (e.shiftKey && dx === 0) [dx, dy] = [dy, 0]; // ⇧ + wheel (Windows / Linux send it as deltaY)
+        const sideways = Math.abs(dx) > Math.abs(dy);
+        if (!sideways && horizontalArea) [dx, dy] = [dy, 0];
+        else if (sideways) dy = 0;
+        else dx = 0;
+        if (!dx && !dy) return;
+        e.preventDefault();
+        // pixels per step / semitone; lines (Firefox) and pages are converted first
+        const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? COLS * 12 : 1;
+        const a = this.wheelAcc;
+        const now = performance.now();
+        if (now - a.at > 250) a.x = a.y = 0; // a new gesture starts afresh
+        a.at = now;
+        a.x += dx * unit;
+        a.y += dy * unit;
+        const steps = Math.trunc(a.x / 12);
+        const semis = Math.trunc(a.y / 20);
+        a.x -= steps * 12;
+        a.y -= semis * 20;
+        if (!steps && !semis) return;
+        const p = this.pattern;
+        const span = Math.max(p.size, p.steps.length) + 4; // as far as the scroll bar goes
+        if (steps) this.scroll = clamp(this.scroll + steps, 0, span);
+        if (semis) this.low = clamp(this.low - semis, 0, 127 - ROWS + 1); // wheel down = lower notes
+        this.ctx.s.changed('editor');
+      },
+      { passive: false },
+    );
   }
 
   /** keyboard selection: where Shift + ← → started, and the moving end */

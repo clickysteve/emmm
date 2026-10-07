@@ -12,6 +12,7 @@ import { conductAt } from './conducting';
 import { Rng } from './rng';
 import { unwarp, warp } from './timeDistortion';
 import type { Composition, CycleStep, Pattern, Snapshot, VariableName } from './types';
+import { CHROMATIC, shiftDegrees } from '../app/scales';
 
 export interface NoteOnEvent {
   kind: 'on';
@@ -488,6 +489,24 @@ export class MEngine {
   }
 
   /**
+   * The pitch a Pattern note plays at: §9 Transposition plus any runtime offset (Trajectory).
+   *
+   * Scale Lock off (M): everything is semitones, `raw + transposition + offset`.
+   * Scale Lock on (emmm): the Transposition value and the runtime offset are degrees of this
+   * Voice's own Pattern scale (shiftDegrees), so a chord keeps its shape within the scale;
+   * Keyboard Transpose (a played key, Use = T) stays a chromatic offset on top. The stored
+   * notes are never changed.
+   */
+  transposePitch(v: number, raw: number): number {
+    const off = this.mod.transpose[v];
+    if (!this.comp.scaleLock) return raw + this.transposition(v) + off;
+    const t = this.comp.transposition.positions[this.comp.transposition.active][v];
+    const k = this.voices[v].keyTranspose;
+    const degrees = (k === null || this.comp.options.secondOrderTranspose ? t : 0) + off;
+    return shiftDegrees(this.pattern(v).scale ?? CHROMATIC, raw, degrees) + (k ?? 0);
+  }
+
+  /**
    * Choose the pattern step for this event (§4 step 4). Returns -1 for an empty pattern.
    * Always consumes exactly one or two random numbers.
    */
@@ -544,7 +563,6 @@ export class MEngine {
       velocity = this.velocityFor(v, ac.level);
       if (vs.mouseAdvance) velocity = Math.max(1, Math.min(127, velocity + this.mouseAdvanceVelocity));
       if (this.mod.velocity[v]) velocity = Math.max(1, Math.min(127, velocity + this.mod.velocity[v]));
-      const tr = this.transposition(v) + this.mod.transpose[v];
       const legatoMul = (this.comp.conducting.continuousLegato.values[v] ?? 1) * this.mod.legato[v];
       const pct = (this.comp.legatoValues[lg.level] ?? 50) * legatoMul;
       // Duration is a percentage of the time to the next event, measured in real time so
@@ -555,7 +573,7 @@ export class MEngine {
       const dur = Math.max(0.25, (realInterval * pct) / 100);
       const channels = this.comp.orchestration.positions[this.comp.orchestration.active][v];
       for (const raw of step) {
-        const pitch = raw + tr;
+        const pitch = this.transposePitch(v, raw);
         if (pitch < 0 || pitch > 127) continue;
         pitches.push(pitch);
         for (const ch of channels) out.push(...this.noteOn(v, ch, pitch, velocity, t, t + dur));
@@ -625,10 +643,9 @@ export class MEngine {
     const played = vs.playEnable && step.length > 0 && ac.level > 0 && dense;
     const pitches: number[] = [];
     if (played) {
-      const tr = this.transposition(v) + this.mod.transpose[v];
       const channels = this.comp.orchestration.positions[this.comp.orchestration.active][v];
       for (const raw of step) {
-        const pitch = raw + tr;
+        const pitch = this.transposePitch(v, raw);
         if (pitch < 0 || pitch > 127) continue;
         pitches.push(pitch);
         for (const ch of channels) {

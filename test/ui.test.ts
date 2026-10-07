@@ -235,10 +235,11 @@ describe('MIDI Assignment selectors keep routing exactly as chosen', () => {
     items().find((i) => i.textContent === 'IAC Driver Bus 1')!.click();
     expect(s.comp.midi.outputs.map((o) => [o.port, o.channel])).toEqual(Array.from({ length: 16 }, (_, i) => ['iac-1', i + 1]));
   });
-  it('input selectors and Send Sync use the same component; no native <select> is left', () => {
+  it('input selectors, Send Sync and clock input use the same component; no native <select> is left', () => {
     const { w } = setup();
     expect(w.win.el.querySelectorAll('select')).toHaveLength(0);
-    expect(w.win.el.querySelectorAll('.msel').length).toBe(16 + 16 + 1 + 1);
+    // 16 inputs + 16 outputs + All outputs + Send Sync + clock input
+    expect(w.win.el.querySelectorAll('.msel').length).toBe(16 + 16 + 1 + 1 + 1);
   });
 });
 

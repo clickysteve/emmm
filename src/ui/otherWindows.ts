@@ -1,6 +1,6 @@
 /**
- * Midi Assignment (S1 ch.19), the event Monitor (emmm), About, MIDI File import dialog and
- * the browser Library (emmm).
+ * MIDI Settings (M's Midi Assignment, S1 ch.19, plus MIDI clock in and out), the event
+ * Monitor (emmm), About, MIDI File import dialog and the browser Library (emmm).
  */
 import { noteName } from '../engine/constants';
 import { newPattern } from '../engine/patternOps';
@@ -9,7 +9,7 @@ import * as msg from '../midi/messages';
 import { notesToSteps, readSmf, type ParsedSmf } from '../midi/smf';
 import { deleteFromLibrary, listLibrary, loadFromLibrary, saveToLibrary } from '../persistence/storage';
 import type { UiContext } from './context';
-import { el, label } from './dom';
+import { el, label, setTip } from './dom';
 import { noteValueIcon } from './icons';
 import { confirmDialog } from './dialogs';
 import { Selector, type SelectorOption } from './selector';
@@ -23,15 +23,29 @@ function deviceSelector(parent: HTMLElement, x: number, y: number, w: number, la
   return new Selector(parent, x, y, w, 13, { options, value, onChange, label, fontSize: 8, missingText: () => 'not connected' });
 }
 
-// ---------------------------------------------------------------------------- Midi Assignment
+// ---------------------------------------------------------------------------- MIDI Settings
 
+const SYNC_TEXT = { internal: 'INTERNAL', waiting: 'WAITING', running: 'RUNNING', lost: 'LOST' } as const;
+const SYNC_TIP = {
+  internal: 'Internal: emmm keeps its own tempo',
+  waiting: 'External: waiting for MIDI clock (or for Start)',
+  running: 'External: following the incoming MIDI clock',
+  lost: 'External: the clock stopped arriving — emmm holds the last tempo until it returns',
+} as const;
+
+/**
+ * MIDI Settings — the one place for MIDI I/O and synchronisation: M's Midi Assignment (input
+ * and output channel maps, first program number, MIDI conducting controllers, latency, MIDI
+ * messages) plus MIDI clock: Send Sync (clock out; the same setting as Options ▸ Send Clock)
+ * and clock input with its status. Clock input is not an Extended feature.
+ */
 export class MidiAssignmentWindow {
   win: MWindow;
   private body: HTMLElement;
   private sig = '';
   private parts: { update(): void }[] = [];
   constructor(private ctx: UiContext, parent: HTMLElement) {
-    this.win = new MWindow(parent, { id: 'midiassign', title: 'Midi Assignment', x: 90, y: 30, w: 470, h: 392, closable: true, area: 'midi' });
+    this.win = new MWindow(parent, { id: 'midiassign', title: 'MIDI Settings', x: 46, y: 30, w: 628, h: 392, closable: true, area: 'midi' });
     this.body = this.win.body;
     this.build();
   }
@@ -127,12 +141,10 @@ export class MidiAssignmentWindow {
     this.parts.push(new Numerical(b, RX + 40, 15, 26, 13, { get: () => s.comp.midi.conductCtrlX, set: (x) => ((s.comp.midi.conductCtrlX = x), s.changed('midi')), min: 0, max: 127 }));
     label(b, RX + 76, 18, '↕', 'small');
     this.parts.push(new Numerical(b, RX + 88, 15, 26, 13, { get: () => s.comp.midi.conductCtrlY, set: (x) => ((s.comp.midi.conductCtrlY = x), s.changed('midi')), min: 0, max: 127 }));
-    label(b, RX, 38, '<b>Send Sync</b> (MIDI clock)');
-    this.parts.push(deviceSelector(b, RX, 50, 150, 'Send Sync: the device that receives MIDI clock', () => [{ value: '', text: '— none —' }, ...s.midi.outputs().map((o) => ({ value: o.id, text: o.name }))], () => s.comp.midi.clockPort, (v) => ((s.comp.midi.clockPort = v), s.changed('midi'))));
-    label(b, RX, 70, '<b>Latency</b>');
-    this.parts.push(new Numerical(b, RX + 50, 67, 34, 13, { get: () => s.comp.midi.latencyMs, set: (x) => ((s.comp.midi.latencyMs = x), s.changed('midi')), min: 0, max: 999 }));
-    label(b, RX + 88, 70, 'ms', 'small');
-    label(b, RX, 92, '<b>MIDI Messages</b> → orchestrated channels');
+    label(b, RX, 40, '<b>Latency</b>');
+    this.parts.push(new Numerical(b, RX + 50, 37, 34, 13, { get: () => s.comp.midi.latencyMs, set: (x) => ((s.comp.midi.latencyMs = x), s.changed('midi')), min: 0, max: 999, title: 'Latency: every MIDI message is sent this many ms later (to line emmm up with other gear)' }));
+    label(b, RX + 88, 40, 'ms', 'small');
+    label(b, RX, 62, '<b>MIDI Messages</b> → orchestrated channels');
     const chans = () => [...new Set(s.comp.orchestration.positions[s.comp.orchestration.active].flat())];
     const mb = (x: number, y: number, w: number, t: string, f: () => void) => {
       const d = el('div', 'btn', b, [RX + x, y, w, 14], t);
@@ -143,20 +155,78 @@ export class MidiAssignmentWindow {
         f();
       });
     };
-    mb(0, 106, 72, 'Omni On', () => s.sendRaw(chans(), (c) => msg.omni(c, true)));
-    mb(76, 106, 72, 'Omni Off', () => s.sendRaw(chans(), (c) => msg.omni(c, false)));
-    mb(0, 122, 72, 'Mono Mode', () => s.sendRaw(chans(), (c) => msg.monoMode(c)));
-    mb(76, 122, 72, 'Poly Mode', () => s.sendRaw(chans(), (c) => msg.polyMode(c)));
-    mb(0, 142, 148, 'Local Control On', () => s.sendRaw(chans(), (c) => msg.localControl(c, true)));
-    mb(0, 158, 148, 'Local Control Off', () => s.sendRaw(chans(), (c) => msg.localControl(c, false)));
-    mb(0, 178, 148, 'All Notes Off  ⌘.', () => s.allNotesOff());
-    mb(0, 194, 148, 'Panic', () => s.panic());
-    const note = el('div', 'label small', b, [RX, 220, 150, 120]);
+    mb(0, 76, 72, 'Omni On', () => s.sendRaw(chans(), (c) => msg.omni(c, true)));
+    mb(76, 76, 72, 'Omni Off', () => s.sendRaw(chans(), (c) => msg.omni(c, false)));
+    mb(0, 92, 72, 'Mono Mode', () => s.sendRaw(chans(), (c) => msg.monoMode(c)));
+    mb(76, 92, 72, 'Poly Mode', () => s.sendRaw(chans(), (c) => msg.polyMode(c)));
+    mb(0, 112, 148, 'Local Control On', () => s.sendRaw(chans(), (c) => msg.localControl(c, true)));
+    mb(0, 128, 148, 'Local Control Off', () => s.sendRaw(chans(), (c) => msg.localControl(c, false)));
+    mb(0, 148, 148, 'All Notes Off  ⌘.', () => s.allNotesOff());
+    mb(0, 164, 148, 'Panic', () => s.panic());
+    const note = el('div', 'label small', b, [RX, 190, 150, 150]);
     note.style.whiteSpace = 'normal';
     note.style.lineHeight = '10px';
     note.innerHTML =
       'M Output Channels 1–16 are what the Orchestration Variable addresses; here each is mapped to a device and MIDI channel. Input Channels map incoming MIDI to the Src numericals. Choose <b>emmm monitor</b> to hear a channel without hardware.';
+    this.buildClock(b, 472);
     this.sig = this.portSig();
+  }
+
+  /** MIDI clock: Send Sync (out) and clock input, with the status of the clock emmm follows. */
+  private buildClock(b: HTMLElement, CX: number): void {
+    const s = this.ctx.s;
+    const toggle = (y: number, text: string, tip: string, get: () => boolean, set: (v: boolean) => void, what: string) => {
+      const d = el('div', 'num', b, [CX, y, 148, 14]);
+      d.style.fontSize = '9px';
+      d.style.justifyContent = 'flex-start';
+      d.style.paddingLeft = '3px';
+      d.title = tip;
+      d.setAttribute('role', 'switch');
+      d.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
+        set(!get());
+        s.changed(what);
+      });
+      this.parts.push({ update: () => ((d.textContent = (get() ? '☒ ' : '☐ ') + text), d.classList.toggle('inv', get()), d.setAttribute('aria-checked', String(get()))) });
+    };
+    label(b, CX, 4, '<b>MIDI Clock</b>');
+    const st = el('div', 'num', b, [CX, 17, 148, 14]);
+    st.style.fontSize = '8px';
+    st.setAttribute('aria-live', 'polite');
+    this.parts.push({
+      update: () => {
+        const k = s.clockStatus();
+        const t = 'Tempo: ' + SYNC_TEXT[k] + (k === 'running' || k === 'lost' ? ` ${s.clockIn.bpm.toFixed(1)}` : '');
+        if (st.textContent !== t) st.textContent = t;
+        st.classList.toggle('inv', k === 'running');
+        st.classList.toggle('blink', k === 'lost');
+        setTip(st, SYNC_TIP[k]);
+      },
+    });
+    // clock out (M: Send Sync device + Options ▸ Send Clock)
+    label(b, CX, 40, '<b>Send Sync</b> (clock out)');
+    toggle(52, 'Send clock', 'Send MIDI clock, Start, Stop and Continue to the device below while emmm plays (the same setting as Options ▸ Send Clock)', () => s.comp.options.sendClock, (v) => (s.comp.options.sendClock = v), 'options');
+    this.parts.push(deviceSelector(b, CX, 68, 148, 'Send Sync: the device that receives MIDI clock', () => [{ value: '', text: '— none —' }, ...s.midi.outputs().map((o) => ({ value: o.id, text: o.name }))], () => s.comp.midi.clockPort, (v) => ((s.comp.midi.clockPort = v), s.changed('midi'))));
+    // clock in (until format v4 an Extended feature)
+    const ci = () => s.comp.midi.clockIn;
+    label(b, CX, 92, '<b>Clock input</b> (follow)');
+    toggle(104, 'Follow clock (tempo)', 'Follow an external MIDI clock (24 pulses per quarter note) for tempo', () => ci().enabled, (v) => (ci().enabled = v), 'clock');
+    toggle(120, 'Start / Stop / Continue', 'Also follow external Start, Stop and Continue messages', () => ci().transport, (v) => (ci().transport = v), 'clock');
+    this.parts.push(
+      new Selector(b, CX, 136, 148, 13, {
+        label: 'Clock input: which input to follow',
+        fontSize: 8,
+        options: () => [{ value: '*', text: 'any input' }, ...s.midi.inputs().map((o) => ({ value: o.id, text: o.name }))],
+        value: () => ci().port,
+        onChange: (v) => ((ci().port = v), s.changed('clock')),
+        missingText: () => 'input not connected',
+      }),
+    );
+    const note = el('div', 'label small', b, [CX, 160, 148, 180]);
+    note.style.whiteSpace = 'normal';
+    note.style.lineHeight = '10px';
+    note.innerHTML =
+      'Send Sync clocks other gear from emmm’s tempo; Pause sends Stop, continuing sends Continue. With <b>Follow clock</b> emmm takes its tempo from the chosen input (Tempo shows RUNNING and the tempo it hears; LOST if the pulses stop — the last tempo is kept). Space still pauses and continues emmm itself.';
   }
 
   /** Rebuild when another document is loaded (controls bind to it). Device lists are read
@@ -486,20 +556,21 @@ n/d of a whole note (1|8 = eighths); Rhythm multiplies each step; Time Distortio
 Phase delays the start. Also in the Pattern Editor (Length, T Base, Phase).<br>
 <b>Pattern Editor</b> — Length = steps the Voice plays (Alt: cut / extend the Pattern) · Clear
 Pattern · Root + Scale of the Pattern (changing it moves the notes by scale degree; new notes snap
-into it; M plays the notes as written).<br>
+into it; M plays the notes as written). <b>Scale Lock</b> (Transposition window, emmm): Transposition
+counts degrees of each Pattern's scale instead of semitones.<br>
 <b>Typing numbers</b> — click any number, type the value, Return (Escape cancels); ↑ ↓ step it.
 Time Base takes "3/8". Range bars take "40-100". emmm ▸ Keyboard Shortcuts… (⌥H) lists every key.<br>
 <b>Undo</b> — ⌘Z / ⇧⌘Z undo and redo edits; the performance (active Positions, tempo, Baton) is
 never rewound.<br><br>
-<b>Keys</b> — Space Start/Sync · Return Stop · Tab Pause · Caps Lock or ⌘⌥ + moving the mouse =
+<b>Keys</b> — Space Play / Pause (emmm; in M it was Start / Sync) · ⇧Space Sync · Return Stop · Tab Pause · Caps Lock or ⌘⌥ + moving the mouse =
 Mouse Advance · ⌘. All Notes Off · ⌘S Save · ⌘O Open · ⌘Z Undo · Escape closes pop-ups.<br><br>
-<b>MIDI</b> — File ▸ Midi Assignment… maps M Output Channels to devices (or the internal monitor).
+<b>MIDI</b> — File ▸ MIDI Settings… (⌥M) maps M Output Channels to devices (or the internal monitor), and sends or follows MIDI clock.
 Set a voice's Use to <b>C</b> to drive emmm from a MIDI keyboard: middle C (C3) Start, B2 Stop,
 B3 Hold/Do, F3 Sync, black keys + white keys select Positions.<br><br>
 <b>Seed</b> — emmm's randomness is seeded (Conducting window). Same document + seed + gestures =
 same music from Start.<br><br>
 <b>Extended</b> (emmm's additions, not M) — Options ▸ Extended…: Seed &amp; Reroll, Locks, Mutation
-(subtle → chaos), A/B states, MIDI clock input, MIDI Learn, CC Cycles, and <b>Trajectory</b> (⌥J):
+(subtle → chaos), A/B states, MIDI Learn, CC Cycles, and <b>Trajectory</b> (⌥J):
 rows of values moved through at a musical rate, driving a MIDI controller, Density, Transposition,
 Tempo, the Baton or a Position. Options ▸ Performance Feedback shows what M decides for each note.<br>
 <b>Comfort</b> — rest the mouse on a control for a tip (Options ▸ Show Tips) · ⤢ in the menu bar =

@@ -1,7 +1,8 @@
 /**
  * EXTENDED windows — emmm's continuation of M, clearly labelled as not part of Classic M:
  *
- *   Extended     mode switch, Seed / Reroll, Locks, Mutation, A/B states, MIDI clock input
+ *   Extended     mode switch, Seed / Reroll, Locks, Mutation, A/B states
+ *                (MIDI clock input moved to MIDI Settings: it is not an Extended feature)
  *   MIDI Learn   map controllers and keys to emmm controls (an application preference)
  *   CC Cycles    (below) cyclic distributions driving MIDI controllers
  *
@@ -9,19 +10,11 @@
  */
 import { allLearnTargets, LOCK_DIMS, sourceLabel, targetKey, targetLabel, type LearnTarget } from '../extended/extended';
 import type { UiContext } from './context';
-import { el, label, localPoint, setSvg, setTip, svgEl, trackDrag } from './dom';
+import { el, label, localPoint, setSvg, svgEl, trackDrag } from './dom';
 import { iconSvg } from './icons';
 import { keyLabel } from './keys';
 import { Selector } from './selector';
 import { MWindow, Numerical, RangeBar } from './widgets';
-
-const SYNC_TEXT = { internal: 'INTERNAL', waiting: 'WAITING', running: 'RUNNING', lost: 'LOST' } as const;
-const SYNC_TIP = {
-  internal: 'Internal: emmm keeps its own tempo',
-  waiting: 'External: waiting for MIDI clock (or for Start)',
-  running: 'External: following the incoming MIDI clock',
-  lost: 'External: the clock stopped arriving — emmm holds the last tempo until it returns',
-} as const;
 
 export class ExtendedWindow {
   win: MWindow;
@@ -31,7 +24,7 @@ export class ExtendedWindow {
   openLearn: (() => void) | null = null;
   openTrajectory: (() => void) | null = null;
   constructor(private ctx: UiContext, parent: HTMLElement) {
-    this.win = new MWindow(parent, { id: 'extended', title: 'Extended', x: 150, y: 20, w: 300, h: 300, closable: true });
+    this.win = new MWindow(parent, { id: 'extended', title: 'Extended', x: 150, y: 20, w: 300, h: 244, closable: true });
   }
 
   private toggle(x: number, y: number, w: number, get: () => boolean, set: (v: boolean) => void, text: string, title = '', what = 'extended'): HTMLDivElement {
@@ -172,32 +165,7 @@ export class ExtendedWindow {
     ab(140, 'b');
     this.button(236, 177, 58, 'A ⇄ B', 'Switch between A and B', () => ext.enabled && s.abToggle());
 
-    // MIDI clock input
-    label(b, 6, 202, '<b>MIDI clock input</b>');
-    const st = el('div', 'num', b, [210, 199, 84, 14]);
-    st.style.fontSize = '8px';
-    this.parts.push({
-      update: () => {
-        const k = s.clockStatus();
-        const t = SYNC_TEXT[k] + (k === 'running' || k === 'lost' ? ` ${s.extStatus.bpm.toFixed(1)}` : '');
-        if (st.textContent !== t) st.textContent = t;
-        st.classList.toggle('inv', k === 'running');
-        st.classList.toggle('blink', k === 'lost');
-        setTip(st, SYNC_TIP[k]);
-      },
-    });
-    this.toggle(6, 216, 110, () => ext.clockIn.enabled, (v) => (ext.clockIn.enabled = v), 'follow clock', 'Follow an external MIDI clock (24 pulses per quarter note) for tempo', 'clock');
-    this.toggle(120, 216, 120, () => ext.clockIn.transport, (v) => (ext.clockIn.transport = v), 'Start/Stop/Cont', 'Follow external Start, Stop and Continue messages', 'clock');
-    this.parts.push(
-      new Selector(b, 6, 234, 234, 14, {
-        label: 'MIDI clock input: which input to follow',
-        options: () => [{ value: '*', text: 'any input' }, ...s.midi.inputs().map((o) => ({ value: o.id, text: o.name }))],
-        value: () => ext.clockIn.port,
-        onChange: (v) => ((ext.clockIn.port = v), s.changed('clock')),
-        missingText: () => 'input not connected',
-      }),
-    );
-    const status = el('div', 'label small', b, [6, 256, 288, 22]);
+    const status = el('div', 'label small', b, [6, 200, 288, 22]);
     status.style.whiteSpace = 'normal';
     status.style.lineHeight = '10px';
     status.setAttribute('aria-live', 'polite');

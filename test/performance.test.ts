@@ -7,7 +7,8 @@ import { Prefs, type PrefStore } from '../src/app/prefs';
 import { Session } from '../src/app/session';
 import { demoComposition } from '../src/engine/defaults';
 import { MEngine, type NoteOnEvent } from '../src/engine/engine';
-import { allLearnTargets, cleanLearnMappings, ClockFollower, CLOCK_LOST_MS, defaultLocks, learnInto, targetKey, type LearnMapping } from '../src/extended/extended';
+import { allLearnTargets, cleanLearnMappings, defaultLocks, learnInto, targetKey, type LearnMapping } from '../src/extended/extended';
+import { ClockFollower, CLOCK_LOST_MS } from '../src/midi/clockIn';
 import { mutate, mutationRng } from '../src/extended/mutation';
 import { capturePerfState } from '../src/extended/perfState';
 import { deserialize, FORMAT_VERSION, onLegacyLearn, serialize } from '../src/persistence/format';
@@ -356,7 +357,7 @@ describe('MIDI clock input: jitter, loss, recovery', () => {
   it('in the Session: Internal when not following; tempo holds when the clock is lost (no runaway)', () => {
     const s = mk();
     expect(s.clockStatus()).toBe('internal');
-    s.comp.extended.clockIn.enabled = true;
+    s.comp.midi.clockIn.enabled = true;
     s.start();
     const per = 60000 / (90 * 24);
     for (let i = 0; i < 40; i++) s.midiIn('x', [0xf8], 1000 + i * per);
@@ -370,7 +371,7 @@ describe('MIDI clock input: jitter, loss, recovery', () => {
   });
   it('Continue after Stop does not double-start; Stop stops', () => {
     const s = mk();
-    s.comp.extended.clockIn.enabled = true;
+    s.comp.midi.clockIn.enabled = true;
     s.midiIn('x', [0xfa], 0);
     s.midiIn('x', [0xfb], 1);
     expect(s.engine.state).toBe('playing');
@@ -442,7 +443,7 @@ describe('persistence: Classic document, Extended state, preferences', () => {
     s.abCapture('a');
     const doc = deserialize(serialize(s.comp));
     expect(doc.version).toBe(FORMAT_VERSION);
-    expect(FORMAT_VERSION).toBe(3);
+    expect(FORMAT_VERSION).toBe(4);
     expect(doc.mode).toBe('extended');
     expect(doc.composition.extended.locks.dims.accent).toBe(true);
     expect(doc.composition.extended.mutation.amount).toBe(70);
@@ -469,7 +470,7 @@ describe('persistence: Classic document, Extended state, preferences', () => {
     onLegacyLearn((l) => (adopted = l));
     const doc = deserialize(JSON.stringify(v1));
     onLegacyLearn(null);
-    expect(doc.version).toBe(3);
+    expect(doc.version).toBe(4);
     expect('learn' in doc.composition.extended).toBe(false);
     expect(doc.composition.extended.locks).toEqual(defaultLocks());
     expect(doc.composition.extended.voiceSeeds).toEqual([null, null, null, null]);

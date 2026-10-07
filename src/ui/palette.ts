@@ -42,7 +42,7 @@ export const ROLE_INFO: Record<Role, { label: string; help: string }> = {
   variables: { label: 'Variables', help: 'Variables window and its edit windows' },
   cyclic: { label: 'Cyclic', help: 'Cyclic Variables window and Cyclic Editor' },
   conducting: { label: 'Conducting', help: 'transport, tempo and Conducting Grid' },
-  midi: { label: 'Midi', help: 'Orchestration, Sound Choice, Midi Assignment, Monitor' },
+  midi: { label: 'Midi', help: 'Orchestration, Sound Choice, MIDI Settings, Monitor' },
   snapshots: { label: 'Snapshots', help: 'Snapshot window' },
   trajectory: { label: 'Trajectory', help: 'Trajectory window (Extended)' },
   activity: { label: 'Activity', help: 'the Baton, now-playing marks, flashing bricks' },

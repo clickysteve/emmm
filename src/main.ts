@@ -193,7 +193,7 @@ function openEditor(name: EditorName, opts: { position?: number; variable?: Vari
     const v = (opts.variable ?? cyclic.which) as 'rhythm' | 'legato' | 'accent';
     cyclic.openAt(v, opts.position ?? session.comp[v].active);
   } else if (name === 'patternEditor') patternEditor.openFor(opts.voice ?? session.selected.findIndex(Boolean));
-  else if (name === 'midiAssignment') midiAssign.win.show();
+  else if (name === 'midiSettings') midiAssign.win.show();
   else if (name === 'monitor') monitorWin.win.show();
   else if (name === 'about') about.win.show();
   else if (name === 'library') {
@@ -345,7 +345,13 @@ const toggleOpt = (k: keyof typeof session.comp.options) => () => {
 const cmd = (id: string, run: () => void, enabled?: () => boolean) => commands.set(id, { run, enabled });
 cmd('open', () => void openDocument());
 cmd('save', () => downloadDocument(session.comp));
-cmd('midiAssignment', () => (openEditor('midiAssignment'), midiAssign.win.flashTitle()));
+cmd('midiSettings', () => (openEditor('midiSettings'), midiAssign.win.flashTitle()));
+/** Space (emmm): stopped → Start, playing → Pause, paused → Continue — M's own transport
+ * functions, nothing parallel. */
+cmd('playPause', () => (session.engine.state === 'stopped' ? session.start() : session.pause()));
+cmd('sync', () => session.sync());
+cmd('stop', () => session.stop());
+cmd('pause', () => session.pause());
 cmd('undo', () => session.undo(), () => session.history.canUndo);
 cmd('redo', () => session.redo(), () => session.history.canRedo);
 cmd('cut', editOp('cut'), anySelected);
@@ -421,7 +427,7 @@ const MENUS: { title: string; cls?: string; items: MenuItem[] | (() => MenuItem[
       { label: 'Save State As Startup', action: () => (saveStartup(session.comp) ? alertBox('The current state (without Pattern contents and Time Distortion maps) is now what <b>New</b> gives you.') : alertBox('Could not save the startup state in this browser.')) },
       { label: 'Forget Startup State', enabled: () => !!loadStartup(), action: () => clearStartup() },
       { sep: true, label: '' },
-      C('midiAssignment', 'Midi Assignment…'),
+      C('midiSettings', 'MIDI Settings…'),
     ],
   },
   {
@@ -505,6 +511,7 @@ const MENUS: { title: string; cls?: string; items: MenuItem[] | (() => MenuItem[
       opt('noZoomRects', 'No Zoom Rects'),
       { sep: true, label: '' },
       { label: 'Palette…', action: () => paletteWin.show() },
+      { label: 'Transposition Scale Lock  (emmm)', checked: () => session.comp.scaleLock, action: () => session.setScaleLock(!session.comp.scaleLock) },
       {
         label: 'Show Tips',
         checked: () => prefs.app.tips,
@@ -577,12 +584,12 @@ for (const m of MENUS) {
 const statusEl = el('div', 'status', menubar);
 const outEl = el('div', 'menu', menubar);
 outEl.style.fontWeight = '400';
-// a long device name is cut short here (the full name is in Midi Assignment)
+// a long device name is cut short here (the full name is in MIDI Settings)
 Object.assign(outEl.style, { display: 'block', lineHeight: '15px', maxWidth: '230px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' });
-outEl.title = 'Where M Output Channel 1 goes — click for Midi Assignment';
+outEl.title = 'Where M Output Channel 1 goes — click for MIDI Settings';
 outEl.addEventListener('pointerdown', (e) => {
   e.stopPropagation();
-  openEditor('midiAssignment');
+  openEditor('midiSettings');
 });
 window.addEventListener('pointerdown', () => closeMenu());
 // an edit gesture (press … release) becomes one Undo step
@@ -622,15 +629,9 @@ window.addEventListener('keydown', (e) => {
   if (e.altKey && /^Key/.test(e.code)) return; // unassigned ⌥ letters do nothing
   if (e.repeat && e.key !== 'Backspace') return;
   switch (e.key) {
-    case ' ':
-      session.start();
-      break;
-    case 'Enter':
-      session.stop();
-      break;
-    case 'Tab':
+    case 'Tab': // plain Tab is Pause (ui/keys.ts); ⌥Tab pauses a Slideshow
       if (e.altKey) session.pauseSlideshow();
-      else session.pause();
+      else return;
       break;
     case 'Backspace':
     case 'Delete':
@@ -745,7 +746,8 @@ function frame(): void {
   }
   const o = session.comp.midi.outputs[0];
   const outName = !o.port ? 'no output' : o.port === 'monitor' ? 'monitor' : session.midi.portName(o.port);
-  const st = `${session.comp.extended.enabled ? 'EXT  ' : ''}${session.hold ? 'HOLD  ' : ''}${session.playing ? '▶' : session.engine.state === 'paused' ? '❚❚' : '■'}|→ ${outName}${session.monitorAll && o.port !== 'monitor' ? ' + monitor' : ''}`;
+  const film = session.movieRecording ? 'MOVIE●  ' : session.movieArmed ? 'MOVIE  ' : '';
+  const st = `${session.comp.extended.enabled ? 'EXT  ' : ''}${session.hold ? 'HOLD  ' : ''}${film}${session.playing ? '▶' : session.engine.state === 'paused' ? '❚❚' : '■'}|→ ${outName}${session.monitorAll && o.port !== 'monitor' ? ' + monitor' : ''}`;
   if (st !== lastStatus) {
     const [a, b] = st.split('|');
     statusEl.textContent = a;
@@ -765,7 +767,7 @@ requestAnimationFrame(frame);
 window.addEventListener('pointerdown', () => session.monitor.unlock(), { once: true });
 void session.midi.request().then((st) => {
   // With no MIDI outputs at all, route output channels to the internal monitor so a first
-  // visit is audible; once a device appears the user chooses it in Midi Assignment.
+  // visit is audible; once a device appears the user chooses it in MIDI Settings.
   const unassigned = session.comp.midi.outputs.every((o) => !o.port);
   if (unassigned) {
     const outs = session.midi.outputs();
@@ -787,7 +789,7 @@ void session.midi.request().then((st) => {
       alertBox(
         st === 'unsupported'
           ? 'This browser has no Web MIDI, so emmm cannot reach MIDI hardware here. It will play through its internal monitor instead. For MIDI, use Chrome, Edge, Opera or Firefox.'
-          : 'MIDI access was not granted, so emmm will play through its internal monitor. Allow MIDI for this site, then use <b>File ▸ Midi Assignment…</b> ▸ Request MIDI.',
+          : 'MIDI access was not granted, so emmm will play through its internal monitor. Allow MIDI for this site, then use <b>File ▸ MIDI Settings…</b> ▸ Request MIDI.',
       );
   }
 });
