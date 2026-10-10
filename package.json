@@ -2,7 +2,7 @@
   "name": "emmm",
   "version": "0.1.0",
   "private": true,
-  "description": "emmm — a modern recreation and continuation of Intelligent Music's M",
+  "description": "emmm \u2014 a modern recreation and continuation of Intelligent Music's M",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -12,7 +12,8 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "build:pages": "tsc --noEmit && vite build --base=/emmm/",
-    "preview:pages": "vite preview --base=/emmm/ --port 4173"
+    "preview:pages": "vite preview --base=/emmm/ --port 4173",
+    "test:browser": "npm run build && node scripts/browser-test.mjs"
   },
   "devDependencies": {
     "happy-dom": "^20.14.5",

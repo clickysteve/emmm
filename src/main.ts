@@ -395,7 +395,8 @@ cmd('feedback', toggleFeedback);
 cmd('fullScreen', () => toggleFullScreen(), () => !!document.documentElement.requestFullscreen);
 cmd('shortcuts', () => bringForward(shortcutsWin.win));
 cmd('trajectoryWindow', () => bringForward(trajectoryWin.win));
-cmd('robotsWindow', () => bringForward(robotsWin.win));
+// ⌥W opens the Robots window; on the window already in front it moves the keyboard into it
+cmd('robotsWindow', () => (robotsWin.win.open && windowFocus.front === robotsWin.win ? robotsWin.focusIn() : bringForward(robotsWin.win)));
 cmd('returnHome', () => session.returnHome(), () => ext().enabled && !!ext().home.positions);
 
 /** A menu item for a keyboard command: same action, same enabling, its key shown. */

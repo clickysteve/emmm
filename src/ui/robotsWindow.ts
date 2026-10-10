@@ -73,22 +73,53 @@ export class RobotsWindow {
 
   // ------------------------------------------------------------------ small controls
 
-  /** A focusable control: Enter / Space act like a click, and the key is not a shortcut. */
+  /**
+   * A control that works from the keyboard once it has focus: Enter / Space act like a click,
+   * ← → ↑ ↓ move to the window's other controls, Escape gives the keys back to emmm. A mouse
+   * click does not take the focus, so Space and Return stay the transport keys (and Tab stays
+   * M's Pause) while you play with the mouse. ⌥W on the open window puts the focus in it.
+   */
   private activatable(d: HTMLElement, f: () => void, enabled: () => boolean = () => true): void {
     d.tabIndex = 0;
+    d.dataset.rnav = '1';
     d.addEventListener('pointerdown', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      d.focus({ preventScroll: true });
       if (enabled()) f();
     });
     d.addEventListener('keydown', (e) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
         e.stopPropagation();
         if (enabled()) f();
+      } else if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        e.stopPropagation();
+        this.moveFocus(d, e.key === 'ArrowDown' ? 1 : -1);
+      } else if (e.key === 'Escape') {
+        e.stopPropagation();
+        d.blur();
       }
     });
+  }
+
+  /** The window's keyboard controls in reading order. */
+  private navigable(): HTMLElement[] {
+    return [...this.win.body.querySelectorAll<HTMLElement>('[data-rnav], .msel')].filter((e) => e.offsetParent !== null || !e.closest('.hidden'));
+  }
+
+  private moveFocus(from: HTMLElement, d: number): void {
+    const all = this.navigable();
+    const i = all.indexOf(from);
+    const next = all[(i + d + all.length) % all.length];
+    next?.focus({ preventScroll: true });
+  }
+
+  /** Put the keyboard focus on the current tab (⌥W when the window is already in front). */
+  focusIn(): void {
+    const t = [...this.win.body.querySelectorAll<HTMLElement>('[role=tab]')].find((e) => e.classList.contains('inv'));
+    (t ?? this.navigable()[0])?.focus({ preventScroll: true });
   }
 
   private toggle(parent: HTMLElement, x: number, y: number, w: number, text: () => string, on: () => boolean, click: () => void, tip: string | (() => string), enabled: () => boolean = () => true, into = this.tabParts): HTMLDivElement {
@@ -215,6 +246,20 @@ export class RobotsWindow {
     msg.style.overflow = 'hidden';
     msg.style.textOverflow = 'ellipsis';
     this.parts.push({ update: () => msg.textContent !== this.s.status && ((msg.textContent = this.s.status), setTip(msg, this.s.status)) });
+    // ← → move between the window's controls from any of them (also off a closed pop-up,
+    // whose ↑ ↓ choose; number boxes keep their arrows for their values)
+    b.addEventListener(
+      'keydown',
+      (e) => {
+        if ((e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') || e.metaKey || e.ctrlKey || e.altKey) return;
+        const t = e.target as HTMLElement;
+        if (!(t.dataset.rnav || (t.classList.contains('msel') && t.getAttribute('aria-expanded') !== 'true'))) return;
+        e.preventDefault();
+        e.stopPropagation();
+        this.moveFocus(t, e.key === 'ArrowRight' ? 1 : -1);
+      },
+      true,
+    );
     this.panel = el('div', '', b, [0, PANEL_Y, W, H - 18 - PANEL_Y]);
     this.panel.style.position = 'absolute';
     this.panel.setAttribute('role', 'tabpanel');
@@ -896,7 +941,7 @@ export class RobotsWindow {
     this.text(p, 272, 26, 200, 9, () => {
       const n = this.ext.rules.filter((r) => r.then.kind === 'returnHome').length;
       return `trigger: button · ${keyLabel('returnHome')}${n ? ` · ${n} Rule${n === 1 ? '' : 's'}` : ' · or a Rule'}`;
-    }, 'label tiny');
+    }, 'label small');
     // progress
     const bar = el('div', 'range', p, [2, 41, 470, 9]);
     const fill = el('div', 'fill inv', bar);
