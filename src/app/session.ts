@@ -1617,7 +1617,7 @@ export class Session {
   /** One Position weight (0 excludes it from random choices; one must stay above 0). */
   setWeight(v: RobotVar, p: number, w: number): void {
     const row = this.comp.extended.weights[v];
-    if (!row || p < 0 || p >= row.length) return;
+    if (!row || p < 0 || p >= row.length || !Number.isFinite(w)) return;
     const x = Math.max(0, Math.min(MAX_WEIGHT, Math.round(w)));
     if (x === 0 && row.every((y, k) => k === p || y === 0)) {
       this.status = `${VAR_LONG[v]}: at least one Position must stay eligible`;

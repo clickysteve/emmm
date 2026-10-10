@@ -56,7 +56,6 @@ export class RobotsWindow {
   private tabSig = '';
   private logEl!: HTMLDivElement;
   private logSig = '';
-  private logAt = 0;
 
   constructor(private ctx: UiContext, parent: HTMLElement) {
     this.win = new MWindow(parent, { id: 'robots', title: 'Robots', x: 120, y: 40, w: W, h: H, closable: true, area: 'trajectory' });
@@ -552,6 +551,7 @@ export class RobotsWindow {
       x0.style.textAlign = 'center';
       const setFrom = (e: PointerEvent, final: boolean) => {
         const pt = localPoint(col, e);
+        if (!(pt.h > 0)) return;
         const w = Math.round(Math.max(0, Math.min(1, 1 - pt.y / pt.h)) * 100);
         if (final || w !== row()[k]) s.setWeight(v as RobotVar, k, w);
       };
@@ -987,13 +987,10 @@ export class RobotsWindow {
   private updateLog(): void {
     const s = this.s;
     const c = this.c;
-    const now = performance.now();
-    // at most ~10 redraws a second while the music plays
-    if (s.playing && now - this.logAt < 100) return;
-    this.logAt = now;
+    // redrawn only when what is shown changes (a new entry reaching the sounding time)
     const t = s.scheduler.nowTick();
     const shown = c.log.filter((e) => !s.playing || e.stopped || e.tick <= t).slice(-6);
-    const sig = `${c.logRev}|${shown.length}|${shown.at(-1)?.tick ?? ''}`;
+    const sig = `${c.logRev}|${shown.length}|${shown.at(-1)?.tick ?? ''}|${this.ext.enabled}`;
     if (sig === this.logSig) return;
     this.logSig = sig;
     this.logEl.innerHTML = '';
