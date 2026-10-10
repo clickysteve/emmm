@@ -31,6 +31,7 @@ import { installTooltips } from './ui/tooltip';
 import { commands, dispatch, keyLabel } from './ui/keys';
 import { ShortcutsWindow } from './ui/shortcutsWindow';
 import { TrajectoryWindow } from './ui/trajectoryWindow';
+import { RobotsWindow } from './ui/robotsWindow';
 import { lastVariable } from './ui/choice';
 import { NoteDensityEditor, NoteOrderEditor, OrchestrationEditor, TimeDistortionEditor, TranspositionEditor, VarEditor, VelocityRangeEditor } from './ui/varEditors';
 
@@ -147,9 +148,11 @@ const paletteWin = new PaletteWindow(palettes, desktop);
 const shortcutsWin = new ShortcutsWindow(desktop);
 const trajectoryWin = new TrajectoryWindow(ctx, desktop);
 extendedWin.openTrajectory = () => bringForward(trajectoryWin.win);
+const robotsWin = new RobotsWindow(ctx, desktop);
+extendedWin.openRobots = () => bringForward(robotsWin.win);
 // a window that appears is drawn at once (not only at the next change)
 windowEvents.shown = () => (session.dirty = true);
-const floating = [...Object.values(editors), cyclic, patternEditor, midiAssign, monitorWin, about, importWin, library, extendedWin, helpWin, ccWin, paletteWin, learnWin, feedbackWin, shortcutsWin, trajectoryWin];
+const floating = [...Object.values(editors), cyclic, patternEditor, midiAssign, monitorWin, about, importWin, library, extendedWin, helpWin, ccWin, paletteWin, learnWin, feedbackWin, shortcutsWin, trajectoryWin, robotsWin];
 floating.forEach((f) => f.win.el.classList.add('hidden'));
 if (prefs.app.feedback) feedbackWin.win.show();
 
@@ -206,6 +209,7 @@ function openEditor(name: EditorName, opts: { position?: number; variable?: Vari
 (window as unknown as { emmmUi: unknown }).emmmUi = {
   openEditor,
   patternEditor,
+  robotsWin,
   /** redraw everything once (used by automated checks) */
   updateAll: () => {
     for (const m of main) m.update();
@@ -283,8 +287,9 @@ function windowsMenu(): MenuItem[] {
     { label: 'Pattern Editor', key: keyLabel('patternEditor'), action: () => (openEditor('patternEditor', { voice: patternEditor.voice }), patternEditor.win.flashTitle()) },
     { label: 'Monitor', action: () => (openEditor('monitor'), monitorWin.win.flashTitle()) },
     C('trajectoryWindow', 'Trajectory  (Extended)'),
+    C('robotsWindow', 'Robots  (Extended)'),
   ];
-  const fixed = new Set<MWindow>([cyclic.win, patternEditor.win, monitorWin.win, trajectoryWin.win]);
+  const fixed = new Set<MWindow>([cyclic.win, patternEditor.win, monitorWin.win, trajectoryWin.win, robotsWin.win]);
   const open: MenuItem[] = floating.filter((f) => f.win.open && !fixed.has(f.win)).map((f) => ({ label: f.win.titleEl.textContent || f.win.o.title, action: () => bringForward(f.win) }));
   return [
     { label: 'Close Edit Windows', key: keyLabel('closeEditWindows'), enabled: () => floating.some((f) => f.win.open), action: closeEditWindows },
@@ -390,6 +395,8 @@ cmd('feedback', toggleFeedback);
 cmd('fullScreen', () => toggleFullScreen(), () => !!document.documentElement.requestFullscreen);
 cmd('shortcuts', () => bringForward(shortcutsWin.win));
 cmd('trajectoryWindow', () => bringForward(trajectoryWin.win));
+cmd('robotsWindow', () => bringForward(robotsWin.win));
+cmd('returnHome', () => session.returnHome(), () => ext().enabled && !!ext().home.positions);
 
 /** A menu item for a keyboard command: same action, same enabling, its key shown. */
 const C = (id: string, label: string, extra: Partial<MenuItem> = {}): MenuItem => {
@@ -527,6 +534,8 @@ const MENUS: { title: string; cls?: string; items: MenuItem[] | (() => MenuItem[
       C('feedback', 'Performance Feedback  (Extended)', { checked: () => prefs.app.feedback }),
       { label: 'MIDI Learn…  (Extended)', action: () => learnWin.win.show() },
       C('trajectoryWindow', 'Trajectory…  (Extended)'),
+      C('robotsWindow', 'Robots, Rules & Home…  (Extended)'),
+      C('returnHome', 'Return Home  (Extended)'),
       { label: 'Monitor All Output (internal)', checked: () => session.monitorAll, action: () => ((session.monitorAll = !session.monitorAll), session.monitor.unlock(), session.changed('midi')) },
     ],
   },

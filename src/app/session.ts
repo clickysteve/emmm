@@ -29,7 +29,7 @@ import { assignDeep } from './assign';
 import { History } from './history';
 import { CHROMATIC, cleanChoice, transformSteps, type ScaleChoice } from './scales';
 import { Conductor } from './conductor';
-import { cleanParams, createsCycle, DEFAULT_WEIGHT, MAX_WEIGHT, ROBOT_VARS, VAR_LONG, type RobotDef, type RobotParams, type RobotVar } from '../extended/conductors';
+import { cleanParams, createsCycle, DEFAULT_WEIGHT, defaultParams, MAX_WEIGHT, personalityInfo, ROBOT_VARS, VAR_LONG, type RobotDef, type RobotParams, type RobotVar } from '../extended/conductors';
 import { captureHome, cleanReturnSettings, type ReturnSettings } from '../extended/home';
 import { cleanRule, defaultRule, MAX_RULES, type Rule } from '../extended/rules';
 
@@ -1578,6 +1578,33 @@ export class Session {
     if (!r) return;
     r.params = cleanParams({ ...r.params, [k]: value });
     this.changed('conductors');
+  }
+
+  /** Put the selected personality's own parameters back to their defaults (others untouched). */
+  resetRobotParams(i: number): void {
+    const r = this.comp.extended.robots[i];
+    if (!r) return;
+    const d = defaultParams() as unknown as Record<string, unknown>;
+    const p = { ...r.params } as unknown as Record<string, unknown>;
+    for (const k of personalityInfo(r.personality).params) p[k] = d[k];
+    r.params = cleanParams(p);
+    this.changed('conductors');
+  }
+
+  /** Could Robot i watch Robot t (Follower / Contrarian) without a cycle? */
+  canWatch(i: number, t: number): boolean {
+    const robots = this.comp.extended.robots;
+    if (t === i || !robots[t]) return false;
+    return !createsCycle(robots.map((r, k) => (k === i ? { ...r, personality: 'follower' as const, target: t } : r)), i, t);
+  }
+
+  /** M's Baton robot (Robot 1's Baton personality): rate as a note value, jump ranges 0–1. */
+  setBatonRobot(patch: Partial<{ rate: number; hRange: number; vRange: number }>): void {
+    const r = this.comp.conducting.robot;
+    if (patch.rate !== undefined && [1, 2, 4, 8].includes(patch.rate)) r.rate = patch.rate;
+    if (patch.hRange !== undefined) r.hRange = Math.max(0, Math.min(1, patch.hRange));
+    if (patch.vRange !== undefined) r.vRange = Math.max(0, Math.min(1, patch.vRange));
+    this.changed('robot');
   }
 
   toggleRobotVariable(i: number, v: RobotVar): void {

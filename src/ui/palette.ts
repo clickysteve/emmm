@@ -44,7 +44,7 @@ export const ROLE_INFO: Record<Role, { label: string; help: string }> = {
   conducting: { label: 'Conducting', help: 'transport, tempo and Conducting Grid' },
   midi: { label: 'Midi', help: 'Orchestration, Sound Choice, MIDI Settings, Monitor' },
   snapshots: { label: 'Snapshots', help: 'Snapshot window' },
-  trajectory: { label: 'Trajectory', help: 'Trajectory window (Extended)' },
+  trajectory: { label: 'Trajectory', help: 'Trajectory and Robots windows (Extended)' },
   activity: { label: 'Activity', help: 'the Baton, now-playing marks, flashing bricks' },
   selection: { label: 'Selection', help: 'selected Patterns, editor regions, menu highlight' },
 };

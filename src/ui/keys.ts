@@ -95,6 +95,8 @@ export const KEYS: KeyDef[] = [
   { id: 'captureB', label: 'Capture B', group: 'Extended', keys: [alt('KeyB', { shift: true })] },
   { id: 'feedback', label: 'Performance Feedback', group: 'Extended', keys: [alt('KeyO')] },
   { id: 'trajectoryWindow', label: 'Trajectory window', group: 'Extended', keys: [alt('KeyJ')] },
+  { id: 'robotsWindow', label: 'Robots window (Robot Conductors, Weights, Rules, Home)', group: 'Extended', keys: [alt('KeyW')] },
+  { id: 'returnHome', label: 'Return Home (again: stop the Return)', group: 'Extended', keys: [alt('KeyH', { shift: true })] },
   // View / Help
   { id: 'fullScreen', label: 'Full Screen', group: 'View', keys: [alt('Enter')] },
   { id: 'shortcuts', label: 'Keyboard Shortcuts', group: 'View', keys: [alt('KeyH')] },
