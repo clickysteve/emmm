@@ -28,7 +28,8 @@ export interface ReturnSettings {
   num: number;
   den: number;
   immediate: boolean;
-  /** Robot decisions skipped after a Return, at Home */
+  /** beats the Returned Variables stay at Home (still owned by the Return) before Robots and
+   * Trajectories may move them again (0–32) */
   rest: number;
 }
 
@@ -41,7 +42,7 @@ export function defaultHome(): HomeState {
 }
 
 export function defaultReturnSettings(): ReturnSettings {
-  return { num: 2, den: 1, immediate: false, rest: 1 };
+  return { num: 2, den: 1, immediate: false, rest: 4 };
 }
 
 export function positionCount(v: VariableName): number {
@@ -79,7 +80,7 @@ export function cleanReturnSettings(v: unknown): ReturnSettings {
     num: typeof o.num === 'number' && Number.isInteger(o.num) && o.num >= 1 && o.num <= 99 ? o.num : d.num,
     den: dens.includes(o.den as number) ? (o.den as number) : d.den,
     immediate: o.immediate === true,
-    rest: typeof o.rest === 'number' && Number.isInteger(o.rest) && o.rest >= 0 && o.rest <= 16 ? o.rest : d.rest,
+    rest: typeof o.rest === 'number' && Number.isInteger(o.rest) && o.rest >= 0 && o.rest <= 32 ? o.rest : d.rest,
   };
 }
 

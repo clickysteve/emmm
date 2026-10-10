@@ -1,9 +1,15 @@
 /**
  * EXTENDED — the Conductor runtime: runs the Robot Conductors, the Rules and Home / Return
- * while the music plays (docs/CONDUCTORS.md). Everything happens inside the engine's render at
- * exact ticks: Robot decisions and Return steps are engine actions, and Rules react through
- * the engine's `observer` hook. Nothing here runs unless the document's Extended is on; with it
+ * (docs/CONDUCTORS.md). Musical things happen inside the engine's render at exact ticks: Robot
+ * decisions and Return steps are engine actions, and Rules react through the engine's
+ * `observer` hook. A hand (a click, a Snapshot, MIDI Learn …) is seen at once through `poke`,
+ * also while paused or stopped. Nothing here runs unless the document's Extended is on; with it
  * off the engine's hooks are null and Classic is untouched.
+ *
+ * Ownership of a Variable's Position, highest first: RETURN (while it brings the Variable Home,
+ * and for the rest period after) > TRAJECTORY > ROBOT. `owns(v, t)` answers "is it Return's
+ * now?"; Robots, M's Baton robot, Position / Baton Trajectories and Rule "set Position" actions
+ * all ask before they write.
  *
  * Runtime state only — never saved, never part of Undo. Start rebuilds it; Stop clears it.
  */
@@ -66,12 +72,29 @@ export interface ReturnRt {
   vars: VariableName[];
   rr: number;
   gen: number;
+  /** steps from Home when it began (progress = 1 − remaining / total) */
+  total: number;
 }
 
+/** After a Return: these Variables stay at Home, owned by the Return, until `until`. */
+export interface RestHold {
+  vars: VariableName[];
+  until: number;
+}
+
+export type LogKind = 'move' | 'rule' | 'return' | 'robot' | 'info';
 export interface LogEntry {
   tick: number;
   text: string;
+  kind: LogKind;
+  /** the Robot that moved (kind 'move') */
+  robot?: number;
+  /** happened while stopped (no musical time) */
+  stopped?: boolean;
 }
+
+/** How a Variable stands with Home (the Home tab). */
+export type HomeVarState = 'none' | 'excluded' | 'home' | 'away' | 'returning' | 'waiting' | 'resting';
 
 export class Conductor {
   /** each Robot's memory (Position, visits …) */
@@ -80,8 +103,8 @@ export class Conductor {
   /** next decision tick on each Robot's grid (Infinity = none) */
   next: number[] = [Infinity, Infinity, Infinity, Infinity];
   suspendedUntil = [-Infinity, -Infinity, -Infinity, -Infinity];
-  /** decisions to skip (resting at Home after a Return) */
-  rest = [0, 0, 0, 0];
+  /** Variables resting at Home after a Return (still owned by it) */
+  restHold: RestHold | null = null;
   private seenTargetMoves = [0, 0, 0, 0];
   /** Rule-made changes (performing, not editing): null = as the document says */
   enabledOverride: (boolean | null)[] = [null, null, null, null];
@@ -199,6 +222,32 @@ export class Conductor {
     return !!this.ret && this.ret.vars.includes(v);
   }
 
+  /** Does Return own Variable v at tick t (bringing it Home, or resting it there)? Then no
+   * Robot, Trajectory or Rule may set its Position. */
+  owns(v: VariableName, t = this.engine.tick): boolean {
+    if (this.returning(v)) return true;
+    const h = this.restHold;
+    return !!h && t < h.until && h.vars.includes(v);
+  }
+
+  /** The Home tab's view of one Variable. */
+  homeState(v: VariableName): HomeVarState {
+    const home = this.ext.home;
+    if (!home.positions || home.positions[v] === undefined) return 'none';
+    if (!home.include[v]) return 'excluded';
+    const at = activeOf(this.comp, v) === home.positions[v];
+    if (this.returning(v)) return at ? 'waiting' : 'returning';
+    if (this.owns(v)) return 'resting';
+    return at ? 'home' : 'away';
+  }
+
+  /** Return progress 0–1 by steps made (null when not returning). */
+  returnProgress(): number | null {
+    const r = this.ret;
+    if (!r) return null;
+    return r.total ? Math.max(0, Math.min(1, 1 - this.remaining() / r.total)) : 1;
+  }
+
   // ------------------------------------------------------------------ hooks
 
   /** Install or remove the engine hooks according to Extended. Cheap; call on any change. */
@@ -212,46 +261,85 @@ export class Conductor {
         this.hubAt = -1;
         this.runGen++;
         this.ret = null;
+        this.restHold = null;
+        this.atStart = [];
       }
       return;
     }
+    if (!e.observer) this.baseline(); // just switched on: what is there now is not a change
     if (!e.robotGate)
       e.robotGate = {
         on: () => this.robotOn(0) && this.isBaton(0),
+        // held while suspended, or while every Variable it moves belongs to a Return (so the
+        // Baton stays at Home through the rest and resumes from there, not from far away)
         held: (t) => {
           if (this.suspended(0, t)) return true;
-          if (this.rest[0] > 0) {
-            this.rest[0]--;
-            return true;
-          }
-          return false;
+          const vars = this.variables(0);
+          return vars.length > 0 && vars.every((v) => this.owns(v, t));
         },
-        skip: (v) => this.returning(v),
+        skip: (v, t) => this.owns(v, t),
       };
     if (!e.observer) e.observer = (t, cause, produced, step) => this.observe(t, cause, produced, step);
   }
 
+  /** Take the current Positions and Home distance as "already seen" (no events for them). */
+  baseline(): void {
+    for (const v of ROBOT_VARS) this.lastPos[v] = activeOf(this.comp, v);
+    this.lastSound = activeOf(this.comp, 'soundChoice');
+    this.lastDistance = this.ext.home.positions ? homeDistance(this.comp, this.ext.weights, this.ext.home).total : null;
+  }
+
+  // ------------------------------------------------------------------ the hand
+
+  /** Rule actions waiting for Start (fired while stopped with a musical timing). */
+  private atStart: { r: Rule; ri: number; depth: number }[] = [];
+  /** distinguishes one gesture from the next for "each rule at most once a moment" */
+  private gesture = 0;
+
+  /**
+   * Something outside the music's render changed (a click, a Snapshot, MIDI Learn, an edit):
+   * the Rules see it now — playing, paused or stopped. Immediate actions happen at once;
+   * timed ones (Q / beat / bar) wait for that point in the music (while stopped: for Start).
+   * Returns the events to emit. Never starts the transport, never makes notes.
+   */
+  poke(): EngineEvent[] {
+    if (!this.on || this.engine.rendering) return [];
+    this.attach();
+    const t = this.engine.tick;
+    this.curTick = -1 - ++this.gesture; // a new moment: every rule may fire once
+    this.fired.clear();
+    this.scan(t, 0);
+    this.process(t);
+    const out = this.out;
+    this.out = [];
+    return tag(out);
+  }
+
   // ------------------------------------------------------------------ transport
 
-  /** Start from stopped (after the engine's rewind): everything from tick 0. */
+  /** Start from stopped (after the engine's rewind): everything from tick 0. Rule overrides
+   * made while stopped (on / off, personality) and Rule actions waiting for Start are kept. */
   start(): void {
-    this.reset();
+    const waiting = this.atStart;
+    this.reset(true);
     this.attach();
     if (!this.on) return;
     this.live = true;
     this.rng = this.rng.map((_, i) => new Rng(this.comp.seed, 6000 + i));
     for (let i = 0; i < NUM_ROBOTS; i++) this.mem[i] = freshMemory(this.initialPos(i));
-    for (const v of ROBOT_VARS) this.lastPos[v] = activeOf(this.comp, v);
-    this.lastDistance = this.ext.home.positions ? homeDistance(this.comp, this.ext.weights, this.ext.home).total : null;
+    this.baseline();
     this.schedule(0, true);
+    // timed Rule actions fired while stopped: at the downbeat (tick 0 is on every grid)
+    for (const w of waiting) this.deferAt(0, w.r, w.ri, w.depth);
   }
 
   /** Stop: runtime cleared (the engine's rewind already dropped every scheduled action). */
   stop(): void {
-    this.reset();
+    this.reset(false);
   }
 
-  private reset(): void {
+  private reset(keepOverrides = false): void {
+    this.atStart = [];
     this.runGen++;
     this.hubGen++;
     this.hubAt = -1;
@@ -259,10 +347,12 @@ export class Conductor {
     this.live = false;
     this.next = [Infinity, Infinity, Infinity, Infinity];
     this.suspendedUntil = [-Infinity, -Infinity, -Infinity, -Infinity];
-    this.rest = [0, 0, 0, 0];
+    this.restHold = null;
     this.seenTargetMoves = [0, 0, 0, 0];
-    this.enabledOverride = [null, null, null, null];
-    this.personalityOverride = [null, null, null, null];
+    if (!keepOverrides) {
+      this.enabledOverride = [null, null, null, null];
+      this.personalityOverride = [null, null, null, null];
+    }
     this.waiting = [false, false, false, false];
     this.lastMoveTick = [-Infinity, -Infinity, -Infinity, -Infinity];
     this.lastChanged = ['', '', '', ''];
@@ -294,8 +384,7 @@ export class Conductor {
       this.live = true;
       this.rng = this.rng.map((_, i) => new Rng(this.comp.seed, 6000 + i));
       for (let i = 0; i < NUM_ROBOTS; i++) this.mem[i] = freshMemory(this.initialPos(i));
-      for (const v of ROBOT_VARS) this.lastPos[v] = activeOf(this.comp, v);
-      this.lastDistance = this.ext.home.positions ? homeDistance(this.comp, this.ext.weights, this.ext.home).total : null;
+      this.baseline();
     }
     this.schedule(this.engine.tick, false);
   }
@@ -396,14 +485,11 @@ export class Conductor {
   private decideRobot(i: number, t: number, claims: Map<VariableName, number>, cause: 'timer' | 'advance' | 'choose'): EngineEvent[] {
     if (!this.positionRobot(i)) return [];
     if (this.suspended(i, t)) return [];
-    if (this.rest[i] > 0) {
-      this.rest[i]--;
-      return [];
-    }
+    if (!this.live) this.mem[i] = freshMemory(this.initialPos(i)); // a Rule, while stopped
     const def = this.ext.robots[i];
     const vars = def.variables;
-    const free = vars.filter((v) => !this.returning(v));
-    if (vars.length && !free.length) return []; // everything it moves is being Returned
+    const free = vars.filter((v) => !this.owns(v, t));
+    if (vars.length && !free.length) return []; // everything it moves belongs to a Return: it rests
     const cands = candidates(this.ext.weights, vars);
     const mem = this.mem[i];
     const target = this.targetView(i);
@@ -433,7 +519,10 @@ export class Conductor {
     if (from === to) return;
     this.lastMoveTick[i] = t;
     this.lastChanged[i] = changed.join(' ');
-    this.addLog(t, `R${i + 1} ${from + 1}→${to + 1}${changed.length ? ' ' + changed.join(' ') : ''}`);
+    const p = this.personality(i);
+    const tg = this.ext.robots[i].target;
+    const verb = p === 'follower' && tg !== null ? ` followed Robot ${tg + 1}:` : p === 'contrarian' && tg !== null ? ` moved away from Robot ${tg + 1}:` : '';
+    this.addLog(t, `Robot ${i + 1}${verb} ${from + 1} → ${to + 1}${changed.length ? ' · ' + changed.join(' ') : ''}`, 'move', i);
     this.enqueue({ kind: 'robotMoved', robot: i, from, to }, this.scanDepth);
     if (this.robotHome(i) === to) this.enqueue({ kind: 'robotHome', robot: i }, this.scanDepth);
   }
@@ -445,6 +534,11 @@ export class Conductor {
     if (t !== this.curTick) {
       this.curTick = t;
       this.fired.clear();
+    }
+    const h = this.restHold;
+    if (h && t >= h.until) {
+      this.restHold = null;
+      this.addLog(h.until, `Rest over: ${h.vars.map((v) => VAR_SHORT[v]).join(' ')} free again`, 'return');
     }
     this.noteSync(produced);
     if (step) this.voiceCycles(step);
@@ -501,7 +595,7 @@ export class Conductor {
     this.lastSound = snd;
     const d = homeDistance(this.comp, this.ext.weights, home).total;
     if (d === 0 && this.lastDistance !== null && this.lastDistance > 0 && homeVars(home).length) {
-      this.addLog(t, 'at Home');
+      this.addLog(t, 'Home reached', 'return');
       this.enqueue({ kind: 'homeReached' }, depth);
     }
     this.lastDistance = d;
@@ -529,7 +623,7 @@ export class Conductor {
       if (++n > MAX_QUEUE) {
         this.dropped += this.queue.length + 1;
         this.queue.length = 0;
-        this.addLog(t, 'too many events: some ignored');
+        this.addLog(t, 'Too many events at once: some ignored', 'info');
         break;
       }
       if (depth > MAX_DEPTH) continue;
@@ -549,31 +643,49 @@ export class Conductor {
   }
 
   private fire(ri: number, r: Rule, t: number, depth: number): void {
-    const at = this.timing(r, t);
+    const stopped = this.engine.state === 'stopped';
+    const at = stopped ? (r.at === 'now' ? t : Infinity) : this.timing(r, t);
     if (at <= t + 1e-9) {
       this.rt(r).flash = t;
-      this.addLog(t, `rule ${ri + 1}: ${actionWords(r.then)}`);
+      this.addLog(t, `Rule ${ri + 1} fired: ${actionWords(r.then)}`, 'rule');
       const ev = this.act(r.then, t, depth);
       this.noteSync(ev);
       this.out.push(...ev);
       this.scan(t, depth);
       return;
     }
-    if (this.deferred >= MAX_DEFERRED) {
-      this.addLog(t, `rule ${ri + 1}: too many waiting, ignored`);
+    if (this.deferred + this.atStart.length >= MAX_DEFERRED) {
+      this.addLog(t, `Rule ${ri + 1}: too many actions waiting — ignored`, 'rule');
       return;
     }
+    if (stopped) {
+      // no musical time while stopped: a timed action waits for Start (the downbeat)
+      this.atStart.push({ r, ri, depth });
+      this.addLog(t, `Rule ${ri + 1} fired: ${actionWords(r.then)} — waits for Start`, 'rule');
+      return;
+    }
+    this.addLog(t, `Rule ${ri + 1} fired: ${actionWords(r.then)} — at the next ${r.at === 'quant' ? 'Q point' : r.at}`, 'rule');
+    this.deferAt(at, r, ri, depth);
+  }
+
+  /** A Rule action at a later tick (an engine action: frozen by Pause, dropped by Stop). */
+  private deferAt(at: number, r: Rule, ri: number, depth: number): void {
     this.deferred++;
     const gen = this.runGen;
     this.engine.schedule(at, 'rule', (tt) => {
       if (gen !== this.runGen) return;
       this.deferred--;
       this.rt(r).flash = tt;
-      this.addLog(tt, `rule ${ri + 1}: ${actionWords(r.then)}`);
+      this.addLog(tt, `Rule ${ri + 1} acts: ${actionWords(r.then)}`, 'rule');
       const ev = this.act(r.then, tt, depth);
       this.scanDepth = depth; // the observer that follows this action scans at this depth
       return tag(ev);
     });
+  }
+
+  /** Timed Rule actions waiting (for their point in the music, or for Start). */
+  waitingActions(): number {
+    return this.deferred + this.atStart.length;
   }
 
   private timing(r: Rule, t: number): number {
@@ -601,7 +713,7 @@ export class Conductor {
         case 'advance':
         case 'choose':
           if (!this.robotOn(a.robot)) {
-            this.addLog(t, `R${a.robot + 1} is off`);
+            this.addLog(t, `Robot ${a.robot + 1} is off: nothing to advance`, 'info');
             return [];
           }
           if (this.isBaton(a.robot)) {
@@ -619,8 +731,8 @@ export class Conductor {
           const want = a.mode === 'toggle' ? !was : a.mode === 'on';
           this.enabledOverride[a.robot] = want;
           if (want && !was) this.mem[a.robot] = { ...freshMemory(this.initialPos(a.robot)) };
-          this.addLog(t, `R${a.robot + 1} ${want ? 'on' : 'off'}`);
-          this.schedule(t, false);
+          this.addLog(t, `Robot ${a.robot + 1} switched ${want ? 'on' : 'off'}`, 'robot');
+          if (this.live) this.schedule(t, false);
           return [];
         }
         case 'personality': {
@@ -633,24 +745,32 @@ export class Conductor {
           const wasBaton = this.isBaton(a.robot);
           this.personalityOverride[a.robot] = p;
           if (wasBaton !== this.isBaton(a.robot)) this.mem[a.robot].pos = this.isBaton(a.robot) ? this.batonPos() : this.mem[a.robot].pos;
-          this.addLog(t, `R${a.robot + 1} → ${PERSONALITIES.find((x) => x.id === p)?.name}`);
-          this.schedule(t, false);
+          this.addLog(t, `Robot ${a.robot + 1} is now ${PERSONALITIES.find((x) => x.id === p)?.name}`, 'robot');
+          if (this.live) this.schedule(t, false);
           return [];
         }
         case 'setPosition':
+          if (this.owns(a.variable, t)) {
+            this.addLog(t, `${VAR_SHORT[a.variable]} belongs to the Return: not set`, 'info');
+            return [];
+          }
           if (activeOf(this.comp, a.variable) === a.position) return [];
           return this.engine.selectPosition(a.variable, a.position, t);
         case 'snapshot': {
           const ev = this.host.recallSnapshotAt(a.index, t);
-          if (!ev) this.addLog(t, `Snapshot ${String.fromCharCode(65 + a.index)} is empty`);
+          if (!ev) this.addLog(t, `Snapshot ${String.fromCharCode(65 + a.index)} is empty: nothing recalled`, 'info');
           return ev ?? [];
         }
         case 'returnHome':
           return this.returnHome(t, a.immediate);
         case 'suspend': {
+          if (!this.live) {
+            this.addLog(t, `Robot ${a.robot + 1}: no pause while stopped`, 'info');
+            return [];
+          }
           const until = t + intervalTicks(a);
           this.suspendedUntil[a.robot] = Math.max(this.suspendedUntil[a.robot], until);
-          this.addLog(t, `R${a.robot + 1} paused`);
+          this.addLog(t, `Robot ${a.robot + 1} paused for ${Math.round((until - t) / 96 * 100) / 100} beats`, 'robot');
           return [];
         }
       }
@@ -668,13 +788,14 @@ export class Conductor {
   returnHome(t: number, immediate = false): EngineEvent[] {
     const home = this.ext.home;
     if (!home.positions || !homeVars(home).length) {
-      this.addLog(t, 'no Home to return to');
+      this.addLog(t, 'No Home to return to (capture one first)', 'info');
       return [];
     }
     if (this.ret) {
-      this.addLog(t, 'already returning');
+      this.addLog(t, 'Already returning', 'info');
       return [];
     }
+    this.restHold = null; // a new Return takes the Variables from any rest
     const vars = homeVars(home);
     const stopped = this.engine.state === 'stopped';
     if (stopped || immediate || this.ext.returnSettings.immediate) {
@@ -687,8 +808,8 @@ export class Conductor {
     const grid = this.comp.quantization ? noteValueTicks(this.comp.quantization) : 96;
     const start = Math.ceil((t - 1e-9) / grid) * grid;
     const end = start + Math.max(grid, Math.ceil(returnTicks(this.ext.returnSettings) / grid - 1e-9) * grid);
-    this.ret = { start, end, grid, vars, rr: 0, gen: ++this.retGen };
-    this.addLog(t, `Return Home (${this.distance()} steps)`);
+    this.ret = { start, end, grid, vars, rr: 0, gen: ++this.retGen, total: this.distance() };
+    this.addLog(t, `Return started: ${this.ret.total} step${this.ret.total === 1 ? '' : 's'} over ${Math.round(((end - start) / 96) * 100) / 100} beats`, 'return');
     this.returnSchedule(start, true);
     return [];
   }
@@ -698,7 +819,7 @@ export class Conductor {
     if (!this.ret) return;
     this.ret = null;
     this.retGen++;
-    this.addLog(this.engine.tick, 'Return cancelled');
+    this.addLog(this.engine.tick, 'Return cancelled', 'return');
   }
 
   private returnSchedule(t: number, first: boolean): void {
@@ -749,7 +870,7 @@ export class Conductor {
       const path = returnPath(this.comp, this.ext.weights, v, activeOf(this.comp, v), this.ext.home.positions![v]!);
       if (!path.length) continue;
       r.rr = (r.rr + j + 1) % r.vars.length;
-      this.addLog(t, `RET ${VAR_SHORT[v]} → ${path[0] + 1}`);
+      this.addLog(t, path.length === 1 ? `${VAR_SHORT[v]} reached Home (${path[0] + 1})` : `Returning ${VAR_SHORT[v]} → ${path[0] + 1}`, 'return');
       return this.engine.selectPosition(v, path[0], t);
     }
     return null;
@@ -761,18 +882,23 @@ export class Conductor {
     const positions: Snapshot['positions'] = {};
     for (const v of vars) if (hp[v] !== undefined && activeOf(this.comp, v) !== hp[v]) positions[v] = hp[v];
     const moved = Object.keys(positions) as VariableName[];
-    if (moved.length) this.addLog(t, `HOME ${moved.map((v) => VAR_SHORT[v]).join(' ')}`);
+    if (moved.length) this.addLog(t, `Home now: ${moved.map((v) => VAR_SHORT[v]).join(' ')}`, 'return');
     const out = Object.keys(positions).length ? this.engine.applySnapshot({ positions, arrows: {}, voices: [], sync: false }, t).filter((e) => !(e.kind === 'change' && e.what === 'snapshot')) : [];
     if (finish) return this.finishReturn(t, out);
     return out;
   }
 
-  /** Return complete: the Robots that were held off start again from Home, after resting. */
+  /**
+   * Return complete. Its Variables stay at Home, still owned by the Return, for the rest period
+   * (beats; not while stopped); the Robots that move them start again from Home afterwards.
+   */
   private finishReturn(t: number, out: EngineEvent[]): EngineEvent[] {
     const vars = this.ret?.vars ?? homeVars(this.ext.home);
     this.ret = null;
     this.retGen++;
-    const rest = this.ext.returnSettings.rest;
+    const beats = this.ext.returnSettings.rest;
+    const playing = this.engine.state !== 'stopped';
+    this.restHold = playing && beats > 0 ? { vars, until: t + beats * 96 } : null;
     for (let i = 0; i < NUM_ROBOTS; i++) {
       if (!this.robotOn(i)) continue;
       const rv = this.variables(i);
@@ -785,9 +911,8 @@ export class Conductor {
         if (h !== null) this.mem[i].pos = h;
       }
       this.mem[i].dwell = 0;
-      this.rest[i] = rest;
     }
-    this.addLog(t, 'Return complete');
+    this.addLog(t, this.restHold ? `Return complete — resting ${beats} beat${beats === 1 ? '' : 's'}` : 'Return complete', 'return');
     this.enqueue({ kind: 'returnDone' }, this.scanDepth);
     return out;
   }
@@ -800,9 +925,22 @@ export class Conductor {
 
   // ------------------------------------------------------------------ log
 
-  private addLog(tick: number, text: string): void {
-    this.log.push({ tick, text });
+  private addLog(tick: number, text: string, kind: LogKind, robot?: number): void {
+    const e: LogEntry = { tick, text, kind };
+    if (robot !== undefined) e.robot = robot;
+    if (this.engine.state === 'stopped') e.stopped = true;
+    this.log.push(e);
     if (this.log.length > LOG_MAX) this.log.splice(0, this.log.length - LOG_MAX);
+    this.logRev++;
+  }
+
+  /** bumped on every log entry (views redraw the log only when it changed) */
+  logRev = 0;
+
+  /** Clear the visible log (runtime only; nothing musical depends on it). */
+  clearLog(): void {
+    this.log = [];
+    this.logRev++;
   }
 }
 

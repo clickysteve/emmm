@@ -41,6 +41,8 @@ function trajTargetKey(t: TrajTarget): string {
 const TRANSIENT = new Set(['editor', 'baton', 'tempo', 'transport', 'select', 'window', 'step', 'mouse', 'learn', 'hold', 'movie', 'sync', 'load', 'undo', 'midi', 'transpose', 'ics', 'clock', 'feedback', 'ab-recall', 'trajectory', 'conductor']);
 /** Changes after which the Robot Conductors re-join their grids (app/conductor.ts). */
 const CONDUCTOR_SYNC = new Set(['extended', 'robot', 'conductors']);
+/** Changes by a hand (or a definition edit) that Rules should see at once (Conductor.poke). */
+const CONDUCTOR_POKE = new Set(['patternGroup', 'noteDensity', 'velocityRange', 'noteOrder', 'transposition', 'timeDistortion', 'accent', 'legato', 'rhythm', 'orchestration', 'soundChoice', 'snapshot', 'ab-recall', 'mutation', 'baton', 'conductors', 'arrows', 'undo']);
 
 export interface VisualEvent {
   ms: number;
@@ -156,6 +158,7 @@ export class Session {
     this.rev++;
     if (what !== 'trajectory') this.trajManual(what);
     if (CONDUCTOR_SYNC.has(what)) this.conductor.sync();
+    if (CONDUCTOR_POKE.has(what) && this.comp.extended.enabled) this.emitNow(this.conductor.poke());
     if (!TRANSIENT.has(what)) this.historySoon();
     this.listeners.forEach((f) => f(what));
   }
@@ -1385,14 +1388,17 @@ export class Session {
         this.comp.extended.mutation.amount = Math.round(value);
         this.dirty = true;
         return;
+      // Return > Trajectory > Robot: a Variable being Returned Home (or resting there) is not
+      // written by a Trajectory; its phase runs on, and it writes again at its next step
       case 'batonX':
         this.dirty = true;
-        return this.engine.conduct(value / 100, this.comp.conducting.baton.y, t, false);
+        return this.engine.conduct(value / 100, this.comp.conducting.baton.y, t, false, (v) => this.conductor.owns(v, t));
       case 'batonY':
         this.dirty = true;
-        return this.engine.conduct(this.comp.conducting.baton.x, value / 100, t, false);
+        return this.engine.conduct(this.comp.conducting.baton.x, value / 100, t, false, (v) => this.conductor.owns(v, t));
       case 'position': {
         const pos = Math.max(0, Math.min(5, Math.round(value) - 1));
+        if (this.conductor.owns(tg.variable, t)) return;
         if ((this.comp[tg.variable] as { active: number }).active === pos) return;
         return this.engine.selectPosition(tg.variable, pos, t);
       }

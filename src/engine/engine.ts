@@ -119,8 +119,8 @@ export interface RobotGate {
   on(): boolean;
   /** held still at this tick (its timer keeps time, the Baton does not move) */
   held(t: number): boolean;
-  /** a Variable it must not change now */
-  skip(v: VariableName): boolean;
+  /** a Variable it must not change at this tick (owned by an Extended Return) */
+  skip(v: VariableName, t: number): boolean;
 }
 
 export class MEngine {
@@ -453,6 +453,19 @@ export class MEngine {
   render(toTick: number): EngineEvent[] {
     const out: EngineEvent[] = [];
     if (this.state !== 'playing') return out;
+    this.rendering = true;
+    try {
+      this.renderLoop(toTick, out);
+    } finally {
+      this.rendering = false;
+    }
+    return out;
+  }
+
+  /** true while `render` runs (EXTENDED: the Conductor reacts to gestures only outside it) */
+  rendering = false;
+
+  private renderLoop(toTick: number, out: EngineEvent[]): void {
     let guard = 0;
     for (;;) {
       if (++guard > 100000) break; // defensive: never hang the audio thread
@@ -511,7 +524,6 @@ export class MEngine {
       if (this.observer) this.observe(out, vt, 'voice', ev);
     }
     if (toTick > this.tick) this.tick = toTick;
-    return out;
   }
 
   private observe(out: EngineEvent[], t: number, cause: 'voice' | 'action' | 'robot', produced: EngineEvent[]): void {
@@ -796,7 +808,7 @@ export class MEngine {
     const ny = Math.max(0, Math.min(0.999, b.y + dy));
     const gate = this.robotGate;
     if (gate?.held(t)) return [];
-    return this.conduct(nx, ny, t, false, gate ? (v) => gate.skip(v) : undefined);
+    return this.conduct(nx, ny, t, false, gate ? (v) => gate.skip(v, t) : undefined);
   }
 
   /** Move the baton and apply the result (manual, robot, MIDI conduct). `skip`: Variables

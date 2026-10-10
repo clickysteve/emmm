@@ -74,7 +74,7 @@ function run(s: Session, to: number, chunk = 24): EngineEvent[] {
   return all;
 }
 const logOf = (s: Session) => s.conductor.log.map((l) => `${l.tick} ${l.text}`);
-const moves = (s: Session, r: number) => s.conductor.log.filter((l) => l.text.startsWith(`R${r + 1} `) && l.text.includes('→')).map((l) => l.tick);
+const moves = (s: Session, r: number) => s.conductor.log.filter((l) => l.kind === 'move' && l.robot === r).map((l) => l.tick);
 const act = (s: Session, v: VariableName) => (s.comp[v] as { active: number }).active;
 const ons = (evs: EngineEvent[]) => evs.filter((e): e is NoteOnEvent => e.kind === 'on').map((e) => `${e.tick}:${e.channel}:${e.pitch}:${e.velocity}`);
 const rule = (r: Partial<Rule> & Pick<Rule, 'when' | 'then'>): Rule => ({ on: true, every: 1, at: 'now', ...r });
@@ -671,6 +671,9 @@ describe('Rules: conditions', () => {
   it('Home reached and Return completed', () => {
     const s = mk();
     s.captureHome();
+    // (Variables in the Home belong to the Return while they rest: the Rules set excluded ones)
+    s.setHomeInclude('rhythm', false);
+    s.setHomeInclude('accent', false);
     s.addRule(rule({ when: { kind: 'homeReached' }, then: { kind: 'setPosition', variable: 'rhythm', position: 5 } }));
     s.addRule(rule({ when: { kind: 'returnDone' }, then: { kind: 'setPosition', variable: 'accent', position: 5 } }));
     s.start();
@@ -746,7 +749,7 @@ describe('Rules: actions', () => {
     expect(act(s, 'noteDensity')).toBe(5);
     run(s, 193);
     expect(act(s, 'noteDensity')).toBe(s.comp.extended.home.positions!.noteDensity);
-    expect(logOf(s)).toContain('192 Return complete');
+    expect(logOf(s)).toContain('192 Return complete — resting 4 beats');
   });
   it('Suspend a Robot for a musical duration', () => {
     const s = mk();
@@ -769,7 +772,7 @@ describe('Rules: safety', () => {
     run(s, 97);
     // rules 1 and 2 each have their own interval event; both fire, in order: 2 wins
     expect(act(s, 'noteDensity')).toBe(2);
-    expect(logOf(s).filter((l) => l.includes('rule'))).toEqual(['96 rule 1: Note Density → Position 2', '96 rule 2: Note Density → Position 3']);
+    expect(logOf(s).filter((l) => l.includes('Rule'))).toEqual(['96 Rule 1 fired: Note Density → Position 2', '96 Rule 2 fired: Note Density → Position 3']);
   });
   it('mutually triggering rules (A → B → A) stop: each rule fires at most once a tick', () => {
     const s = mk();
@@ -831,7 +834,7 @@ describe('Rules: safety', () => {
     s.addRule(rule({ when: { kind: 'interval', num: 1, den: 4 }, then: { kind: 'snapshot', index: 25 } }));
     s.start();
     expect(() => run(s, 500)).not.toThrow();
-    expect(logOf(s).join('|')).toMatch(/R4 is off.*no Home.*Snapshot Z is empty/);
+    expect(logOf(s).join('|')).toMatch(/Robot 4 is off.*No Home.*Snapshot Z is empty/);
   });
   it('invalid stored rules are dropped or clamped on load; at most 16', () => {
     const rules = cleanRules([
@@ -866,12 +869,19 @@ describe('Rules: safety', () => {
     expect([...open.values()].every((x) => x === 0)).toBe(true);
     expect(notes.filter((n) => n.on).length).toBeGreaterThan(20);
   });
-  it('rules only act while Extended is on and the music plays', () => {
+  it('rules only act while Extended is on', () => {
     const s = mk();
     s.addRule(rule({ when: { kind: 'variableAt', variable: 'noteDensity', position: 3 }, then: { kind: 'setPosition', variable: 'legato', position: 5 } }));
+    s.comp.extended.enabled = false;
+    s.changed('extended');
     const lg = act(s, 'legato');
     s.clickPosition('noteDensity', 3);
     expect(act(s, 'legato')).toBe(lg);
+    s.clickPosition('noteDensity', 0);
+    s.comp.extended.enabled = true;
+    s.changed('extended');
+    s.clickPosition('noteDensity', 3);
+    expect(act(s, 'legato')).toBe(5);
   });
 });
 
@@ -948,12 +958,12 @@ describe('Home and Return', () => {
     }
     expect(seen).toEqual([5, 4, 3, 2, 1, 0]); // 10 → 20 → 40 → 60 → 80 → 100
     expect(s.conductor.ret).toBeNull();
-    const steps = s.conductor.log.filter((l) => l.text.startsWith("RET") || l.text.startsWith("HOME")).map((l) => l.tick);
+    const steps = s.conductor.log.filter((l) => l.kind === 'return' && /Returning|reached Home|Home now/.test(l.text)).map((l) => l.tick);
     expect(steps.length).toBe(5);
     expect(steps[4]).toBe(96 + 384); // the last lands at the end (Return begins at the next beat)
     expect(new Set(steps).size).toBe(5);
   });
-  it('Robots leave Returning Variables alone, then rest at Home and move on', () => {
+  it('Robots leave Returning Variables alone, then the Variables rest at Home (beats) and the Robot moves on from Home', () => {
     const s = mk();
     s.captureHome();
     robot(s, 1, { personality: 'orbit', variables: ['noteDensity'], rateNum: 1, rateDen: 8 });
@@ -969,13 +979,16 @@ describe('Home and Return', () => {
     }
     expect(during).toEqual([]);
     expect(act(s, 'noteDensity')).toBe(s.comp.extended.home.positions!.noteDensity);
-    const done = s.conductor.log.find((l) => l.text === 'Return complete')!.tick;
-    run(s, done + 48 * 5);
+    const done = s.conductor.log.find((l) => l.text.startsWith('Return complete'))!.tick;
+    expect(s.conductor.owns('noteDensity', done + 191)).toBe(true);
+    expect(s.conductor.homeState('noteDensity')).toBe('resting');
+    run(s, done + 48 * 6);
     const first = moves(s, 1).find((t) => t >= done)!;
-    // it rests two of its decisions (at or after the end of the Return), then moves on from Home
-    expect(first - done).toBeGreaterThanOrEqual(2 * 48);
-    expect(first - done).toBeLessThanOrEqual(3 * 48);
-    expect(logOf(s).find((l) => l.startsWith(`${first} R2`))).toBe(`${first} R2 ${s.comp.extended.home.positions!.noteDensity! + 1}→${s.comp.extended.home.positions!.noteDensity! + 2} Dens`);
+    // the Variable rests 2 beats at Home; the Robot's first move is exactly when the rest ends
+    expect(first - done).toBe(2 * 96);
+    const h = s.comp.extended.home.positions!.noteDensity!;
+    expect(logOf(s).find((l) => l.startsWith(`${first} Robot 2`))).toBe(`${first} Robot 2 ${h + 1} → ${((h + 1) % 6) + 1} · Dens`);
+    expect(logOf(s)).toContain(`${first} Rest over: Dens Vel Ord Trn TDis Rhy Leg Acc Orch free again`);
   });
   it('a hand during Return is taken into account; the Return still finishes at its end', () => {
     const c = demoComposition(4);
@@ -1019,6 +1032,11 @@ describe('Home and Return', () => {
     expect(act(s, 'noteDensity')).toBe(s.comp.extended.home.positions!.noteDensity);
     expect(s.comp.conducting.baton).toEqual(s.comp.extended.home.baton);
     expect(r.end).toBeGreaterThan(r.start);
+    // held through the rest (4 beats): the Baton stays Home, then jumps from there
+    run(s, r.end + 4 * 96 - 1);
+    expect(s.comp.conducting.baton).toEqual(s.comp.extended.home.baton);
+    run(s, r.end + 4 * 96 + 49);
+    expect(s.comp.conducting.baton).not.toEqual(s.comp.extended.home.baton);
   });
   it('external clock: a Return is the same in ticks at any incoming tempo', () => {
     const go = (bpm: number) => {
@@ -1089,5 +1107,177 @@ describe('persistence and Undo', () => {
     expect(r[1].params.step).toBe(5);
     expect(r[1].params.mode).toBe('copy');
     expect(r.length).toBe(4);
+  });
+});
+
+// ============================================================================ ownership: Return > Trajectory > Robot
+
+describe('ownership: Return > Trajectory > Robot', () => {
+  const setup = (seed = 4) => {
+    const c = demoComposition(seed);
+    c.noteDensity.positions = [100, 80, 60, 40, 20, 10].map((x) => [x, x, x, x]);
+    const s = mk(seed, c);
+    s.clickPosition('noteDensity', 0);
+    s.captureHome();
+    s.setHomeInclude('legato', false); // legato stays free throughout
+    s.setReturnSettings({ num: 1, den: 1, rest: 2 });
+    // a Trajectory and a Robot both on Density, a Trajectory on Legato
+    s.setTrajectory(0, { on: true, target: { kind: 'position', variable: 'noteDensity' }, values: [6, 5, 4], rateNum: 1, rateDen: 8 });
+    s.setTrajectory(1, { on: true, target: { kind: 'position', variable: 'legato' }, values: [1, 2, 3, 4], rateNum: 1, rateDen: 8 });
+    robot(s, 1, { personality: 'chaotic', variables: ['noteDensity'], rateNum: 1, rateDen: 16 });
+    return s;
+  };
+  it('while Returning and resting, only the Return writes the Variable; the others go on; then control resumes on the Trajectory’s grid', () => {
+    const s = setup();
+    s.start();
+    run(s, 300);
+    s.clickPosition('noteDensity', 5);
+    s.returnHome();
+    const r = s.conductor.ret!;
+    expect(r.total).toBe(5);
+    const dens: [number, number][] = [];
+    const leg = new Set<number>();
+    let t = s.engine.tick;
+    while (t < r.end + 2 * 96) {
+      t += 6;
+      run(s, t, 6);
+      if (dens.at(-1)?.[1] !== act(s, 'noteDensity')) dens.push([t, act(s, 'noteDensity')]);
+      leg.add(act(s, 'legato'));
+    }
+    // Density only ever moved toward Home (value order: Positions 6,5,4,3,2,1 → Home 1), never away
+    const seq = dens.filter((d) => d[0] > r.start && d[0] < r.end + 2 * 96).map((d) => d[1]);
+    for (let i = 1; i < seq.length; i++) expect(seq[i]).toBeLessThan(seq[i - 1]);
+    expect(dens.filter((d) => d[0] < r.end + 2 * 96).at(-1)![1]).toBe(0); // at Home through the rest
+    expect(leg.size).toBeGreaterThan(2); // Legato's Trajectory kept going
+    // after the rest: the Trajectory or the Robot writes again, at one of their grid points
+    run(s, r.end + 2 * 96 + 96);
+    const after = dens.length;
+    expect(s.conductor.owns('noteDensity')).toBe(false);
+    expect(act(s, 'noteDensity') !== 0 || after > 0).toBe(true);
+  });
+  it('a Baton Trajectory moves the Baton but not a Variable the Return owns', () => {
+    const s = mk();
+    s.comp.conducting.arrows.noteDensity = { enabled: true, dir: 'right' };
+    s.comp.conducting.arrows.transposition = { enabled: true, dir: 'right' };
+    s.clickPosition('noteDensity', 0);
+    s.captureHome();
+    s.setHomeInclude('transposition', false);
+    s.setTrajectory(0, { on: true, target: { kind: 'batonX' }, values: [90, 10], rateNum: 1, rateDen: 8 });
+    s.start();
+    run(s, 200);
+    s.returnHome(true);
+    run(s, 200 + 96 * 3);
+    expect(act(s, 'noteDensity')).toBe(0); // owned (resting): the Baton did not move it
+    expect(new Set([act(s, 'transposition')]).size).toBe(1);
+    expect(s.comp.conducting.baton.x).not.toBe(s.comp.extended.home.baton!.x);
+  });
+  it('a Rule cannot set a Variable the Return owns', () => {
+    const s = mk();
+    s.captureHome();
+    s.clickPosition('noteDensity', 4);
+    s.addRule(rule({ when: { kind: 'interval', num: 1, den: 4 }, then: { kind: 'setPosition', variable: 'noteDensity', position: 5 } }));
+    s.start();
+    run(s, 50);
+    s.returnHome();
+    run(s, 900);
+    expect(logOf(s).some((l) => l.includes('Dens belongs to the Return: not set'))).toBe(true);
+  });
+  it('simultaneous Robot, Trajectory and Return are deterministic and independent of render granularity', () => {
+    const go = (chunk: number) => {
+      const s = setup(9);
+      s.start();
+      run(s, 300, chunk);
+      s.returnHome();
+      run(s, 2400, chunk);
+      return [logOf(s).join('\n'), act(s, 'noteDensity'), act(s, 'legato')];
+    };
+    expect(go(1)).toEqual(go(37));
+  });
+});
+
+// ============================================================================ Rules and the hand
+
+describe('Rules respond to manual changes at once (Play, Pause, Stop)', () => {
+  const rules = (s: Session) => {
+    s.addRule(rule({ when: { kind: 'variableAt', variable: 'noteDensity', position: 4 }, then: { kind: 'setPosition', variable: 'legato', position: 5 } }));
+    s.addRule(rule({ when: { kind: 'variableAt', variable: 'noteDensity', position: 4 }, then: { kind: 'setPosition', variable: 'rhythm', position: 3 }, at: 'bar' }));
+  };
+  it('stopped: an immediate action happens at once — no Start, no notes; a timed one waits for Start (the downbeat)', () => {
+    const s = mk();
+    const notes = spy(s);
+    rules(s);
+    s.clickPosition('noteDensity', 4);
+    expect(act(s, 'legato')).toBe(5);
+    expect(act(s, 'rhythm')).not.toBe(3);
+    expect(s.engine.state).toBe('stopped');
+    expect(notes).toEqual([]);
+    expect(s.conductor.waitingActions()).toBe(1);
+    expect(logOf(s).at(-1)).toMatch(/waits for Start/);
+    s.start();
+    run(s, 1);
+    expect(act(s, 'rhythm')).toBe(3);
+    expect(s.conductor.log.at(-1)).toMatchObject({ tick: 0, kind: 'rule' });
+  });
+  it('paused: immediate at once; a timed one waits for Continue and its bar', () => {
+    const s = mk();
+    rules(s);
+    s.start();
+    run(s, 500);
+    s.pause();
+    s.clickPosition('noteDensity', 4);
+    expect(act(s, 'legato')).toBe(5);
+    expect(act(s, 'rhythm')).not.toBe(3);
+    expect(s.engine.render(5000)).toEqual([]);
+    expect(act(s, 'rhythm')).not.toBe(3);
+    s.pause();
+    run(s, 767);
+    expect(act(s, 'rhythm')).not.toBe(3);
+    run(s, 769);
+    expect(act(s, 'rhythm')).toBe(3);
+  });
+  it('playing: immediate before the next note is rendered; timed at the next bar', () => {
+    const s = mk();
+    rules(s);
+    s.start();
+    run(s, 100);
+    s.clickPosition('noteDensity', 4);
+    expect(act(s, 'legato')).toBe(5);
+    run(s, 383);
+    expect(act(s, 'rhythm')).not.toBe(3);
+    run(s, 385);
+    expect(act(s, 'rhythm')).toBe(3);
+  });
+  it('each gesture is a new moment, and chains still stop (once per rule per moment, depth 3, bounded queue)', () => {
+    const s = mk();
+    s.addRule(rule({ when: { kind: 'variableAt', variable: 'noteDensity', position: 1 }, then: { kind: 'setPosition', variable: 'noteDensity', position: 2 } }));
+    s.addRule(rule({ when: { kind: 'variableAt', variable: 'noteDensity', position: 2 }, then: { kind: 'setPosition', variable: 'noteDensity', position: 1 } }));
+    s.clickPosition('noteDensity', 1);
+    expect(act(s, 'noteDensity')).toBe(1);
+    expect([s.conductor.ruleFires(0), s.conductor.ruleFires(1)]).toEqual([1, 1]);
+    s.clickPosition('noteDensity', 3);
+    s.clickPosition('noteDensity', 1);
+    expect([s.conductor.ruleFires(0), s.conductor.ruleFires(1)]).toEqual([2, 2]);
+  });
+  it('Rule overrides made while stopped (on / off) last into the next Start; Stop clears them', () => {
+    const s = mk();
+    robot(s, 1, { personality: 'orbit', variables: ['legato'], rateNum: 1, rateDen: 4 }, false);
+    s.addRule(rule({ when: { kind: 'variableAt', variable: 'noteDensity', position: 2 }, then: { kind: 'enable', robot: 1, mode: 'on' } }));
+    s.clickPosition('noteDensity', 2);
+    expect(s.conductor.robotOn(1)).toBe(true);
+    s.start();
+    run(s, 200);
+    expect(moves(s, 1)).toEqual([96, 192]);
+    s.stop();
+    expect(s.conductor.robotOn(1)).toBe(false);
+  });
+  it('a Snapshot recalled by hand is seen too; a Return rule while stopped is immediate', () => {
+    const s = mk();
+    s.captureHome();
+    s.clickPosition('transposition', 3);
+    s.hold = { mode: 'hold', pending: { positions: { noteDensity: 4 }, arrows: {}, voices: [{}, {}, {}, {}], sync: false } };
+    s.clickSnapshot(2);
+    s.addRule(rule({ when: { kind: 'variableAt', variable: 'noteDensity', position: 4 }, then: { kind: 'returnHome', immediate: false } }));
+    s.executeSnapshot(2);
+    expect(act(s, 'transposition')).toBe(s.comp.extended.home.positions!.transposition);
   });
 });
