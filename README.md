@@ -120,7 +120,7 @@ moves the notes by scale degree) and an optional Transposition **Scale Lock** (T
 counts degrees of each Pattern's scale), typing any number directly, keyboard shortcuts
 (Space = Play / Pause), mouse-wheel and trackpad scrolling in the Pattern Editor, MIDI clock
 in and out in one MIDI Settings window, emmm-style tooltips and pop-up menus, and full
-screen. 354 automated tests (including a seeded
+screen. 372 automated tests (including a seeded
 fuzz test, worked examples, and the whole app driven through its menus in a simulated browser)
 cover the engine, timing maths, persistence, session logic, the interface and Extended.
 

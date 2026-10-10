@@ -369,7 +369,7 @@ export class ConductingWindow implements Updatable {
     };
     strip(2, [
       ['start', iconSvg('play'), `Start — while playing, Sync (keys: ${keyLabel('playPause')} Play / Pause)`, () => s.start()],
-      ['stop', iconSvg('stop'), `Stop (${keyLabel('stop')})`, () => s.stop()],
+      ['stop', iconSvg('stop'), `Stop (${keyLabel('stop')}): all notes off and back to the beginning — Start then plays from the top (Pause keeps the place)`, () => s.stop()],
       ['pause', iconSvg('pause'), `Pause / Continue (${keyLabel('pause')}, or ${keyLabel('playPause')})`, () => s.pause()],
     ]);
     strip(22, [

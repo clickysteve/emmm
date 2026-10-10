@@ -212,15 +212,30 @@ export class MEngine {
 
   // ---------------------------------------------------------------- transport
 
-  /** Start (§11): from stopped re-seeds randomness and plays from the beginning; while
-   * playing it is a Sync. Returns events to emit immediately (note-offs). */
+  /** Start (§11): from stopped plays from the defined initial position (randomness
+   * re-seeded); while playing it is a Sync; while paused it continues. Returns events to emit
+   * immediately (note-offs). */
   start(): EngineEvent[] {
     if (this.state === 'paused') {
       this.state = 'playing';
       return [];
     }
     if (this.state === 'playing') return this.sync(this.tick);
+    this.rewind();
     this.state = 'playing';
+    return [];
+  }
+
+  /**
+   * The defined initial position of the transport (§11 "Start … will reset your Voices to the
+   * beginning"): tick 0; every Voice at its first step and first cycle step, its Phase from
+   * tick 0; the Sequence at its start; the Robot's timer at 0; every random stream re-seeded
+   * from the seed; nothing pending (quantized actions, note-offs) and nothing sounding.
+   * Used by Stop (at once, so a stopped performance is at the beginning) and by Start.
+   * Not touched: the document and the performance settings (active Positions, tempo, Baton,
+   * conducting values, Play-Enable…), which persist across Stop as in M.
+   */
+  rewind(): void {
     this.tick = 0;
     this.offs = [];
     this.actions = [];
@@ -235,7 +250,6 @@ export class MEngine {
     this.robotNext = 0;
     this.resetVoices(0);
     this.restartSequence(0);
-    return [];
   }
 
   /** Restart the play-along Sequence at `at` (Start, and Sync with Sync Restarts Sequence). */
@@ -250,8 +264,8 @@ export class MEngine {
     return this.seqOrigin + sq.notes[this.seqIndex].tick;
   }
 
-  /** Stop (§11): all sounding notes off, generation halts. */
-  stop(): EngineEvent[] {
+  /** Note-offs for everything sounding or held (pending note-offs, step-advance notes). */
+  private releaseAll(): EngineEvent[] {
     const out: EngineEvent[] = [];
     for (const o of this.offs) {
       if (this.cancelled.has(o.id)) continue;
@@ -262,10 +276,30 @@ export class MEngine {
       vr.heldStepNotes = [];
     }
     this.offs = [];
-    this.actions = [];
     this.sounding.clear();
     this.cancelled.clear();
+    return out;
+  }
+
+  /** Stop (§11): all sounding notes off, generation halts, and the transport returns to its
+   * initial position at once (rewind) — Start then plays from the beginning. Distinct from
+   * Pause, which keeps the place (and the notes). */
+  stop(): EngineEvent[] {
+    const out = this.releaseAll();
+    this.rewind();
     this.state = 'stopped';
+    return out;
+  }
+
+  /**
+   * Halt for an external MIDI Stop (FC, emmm): notes off, but the position is kept — the
+   * MIDI meaning of Stop, so a following Continue (FB) resumes where it stopped, and Start
+   * (FA) begins again. Leaves the engine paused; quantized actions stay pending.
+   */
+  halt(): EngineEvent[] {
+    if (this.state === 'stopped') return [];
+    const out = this.releaseAll();
+    this.state = 'paused';
     return out;
   }
 

@@ -66,15 +66,18 @@ export class ClockFollower {
     return playing ? 'running' : 'waiting';
   }
 
-  /** After a loss, count pulses from where emmm is now instead of chasing the gap. */
+  /** After a loss (or a Continue), count pulses from where emmm is now instead of chasing
+   * the gap: the pulse just received is at `nowTick`. */
   rebase(nowTick: number): void {
-    this.pulses = Math.round(nowTick / 4);
+    this.pulses = Math.round(nowTick / 4) + 1;
     this.recovered = false;
   }
 
-  /** Expected M tick for the pulses received since Start (96 ticks per quarter). */
+  /** Expected M tick for the pulses received since Start (96 ticks per quarter, 4 per
+   * pulse). MIDI: the first clock after Start is the downbeat — tick 0 — so pulse n is at
+   * tick (n − 1) × 4. (Counting it as tick 4 put emmm one pulse ahead of its master.) */
   expectedTick(): number {
-    return this.pulses * 4;
+    return Math.max(0, this.pulses - 1) * 4;
   }
 
   /** Tempo with phase correction: `nowTick` is where emmm is; gain is per beat of error. */

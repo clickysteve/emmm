@@ -369,14 +369,15 @@ describe('MIDI clock input: jitter, loss, recovery', () => {
     expect(s.comp.tempo.value).toBe(tempo);
     expect(s.engine.state).toBe('playing');
   });
-  it('Continue after Stop does not double-start; Stop stops', () => {
+  it('Continue while playing does not double-start; MIDI Stop halts', () => {
     const s = mk();
     s.comp.midi.clockIn.enabled = true;
     s.midiIn('x', [0xfa], 0);
     s.midiIn('x', [0xfb], 1);
     expect(s.engine.state).toBe('playing');
     s.midiIn('x', [0xfc], 2);
-    expect(s.engine.state).toBe('stopped');
+    expect(s.playing).toBe(false);
+    expect(s.extHalted).toBe(true);
   });
 });
 

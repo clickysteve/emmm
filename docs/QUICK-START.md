@@ -116,6 +116,12 @@ a bass line and a sparse high line, with every Variable on Position 1 (a "neutra
    Stop / Continue, from an incoming MIDI clock. Its status reads INTERNAL, WAITING, RUNNING
    (with the tempo it hears) or LOST.
 
+   Following a master (a Hermod+, a DAW): its **Start** plays emmm from the beginning; its
+   **Stop** silences emmm but keeps the place (the menu bar says **EXT STOP**), so its
+   **Continue** carries on from there — or press Space to continue, or Return for emmm's own
+   Stop (back to the beginning). A Song Position of 0 also goes back to the beginning. Clock
+   sent while the master is stopped never starts emmm.
+
 5. **Route Voice 1 to MIDI channel 1.** It already is, in two layers:
    - The **Orchestration** Variable sends each Voice to one or more *M Output Channels*. In
      the Midi window, the inverted (active) box in the **Chan Orch** row shows four rows of
@@ -180,10 +186,11 @@ a bass line and a sparse high line, with every Variable on Position 1 (a "neutra
 
     ![Conducting: 1–2 transport strips, 3 Tempo arrow, 4 Tempo range bar, 5 seed, 6 Conducting Grid, 7 Robot, 8 and 9 arrows enabled](images/qs-conducting.png)
 
-15. **Stop safely.** Press **Return**, or click **●** (the middle of the top transport strip).
-    Stop sends note-offs for everything that is sounding. (**Tab** is *Pause*: it freezes
-    the music and deliberately leaves held notes sounding, as M did — press Tab or Space to
-    continue.) If a note ever hangs, press **⌘.** (All Notes Off), or use **Panic** in
+15. **Stop safely.** Press **Return**, or click **●** (the middle of the top transport strip —
+    in M that is Stop, not record). Stop sends note-offs for everything that is sounding and
+    takes the music **back to the beginning**: the next Start plays from the top. (**Tab** is
+    *Pause*: it freezes the music in place and deliberately leaves held notes sounding, as M
+    did — press Tab or Space to continue from the same place.) If a note ever hangs, press **⌘.** (All Notes Off), or use **Panic** in
     File ▸ MIDI Settings… .
 
 At this point you have heard the whole idea: *the notes never changed — everything you
@@ -955,7 +962,7 @@ how timed) → Cyclic Variables (rhythm, length, accent per note) → Orchestrat
 |---|---|
 | Space | Play / Pause: Start, then Pause / continue (emmm; in M, Start and Sync) |
 | ⇧Space | Sync |
-| Return | Stop (notes off) |
+| Return | Stop (notes off, back to the beginning) |
 | Tab | Pause / continue (notes held) |
 | Backspace | Hold/Do |
 | A–Z | recall Snapshot (store it while holding); Shift = with Sync |

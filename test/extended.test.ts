@@ -75,7 +75,8 @@ describe('MIDI clock input', () => {
     const msPerPulse = 60000 / (100 * 24); // 100 bpm
     for (let i = 0; i < 30; i++) bpm = f.pulse(i * msPerPulse) ?? bpm;
     expect(bpm).toBeCloseTo(100, 6);
-    expect(f.expectedTick()).toBe(120);
+    // MIDI: the first clock after Start is the downbeat (tick 0); the 30th is at 29 × 4
+    expect(f.expectedTick()).toBe(116);
   });
   it('phase correction speeds up when behind and slows when ahead (bounded)', () => {
     const f = new ClockFollower();
@@ -90,7 +91,9 @@ describe('MIDI clock input', () => {
     s.midiIn('x', [0xfa], 0);
     expect(s.engine.state).toBe('playing');
     s.midiIn('x', [0xfc], 0);
-    expect(s.engine.state).toBe('stopped');
+    // MIDI Stop halts (notes off) and keeps the place for a Continue; it is not emmm's Stop
+    expect(s.playing).toBe(false);
+    expect(s.extHalted).toBe(true);
   });
 });
 

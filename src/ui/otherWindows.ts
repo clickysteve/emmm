@@ -562,7 +562,7 @@ counts degrees of each Pattern's scale instead of semitones.<br>
 Time Base takes "3/8". Range bars take "40-100". emmm ▸ Keyboard Shortcuts… (⌥H) lists every key.<br>
 <b>Undo</b> — ⌘Z / ⇧⌘Z undo and redo edits; the performance (active Positions, tempo, Baton) is
 never rewound.<br><br>
-<b>Keys</b> — Space Play / Pause (emmm; in M it was Start / Sync) · ⇧Space Sync · Return Stop · Tab Pause · Caps Lock or ⌘⌥ + moving the mouse =
+<b>Keys</b> — Space Play / Pause (emmm; in M it was Start / Sync) · ⇧Space Sync · Return Stop (back to the beginning) · Tab Pause (keeps the place) · Caps Lock or ⌘⌥ + moving the mouse =
 Mouse Advance · ⌘. All Notes Off · ⌘S Save · ⌘O Open · ⌘Z Undo · Escape closes pop-ups.<br><br>
 <b>MIDI</b> — File ▸ MIDI Settings… (⌥M) maps M Output Channels to devices (or the internal monitor), and sends or follows MIDI clock.
 Set a voice's Use to <b>C</b> to drive emmm from a MIDI keyboard: middle C (C3) Start, B2 Stop,

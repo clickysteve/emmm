@@ -195,9 +195,22 @@ Enters Rests* option: sustain pedal down records a rest.
 * Tempo Range Bar: drag draws a range, tempo is set to its midpoint; click sets a single
   value; Tempo Numerical adjusts within the range [DOC].
 * **Start** (Space) plays all voices from the beginning; pressing Start while playing is a
-  Sync [DOC]. **Stop** (Return) turns sounding notes off [DOC]. **Pause** (Tab) freezes
-  everything *without* releasing notes — "organ sounds sustain indefinitely" — and resumes
-  where it left off [DOC]. **Sync** resets every voice to its first step and first cycle step
+  Sync [DOC]. **Stop** (Return) turns sounding notes off; after it "you have no choice but to
+  click on the Start Button to begin playing again, which will reset your Voices to the
+  beginning" [DOC]. **Pause** (Tab) freezes everything *without* releasing notes — "organ
+  sounds sustain indefinitely" — and "picks up at the same place when you click on Pause again
+  or hit Start" [DOC].
+* emmm applies Stop's reset **at once** (`MEngine.rewind`): a stopped performance *is* at the
+  initial position — tick 0, every Voice at its first step and first cycle step (from its
+  Phase), the Sequence at its start, the Robot's timer at 0, randomness re-seeded, nothing
+  pending (quantized Snapshots / Positions are dropped), nothing sounding; Slideshow playback
+  and recording, Trajectories, tap conducting, the Movie recording and clock output end. M
+  applied it at the next Start; for what is heard the two are identical [DOC: Start after Stop
+  always resets], but emmm's displays and external Continue now see the true position.
+  Persisting across Stop (performance settings, not time): active Positions, tempo, Baton,
+  conducting values, Play-Enable and the other Voice settings, Snapshots and the current one,
+  a Hold/Do in progress, the captured Movie, Keyboard Transpose [INF — none is reset by
+  M's Start either]. **Sync** resets every voice to its first step and first cycle step
   (quantized to the Snapshot quantization) [DOC].
 * emmm keys: **Space is Play / Pause** (stopped → Start, playing → Pause, paused →
   continue), a deliberate emmm change; M's Start-while-playing Sync is **⇧Space**. Return

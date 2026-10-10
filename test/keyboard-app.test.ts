@@ -335,6 +335,8 @@ describe('MIDI Settings', () => {
     s.midiIn('any', [0xfa], performance.now());
     expect(s.engine.state).toBe('playing');
     s.midiIn('any', [0xfc], performance.now());
+    expect(s.playing).toBe(false); // halted by the master, the place kept for Continue
+    key('Enter'); // emmm's own Stop: back to the beginning
     expect(s.engine.state).toBe('stopped');
     pd(sw('Follow clock'));
     pd(sw('Send clock'));

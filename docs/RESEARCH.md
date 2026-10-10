@@ -216,6 +216,19 @@ is an emmm addition; it now lives in **MIDI Settings** with clock out, independe
 and follows the incoming clock at 24 ppq per quarter note (it does not apply the Sync Ratio to
 incoming clock — U25).
 
+**External transport (October 2026).** The MIDI meaning of the real-time messages: Start (FA)
+= from the beginning (Song Position 0 + Continue); Stop (FC) = halt, keeping the position;
+Continue (FB) = resume from that position; Song Position Pointer (F2) = a position in 16ths
+(six clocks each); the first clock after Start is the downbeat. Squarp's Hermod+ manual: Play
+starts; "Press play again to stop the sequencer and return to the beginning of the sequence";
+the SYNC OUT settings send "CLOCK+TRANSPORT", "ONLY CLOCK" or "ONLY TRANSPORT" per port, and
+**CLOCK ON STOP** sends clock while stopped. It does not say whether it ever sends Continue or
+Song Position (so a Hermod+ master is expected to send FA … FC … FA). emmm now follows these
+meanings (FC no longer rewinds — a DAW's Stop / Continue resumes; Song Position 0 rewinds; other
+positions are not located, U26) and counts the first clock after Start as tick 0 (it used to
+count it as tick 4, which put emmm one pulse — 1/24 beat — ahead of its master). Tested with
+simulated message streams; no Hermod+ was attached.
+
 ## Things not yet studied
 
 * Running the original program (emulator) to observe exact timings, defaults and edge cases.

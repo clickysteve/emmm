@@ -47,8 +47,8 @@ export const KEYS: KeyDef[] = [
   // Transport (plain keys; Space is emmm's Play / Pause)
   { id: 'playPause', label: 'Play / Pause (stopped: Start; playing: Pause; paused: Continue)', group: 'Transport', keys: [c('Space')], noRepeat: true },
   { id: 'sync', label: 'Sync (M: Space while playing)', group: 'Transport', keys: [c('Space', { shift: true })], noRepeat: true },
-  { id: 'stop', label: 'Stop (all notes off)', group: 'Transport', keys: [c('Enter')], noRepeat: true },
-  { id: 'pause', label: 'Pause / Continue (⌥Tab: pause a Slideshow)', group: 'Transport', keys: [c('Tab')], noRepeat: true },
+  { id: 'stop', label: 'Stop: all notes off and back to the beginning (Start plays from the top)', group: 'Transport', keys: [c('Enter')], noRepeat: true },
+  { id: 'pause', label: 'Pause / Continue: keeps the place and the notes (⌥Tab: pause a Slideshow)', group: 'Transport', keys: [c('Tab')], noRepeat: true },
   // File
   { id: 'open', label: 'Open…', group: 'File', keys: [mod('KeyO')] },
   { id: 'save', label: 'Save', group: 'File', keys: [mod('KeyS')] },

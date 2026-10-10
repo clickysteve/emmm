@@ -102,7 +102,19 @@ Changes named in `TRANSIENT` (transport, Baton, view changes…) never create hi
 
 **MIDI clock out** (`Options ▸ Send Clock`): one stream to one device; Start / clock / Stop,
 Stop on Pause and Continue on resume; Stop is stamped after the pulses already queued ahead;
-changing the device or switching Send Clock off mid-play stops the old device.
+changing the device or switching Send Clock off mid-play stops the old device. A Start after a
+Stop is always Start (FA), never Continue.
+
+**Transport.** `MEngine.rewind` defines the initial position (tick 0, Voices at step 1 / cycle
+step 1 from their Phase, Sequence at its start, Robot timer 0, random streams re-seeded,
+nothing pending or sounding). `stop` = note-offs + rewind (Stop returns there at once);
+`start` from stopped = rewind + play; `pause` toggles and keeps everything (and the notes);
+`halt` = note-offs with the place kept, for an external MIDI Stop. In the Session, `stop` also
+ends Slideshows, Trajectories, tap conducting, the Movie recording and clock output and resets
+the clock follower and CC Cycles; the performance settings persist. **Clock input**
+(`clockRealtime`): FA = Stop if needed, then Start; FC = `externalStop` (halt; menu bar *EXT
+STOP*; Space continues, Return stops); FB = continue from a halt or pause, Start when stopped;
+F2 Song Position 0 while not playing = Stop (rewind); clocks while stopped are only liveness.
 
 ### UI (`src/ui`)
 Plain TypeScript + DOM/SVG, no framework. The whole screen is laid out in a fixed **720 × 470

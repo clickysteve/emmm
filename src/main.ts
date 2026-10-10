@@ -747,7 +747,7 @@ function frame(): void {
   const o = session.comp.midi.outputs[0];
   const outName = !o.port ? 'no output' : o.port === 'monitor' ? 'monitor' : session.midi.portName(o.port);
   const film = session.movieRecording ? 'MOVIE●  ' : session.movieArmed ? 'MOVIE  ' : '';
-  const st = `${session.comp.extended.enabled ? 'EXT  ' : ''}${session.hold ? 'HOLD  ' : ''}${film}${session.playing ? '▶' : session.engine.state === 'paused' ? '❚❚' : '■'}|→ ${outName}${session.monitorAll && o.port !== 'monitor' ? ' + monitor' : ''}`;
+  const st = `${session.comp.extended.enabled ? 'EXT  ' : ''}${session.hold ? 'HOLD  ' : ''}${film}${session.playing ? '▶' : session.engine.state === 'paused' ? (session.extHalted ? 'EXT STOP ❚❚' : '❚❚') : '■'}|→ ${outName}${session.monitorAll && o.port !== 'monitor' ? ' + monitor' : ''}`;
   if (st !== lastStatus) {
     const [a, b] = st.split('|');
     statusEl.textContent = a;

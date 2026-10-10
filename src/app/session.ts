@@ -368,6 +368,7 @@ export class Session {
 
   start(): void {
     this.monitor.unlock();
+    this.extHalted = false;
     if (this.engine.state === 'playing') {
       this.sync();
       return;
@@ -395,7 +396,16 @@ export class Session {
     this.changed('transport');
   }
 
+  /**
+   * Stop (§11, Return / ●): terminate playback and return the transport to its initial
+   * position — all notes off, the engine rewound (MEngine.rewind), Slideshow playback and
+   * recording, Trajectories, the Movie, tap conducting and clock output ended; Start then plays
+   * from the beginning. Performance settings persist (active Positions, tempo, Baton,
+   * conducting values, Play-Enable, Snapshots, Hold/Do in progress, the captured Movie).
+   * Distinct from Pause, which keeps the place and the sounding notes.
+   */
   stop(): void {
+    this.extHalted = false;
     // Note-ons up to the render frontier may already be queued in the MIDI driver with future
     // timestamps; the note-offs must not be sent before them or notes would hang.
     const offAt = this.afterQueued();
@@ -415,12 +425,35 @@ export class Session {
     }
     if (this.slideshowRec) this.finishSlideshowRecording(null);
     if (this.slideshowPlay) this.slideshowPlay = null;
+    this.clockFollower.reset();
+    this.ccRunner.reset(this.comp.seed);
+    // nothing already scheduled for the display may flash after the stop
+    this.visual.length = 0;
     this.engine.voices.forEach((_, v) => (this.nowPlaying[v] = null));
+    this.changed('transport');
+  }
+
+  /** Stopped by an external MIDI Stop (FC) with the place kept, so Continue can resume. */
+  extHalted = false;
+
+  /** External MIDI Stop (FC): notes off, position kept (MEngine.halt). */
+  private externalStop(): void {
+    if (this.engine.state === 'stopped') return;
+    const wasPlaying = this.engine.state === 'playing';
+    const offAt = this.afterQueued();
+    const evs = this.engine.halt();
+    if (evs.length) this.dispatch(evs, () => offAt);
+    this.scheduler.pauseToggled();
+    this.monitor.allOff();
+    if (this.clockOut && wasPlaying) this.midi.send(this.clockOut, msg.STOP, offAt + this.comp.midi.latencyMs);
+    this.tapConduct.active = false;
+    this.extHalted = true;
     this.changed('transport');
   }
 
   pause(): void {
     if (this.engine.state === 'stopped') return;
+    this.extHalted = false;
     const pausing = this.engine.state === 'playing';
     const at = this.afterQueued() + this.comp.midi.latencyMs;
     this.engine.pause();
@@ -1046,14 +1079,27 @@ export class Session {
   /** the incoming clock's tempo estimate, for display */
   clockIn = { bpm: 0 };
 
-  /** System real-time messages for MIDI clock input (whether or not Extended is on).
-   * Returns true if consumed. */
-  private clockRealtime(port: string, status: number, ts: number): boolean {
+  /**
+   * MIDI clock input (whether or not Extended is on): 0xF8 clock, and — with Start / Stop /
+   * Continue followed — the transport by its MIDI meaning:
+   *   FA Start     from the initial position (a running or halted emmm is stopped first);
+   *                the first clock after it is the downbeat.
+   *   FB Continue  from where an external Stop left off; from stopped it is a Start (MIDI:
+   *                Start = Song Position 0 + Continue).
+   *   FC Stop      notes off, the place kept (externalStop), so Continue can resume.
+   *   F2 Song Position Pointer 0 while not playing = back to the beginning (DAWs send it
+   *                before Continue to play from the top). Other positions are not located:
+   *                M's performance is generative, not a timeline; Continue resumes from
+   *                where emmm stopped.
+   * Clock pulses while stopped (e.g. a master's "clock on stop") never start emmm.
+   * Returns true if consumed.
+   */
+  private clockRealtime(port: string, data: ArrayLike<number>, ts: number): boolean {
     const ci = this.comp.midi.clockIn;
     if (!ci.enabled) return false;
     if (ci.port !== '*' && ci.port !== port) return false;
     const f = this.clockFollower;
-    switch (status) {
+    switch (data[0]) {
       case 0xf8: {
         if (!this.playing) {
           f.lastPulseMs = ts; // the clock is alive: Waiting, not Lost
@@ -1076,16 +1122,25 @@ export class Session {
         return true;
       case 0xfb:
         if (!ci.transport) return true;
-        if (this.engine.state === 'paused') this.pause();
-        else if (this.engine.state === 'stopped') {
+        if (this.engine.state === 'paused') {
+          this.pause(); // continue from the kept place
+          f.reset();
+          f.recovered = true; // the next pulse re-bases the phase on where emmm is
+        } else if (this.engine.state === 'stopped') {
           f.reset();
           this.start();
         }
         return true;
       case 0xfc:
         if (!ci.transport) return true;
-        this.stop();
+        this.externalStop();
         return true;
+      case 0xf2: {
+        if (!ci.transport) return true;
+        const pos = ((data[1] ?? 0) & 0x7f) | (((data[2] ?? 0) & 0x7f) << 7);
+        if (pos === 0 && this.engine.state === 'paused') this.stop();
+        return true;
+      }
     }
     return false;
   }
@@ -1537,7 +1592,7 @@ export class Session {
   }
 
   midiIn(port: string, data: ArrayLike<number>, ts: number): void {
-    if ((data[0] ?? 0) >= 0xf8 && this.clockRealtime(port, data[0], ts)) return;
+    if (((data[0] ?? 0) >= 0xf8 || data[0] === 0xf2) && this.clockRealtime(port, data, ts)) return;
     const m = msg.parse(data);
     if (this.extendedLearn(m)) {
       this.changed('learn');
