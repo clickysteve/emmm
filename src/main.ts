@@ -346,11 +346,12 @@ const cmd = (id: string, run: () => void, enabled?: () => boolean) => commands.s
 cmd('open', () => void openDocument());
 cmd('save', () => downloadDocument(session.comp));
 cmd('midiSettings', () => (openEditor('midiSettings'), midiAssign.win.flashTitle()));
-/** Space (emmm): stopped → Start, playing → Pause, paused → Continue — M's own transport
+/** Return (emmm): stopped → Start, playing → Pause, paused → Continue. Space (emmm):
+ * stopped → Start, playing or paused → Stop (back to the beginning). M's own transport
  * functions, nothing parallel. */
 cmd('playPause', () => (session.engine.state === 'stopped' ? session.start() : session.pause()));
+cmd('stopPlay', () => (session.engine.state === 'stopped' ? session.start() : session.stop()));
 cmd('sync', () => session.sync());
-cmd('stop', () => session.stop());
 cmd('pause', () => session.pause());
 cmd('undo', () => session.undo(), () => session.history.canUndo);
 cmd('redo', () => session.redo(), () => session.history.canRedo);

@@ -368,9 +368,9 @@ export class ConductingWindow implements Updatable {
       box.appendChild(svgEl(W, H, [40, 80].map((c) => `<line x1="${c + sl + 0.5}" y1="0" x2="${c - sl + 0.5}" y2="${H}" stroke="var(--ink)" stroke-width="1.2" shape-rendering="geometricPrecision"/>`).join('')));
     };
     strip(2, [
-      ['start', iconSvg('play'), `Start — while playing, Sync (keys: ${keyLabel('playPause')} Play / Pause)`, () => s.start()],
-      ['stop', iconSvg('stop'), `Stop (${keyLabel('stop')}): all notes off and back to the beginning — Start then plays from the top (Pause keeps the place)`, () => s.stop()],
-      ['pause', iconSvg('pause'), `Pause / Continue (${keyLabel('pause')}, or ${keyLabel('playPause')})`, () => s.pause()],
+      ['start', iconSvg('play'), `Start — while playing, Sync (keys: ${keyLabel('stopPlay')} Stop / Play, ${keyLabel('playPause')} Play / Pause)`, () => s.start()],
+      ['stop', iconSvg('stop'), `Stop (${keyLabel('stopPlay')}): all notes off and back to the beginning — Start then plays from the top (Pause keeps the place)`, () => s.stop()],
+      ['pause', iconSvg('pause'), `Pause / Continue (${keyLabel('playPause')} or ${keyLabel('pause')}): keeps the place and the notes`, () => s.pause()],
     ]);
     strip(22, [
       ['sync', '<span style="font-size:10px">Sync</span>', `Sync (${keyLabel('sync')}; Shift-click in Snapshots also syncs)`, () => s.sync()],

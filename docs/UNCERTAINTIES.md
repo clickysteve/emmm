@@ -43,8 +43,8 @@ conservative choice in emmm, isolated so it can be corrected. Search the code fo
   (File ▸ MIDI Settings…, independent of Extended; see U25). On an external Start emmm starts
   at once rather than waiting for the first clock pulse, and its phase correction is bounded
   (±15 %), so a clock whose pulses begin late is caught up gradually.
-* Space is Play / Pause in emmm (stopped → Start, playing → Pause, paused → continue); in M it
-  was Start, and Sync while playing. Sync is ⇧Space. A deliberate emmm change, not an
-  uncertainty.
+* Transport keys in emmm: Return is Play / Pause, Space is Stop / Play (in M Space was Start,
+  and Sync while playing, and Return was Stop). Sync is ⇧Space. A deliberate emmm change, not
+  an uncertainty.
 * Look-ahead: gestures take effect from the scheduler's render frontier, i.e. up to ~60 ms
   after the click, and a Pause may let the last ≤60 ms of already-scheduled notes sound.

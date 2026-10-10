@@ -397,7 +397,7 @@ export class Session {
   }
 
   /**
-   * Stop (§11, Return / ●): terminate playback and return the transport to its initial
+   * Stop (§11, Space / ●): terminate playback and return the transport to its initial
    * position — all notes off, the engine rewound (MEngine.rewind), Slideshow playback and
    * recording, Trajectories, the Movie, tap conducting and clock output ended; Start then plays
    * from the beginning. Performance settings persist (active Positions, tempo, Baton,

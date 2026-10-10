@@ -113,7 +113,7 @@ nothing pending or sounding). `stop` = note-offs + rewind (Stop returns there at
 ends Slideshows, Trajectories, tap conducting, the Movie recording and clock output and resets
 the clock follower and CC Cycles; the performance settings persist. **Clock input**
 (`clockRealtime`): FA = Stop if needed, then Start; FC = `externalStop` (halt; menu bar *EXT
-STOP*; Space continues, Return stops); FB = continue from a halt or pause, Start when stopped;
+STOP*; Return continues, Space stops); FB = continue from a halt or pause, Start when stopped;
 F2 Song Position 0 while not playing = Stop (rewind); clocks while stopped are only liveness.
 
 ### UI (`src/ui`)

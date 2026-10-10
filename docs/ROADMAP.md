@@ -56,7 +56,8 @@
   place of every native `<select>`, emmm dialogs in place of the browser's confirm / prompt.
 * Windows menu fixed to M's documented behaviour (live list, visible bring-to-front); Full
   Screen; colour palettes.
-* **Space = Play / Pause** (Sync moves to ⇧Space), from the shared shortcut table.
+* **Return = Play / Pause, Space = Stop / Play** (Sync moves to ⇧Space), from the shared
+  shortcut table.
 * Mouse wheel / trackpad scrolling in the Pattern Editor (pitches, and sideways or ⇧ + wheel
   for steps), never global.
 * **MIDI Settings** (File ▸ MIDI Settings…): M's Midi Assignment plus MIDI clock out and

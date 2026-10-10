@@ -93,7 +93,8 @@ a bass line and a sparse high line, with every Variable on Position 1 (a "neutra
 2. **Start playback.** Press **Space**, or click **▶** — the leftmost part of the
    top strip in the Conducting window. The ▶ part turns black while playing. (In M the
    middle **●** is **Stop**, not record; the right one, **❚❚**, is Pause.) In emmm **Space is
-   Play / Pause**: press it again to pause, and again to carry on.
+   Stop / Play** — press it again to stop (back to the beginning) — and **Return is Play /
+   Pause** — press it to pause, and again to carry on from the same place.
 
 3. **Hear and see what it is generating.** Look at the top-right corner of the menu bar:
    `→ monitor` means emmm is playing through its small built-in sound (used when no MIDI
@@ -118,7 +119,7 @@ a bass line and a sparse high line, with every Variable on Position 1 (a "neutra
 
    Following a master (a Hermod+, a DAW): its **Start** plays emmm from the beginning; its
    **Stop** silences emmm but keeps the place (the menu bar says **EXT STOP**), so its
-   **Continue** carries on from there — or press Space to continue, or Return for emmm's own
+   **Continue** carries on from there — or press Return to continue, or Space for emmm's own
    Stop (back to the beginning). A Song Position of 0 also goes back to the beginning. Clock
    sent while the master is stopped never starts emmm.
 
@@ -186,11 +187,11 @@ a bass line and a sparse high line, with every Variable on Position 1 (a "neutra
 
     ![Conducting: 1–2 transport strips, 3 Tempo arrow, 4 Tempo range bar, 5 seed, 6 Conducting Grid, 7 Robot, 8 and 9 arrows enabled](images/qs-conducting.png)
 
-15. **Stop safely.** Press **Return**, or click **●** (the middle of the top transport strip —
+15. **Stop safely.** Press **Space**, or click **●** (the middle of the top transport strip —
     in M that is Stop, not record). Stop sends note-offs for everything that is sounding and
     takes the music **back to the beginning**: the next Start plays from the top. (**Tab** is
     *Pause*: it freezes the music in place and deliberately leaves held notes sounding, as M
-    did — press Tab or Space to continue from the same place.) If a note ever hangs, press **⌘.** (All Notes Off), or use **Panic** in
+    did — press Tab or Return to continue from the same place.) If a note ever hangs, press **⌘.** (All Notes Off), or use **Panic** in
     File ▸ MIDI Settings… .
 
 At this point you have heard the whole idea: *the notes never changed — everything you
@@ -767,7 +768,7 @@ number selected, **Return** edits the current value, **↑ ↓** step it (**⇧*
 kept within the control's legal range; anything that is not a number is refused (the box
 flashes) and nothing changes. One typed value is one **⌘Z**. A clicked number lets go of the
 keyboard after three seconds without a key (or at once with **Escape** or a click elsewhere),
-so **Return** stops and **1–9** play Slideshows again, as in M.
+so **Return** plays / pauses and **1–9** play Slideshows again.
 
 - **Time Base** takes both numbers at once — type `3/8` in either box — and `sa` for step
   advance; only legal denominators are accepted.
@@ -777,11 +778,13 @@ so **Return** stops and **1–9** play Slideshows again, as in M.
   `40-100` (or one number).
 - **Programs** in the Midi window: type the number as shown; `-` means no program change.
 
-**Space is Play / Pause** (emmm): stopped → Start, playing → Pause, paused → continue. In M
-Space was Start, and Sync while playing; Sync is now **⇧Space** (or the Sync button). Space
-does nothing while you are typing a number. M's other performance keys are unchanged (Return,
-Tab, Backspace, letters for Snapshots, digits for Slideshows), so emmm's shortcuts use **⌘**
-or **⌥**. They are shown
+**Transport keys** (emmm): **Return is Play / Pause** — stopped → Start, playing → Pause,
+paused → continue from the same place. **Space is Stop / Play** — stopped → Start, playing or
+paused → Stop (all notes off, back to the beginning). In M Space was Start (and Sync while
+playing) and Return was Stop; Sync is now **⇧Space** (or the Sync button). Neither key does
+anything while you are typing a number (Return on a clicked number edits it). M's other
+performance keys are unchanged (Tab, Backspace, letters for Snapshots, digits for
+Slideshows), so emmm's shortcuts use **⌘** or **⌥**. They are shown
 beside the commands in the menus, and **emmm ▸ Keyboard Shortcuts…** (**⌥H**) lists them all.
 The most useful:
 
@@ -960,9 +963,9 @@ how timed) → Cyclic Variables (rhythm, length, accent per note) → Orchestrat
 
 | Key | Does |
 |---|---|
-| Space | Play / Pause: Start, then Pause / continue (emmm; in M, Start and Sync) |
+| Return | Play / Pause: Start, then Pause / continue from the same place (emmm) |
+| Space | Stop / Play: Stop (notes off, back to the beginning), or Start when stopped (emmm) |
 | ⇧Space | Sync |
-| Return | Stop (notes off, back to the beginning) |
 | Tab | Pause / continue (notes held) |
 | Backspace | Hold/Do |
 | A–Z | recall Snapshot (store it while holding); Shift = with Sync |

@@ -249,8 +249,8 @@ describe('the keyboard command table', () => {
   });
   it('no command uses a plain key (those are M’s performance keys) — except the Transport keys', () => {
     for (const d of KEYS) if (d.group !== 'Transport') for (const k of d.keys) expect(k.mod || k.alt, d.id).toBeTruthy();
-    // the Transport group is exactly Space (Play / Pause), ⇧Space (Sync), Return and Tab
-    expect(KEYS.filter((d) => d.group === 'Transport').map((d) => d.keys.map((k) => chordLabel(k, true)).join())).toEqual(['Space', '⇧Space', '↩', 'Tab']);
+    // the Transport group is exactly Return (Play / Pause), Space (Stop / Play), ⇧Space (Sync) and Tab
+    expect(KEYS.filter((d) => d.group === 'Transport').map((d) => d.keys.map((k) => chordLabel(k, true)).join())).toEqual(['↩', 'Space', '⇧Space', 'Tab']);
   });
   it('nothing collides with browser- or system-reserved combinations', () => {
     const reserved: Chord[] = [

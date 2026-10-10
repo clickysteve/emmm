@@ -88,7 +88,7 @@ workflow uses the actual repository name automatically.)
 ## First steps
 
 1. **Start** (Space, or ▶ in the Conducting window). The demo document "Jumping In" plays
-   four Voices. In emmm Space is Play / Pause; ⇧Space is Sync.
+   four Voices. In emmm Space is Stop / Play, Return is Play / Pause and ⇧Space is Sync.
 2. Click Positions in the **Variables** and **Cyclic Variables** windows while it plays.
    Double-click a Position to open its edit window; edits are heard immediately.
 3. **File ▸ MIDI Settings…**: choose your MIDI device for the 16 output channels ("All
@@ -118,9 +118,9 @@ Everyday comforts that do not change M's music: Undo / Redo, the Pattern's Lengt
 and Phase right in the Pattern Editor, Clear Pattern, a Root + Scale per Pattern (changing it
 moves the notes by scale degree) and an optional Transposition **Scale Lock** (Transposition
 counts degrees of each Pattern's scale), typing any number directly, keyboard shortcuts
-(Space = Play / Pause), mouse-wheel and trackpad scrolling in the Pattern Editor, MIDI clock
+(Return = Play / Pause, Space = Stop / Play), mouse-wheel and trackpad scrolling in the Pattern Editor, MIDI clock
 in and out in one MIDI Settings window, emmm-style tooltips and pop-up menus, and full
-screen. 372 automated tests (including a seeded
+screen. 373 automated tests (including a seeded
 fuzz test, worked examples, and the whole app driven through its menus in a simulated browser)
 cover the engine, timing maths, persistence, session logic, the interface and Extended.
 

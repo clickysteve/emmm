@@ -148,7 +148,7 @@ describe('shortcuts', () => {
     key('[', { altKey: true, code: 'BracketLeft' });
     expect(s.comp.noteDensity.active).toBe(5);
   });
-  it('during playback: Space starts, ⌥ commands keep working, Tab pauses, Return stops', () => {
+  it('during playback: Space starts, ⌥ commands keep working, Tab pauses, Space stops', () => {
     blur();
     key(' ');
     expect(s.engine.state).toBe('playing');
@@ -158,7 +158,7 @@ describe('shortcuts', () => {
     expect(s.engine.state).toBe('paused');
     key('Tab');
     expect(s.engine.state).toBe('playing');
-    key('Enter');
+    key(' ');
     expect(s.engine.state).toBe('stopped');
   });
   it('⌘⌫ clears the selected Pattern; ⌘Z brings it back', () => {
@@ -239,42 +239,59 @@ describe('menus show the keys', () => {
   });
 });
 
-describe('Space = Play / Pause (emmm; M had Start / Sync)', () => {
-  it('stopped → Start, playing → Pause, paused → Continue; Return stops', () => {
+describe('Return = Play / Pause, Space = Stop / Play (emmm; M had Space Start / Sync, Return Stop)', () => {
+  it('Return: stopped → Start, playing → Pause, paused → Continue', () => {
     blur();
     s.stop();
-    key(' ');
+    key('Enter');
     expect(s.engine.state).toBe('playing');
-    key(' ');
-    expect(s.engine.state).toBe('paused');
-    key(' ');
-    expect(s.engine.state).toBe('playing');
-    key(' ');
+    key('Enter');
     expect(s.engine.state).toBe('paused');
     key('Enter');
+    expect(s.engine.state).toBe('playing');
+    key('Enter');
+    expect(s.engine.state).toBe('paused');
+    key(' ');
     expect(s.engine.state).toBe('stopped');
   });
-  it('uses the existing transport: a paused Continue keeps the position (no restart)', () => {
+  it('Space: stopped → Start, playing → Stop (back to the beginning), paused → Stop', () => {
     blur();
     key(' ');
+    expect(s.engine.state).toBe('playing');
+    s.emitNow(s.engine.render(s.engine.tick + 300));
+    key(' ');
+    expect(s.engine.state).toBe('stopped');
+    expect(s.engine.tick).toBe(0);
+    key(' ');
+    key('Enter'); // pause
+    expect(s.engine.state).toBe('paused');
+    key(' ');
+    expect(s.engine.state).toBe('stopped');
+    expect(s.engine.tick).toBe(0);
+  });
+  it('uses the existing transport: Return’s Continue keeps the position (no restart)', () => {
+    blur();
+    key('Enter');
     s.scheduler.wake();
     s.emitNow(s.engine.render(s.engine.tick + 300));
     const at = s.engine.tick;
-    key(' ');
-    key(' ');
+    key('Enter');
+    key('Enter');
     expect(s.engine.state).toBe('playing');
     expect(s.engine.tick).toBeGreaterThanOrEqual(at);
-    key('Enter');
+    key(' ');
   });
-  it('a held Space (auto-repeat) does not toggle again', () => {
+  it('a held key (auto-repeat) does not toggle again', () => {
     blur();
     key(' ');
     key(' ', { repeat: true });
     key(' ', { repeat: true });
     expect(s.engine.state).toBe('playing');
-    key('Enter');
+    key('Enter', { repeat: true });
+    expect(s.engine.state).toBe('playing');
+    key(' ');
   });
-  it('⇧Space is Sync (M’s Start-while-playing); it does not pause', () => {
+  it('⇧Space is Sync (M’s Start-while-playing); it does not stop', () => {
     blur();
     key(' ');
     let synced = 0;
@@ -284,24 +301,28 @@ describe('Space = Play / Pause (emmm; M had Start / Sync)', () => {
     s.sync = orig;
     expect(synced).toBe(1);
     expect(s.engine.state).toBe('playing');
-    key('Enter');
+    key(' ');
   });
-  it('never while typing: Space goes into a number being typed', () => {
+  it('never while typing: Space and Return go to the number being typed', () => {
     const t = box('[data-win="conducting"]', /^Tempo/);
     t.focus();
-    key('Enter'); // edit
+    key('Enter'); // a selected number: Return edits it, not the transport
+    expect(s.engine.state).toBe('stopped');
     key(' ');
     expect(s.engine.state).toBe('stopped');
     key('Escape');
     blur();
   });
-  it('one source of truth: the Start / Pause tooltips and Keyboard Shortcuts show the registry keys', () => {
-    expect(keyLabel('playPause')).toBe('Space');
+  it('one source of truth: the Start / Stop / Pause tooltips and Keyboard Shortcuts show the registry keys', () => {
+    expect(keyLabel('playPause')).toBe(IS_MAC ? '↩' : 'Enter');
+    expect(keyLabel('stopPlay')).toBe('Space');
     const tips = [...document.querySelectorAll<HTMLElement>('[data-win="conducting"] [title], [data-win="conducting"] [data-tip]')].map((e) => e.title || e.dataset.tip || '');
-    expect(tips.some((t) => t.startsWith('Start') && t.includes(keyLabel('playPause')))).toBe(true);
-    expect(tips.some((t) => t.startsWith('Pause') && t.includes(keyLabel('pause')))).toBe(true);
+    expect(tips.some((t) => t.startsWith('Start') && t.includes(keyLabel('playPause')) && t.includes(keyLabel('stopPlay')))).toBe(true);
+    expect(tips.some((t) => t.startsWith('Stop') && t.includes(keyLabel('stopPlay')))).toBe(true);
+    expect(tips.some((t) => t.startsWith('Pause') && t.includes(keyLabel('playPause')))).toBe(true);
     key('h', { altKey: true });
     expect(win('shortcuts').textContent).toContain('Play / Pause');
+    expect(win('shortcuts').textContent).toContain('Stop / Play');
   });
 });
 
@@ -336,7 +357,7 @@ describe('MIDI Settings', () => {
     expect(s.engine.state).toBe('playing');
     s.midiIn('any', [0xfc], performance.now());
     expect(s.playing).toBe(false); // halted by the master, the place kept for Continue
-    key('Enter'); // emmm's own Stop: back to the beginning
+    key(' '); // emmm's own Stop: back to the beginning
     expect(s.engine.state).toBe('stopped');
     pd(sw('Follow clock'));
     pd(sw('Send clock'));

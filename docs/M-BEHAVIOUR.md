@@ -212,9 +212,10 @@ Enters Rests* option: sustain pedal down records a rest.
   a Hold/Do in progress, the captured Movie, Keyboard Transpose [INF — none is reset by
   M's Start either]. **Sync** resets every voice to its first step and first cycle step
   (quantized to the Snapshot quantization) [DOC].
-* emmm keys: **Space is Play / Pause** (stopped → Start, playing → Pause, paused →
-  continue), a deliberate emmm change; M's Start-while-playing Sync is **⇧Space**. Return
-  and Tab are as in M. The Start *button* keeps M's behaviour (Start; while playing, Sync).
+* emmm keys (a deliberate emmm change): **Return is Play / Pause** (stopped → Start, playing →
+  Pause, paused → continue); **Space is Stop / Play** (stopped → Start, playing or paused →
+  Stop). M: Space Start (Sync while playing), Return Stop. Sync is **⇧Space**; Tab is Pause as
+  in M. The Start *button* keeps M's behaviour (Start; while playing, Sync).
 * Metronome (Options ▸ Use Metronome) clicks at the Sync Ratio note value [DOC].
 * Send Clock: MIDI clock at 24 ppq × sync ratio [DOC].
 

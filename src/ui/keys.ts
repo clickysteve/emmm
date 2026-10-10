@@ -3,8 +3,9 @@
  *
  * Plain keys belong to M's performance keyboard (S1 Appendix A) and stay as they were —
  * Return Stop, Tab Pause, Backspace Hold/Do, A–Z Snapshots, 1–9 Slideshows, 0 / \ Slideshow
- * stop / loop, ` and , Pattern Editor audition — with one deliberate emmm change: Space is
- * Play / Pause (M: Start, and Sync while playing; Sync is now ⇧Space). So emmm's own
+ * stop / loop, ` and , Pattern Editor audition — with one deliberate emmm change to the
+ * transport keys: Return is Play / Pause and Space is Stop / Play (M: Space Start, and Sync
+ * while playing; Return Stop). Sync is ⇧Space. So emmm's own
  * commands use a modifier:
  *
  *   ⌘ (Ctrl on Windows / Linux) — document and editing commands, as on any desktop
@@ -44,10 +45,10 @@ const mod = (key: string, m: Partial<Chord> = {}) => c(key, { mod: true, ...m })
 const alt = (key: string, m: Partial<Chord> = {}) => c(key, { alt: true, ...m });
 
 export const KEYS: KeyDef[] = [
-  // Transport (plain keys; Space is emmm's Play / Pause)
-  { id: 'playPause', label: 'Play / Pause (stopped: Start; playing: Pause; paused: Continue)', group: 'Transport', keys: [c('Space')], noRepeat: true },
+  // Transport (plain keys; emmm: Return = Play / Pause, Space = Stop / Play)
+  { id: 'playPause', label: 'Play / Pause (stopped: Start; playing: Pause; paused: Continue)', group: 'Transport', keys: [c('Enter')], noRepeat: true },
+  { id: 'stopPlay', label: 'Stop / Play (playing or paused: Stop — all notes off, back to the beginning; stopped: Start)', group: 'Transport', keys: [c('Space')], noRepeat: true },
   { id: 'sync', label: 'Sync (M: Space while playing)', group: 'Transport', keys: [c('Space', { shift: true })], noRepeat: true },
-  { id: 'stop', label: 'Stop: all notes off and back to the beginning (Start plays from the top)', group: 'Transport', keys: [c('Enter')], noRepeat: true },
   { id: 'pause', label: 'Pause / Continue: keeps the place and the notes (⌥Tab: pause a Slideshow)', group: 'Transport', keys: [c('Tab')], noRepeat: true },
   // File
   { id: 'open', label: 'Open…', group: 'File', keys: [mod('KeyO')] },

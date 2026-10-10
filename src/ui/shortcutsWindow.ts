@@ -19,7 +19,7 @@ export class ShortcutsWindow {
     const table = (rows: [string, string][]) => `<table>${rows.map(([k, d]) => `<tr><td class="k">${esc(k)}</td><td>${esc(d)}</td></tr>`).join('')}</table>`;
     const groups = [...new Set(KEYS.map((k) => k.group))];
     const group = (g: string) => table(KEYS.filter((k) => k.group === g).map((k) => [k.keys.map((c) => chordLabel(c)).join('  or  '), k.label]));
-    let html = `<b>Transport</b> (whenever you are not typing a number; Space is emmm's Play / Pause — in M it was Start / Sync)${group('Transport')}`;
+    let html = `<b>Transport</b> (whenever you are not typing a number; emmm: Return = Play / Pause, Space = Stop / Play — in M Space was Start / Sync and Return Stop)${group('Transport')}`;
     html += `<b>Performing</b> (M's own keys)${table(PERFORMANCE_KEYS)}`;
     for (const g of groups.filter((g) => g !== 'Transport')) html += `<b>${esc(g)}</b>${group(g)}`;
     html += `<b>Pattern Editor</b> (when it is the front window)${table(PATTERN_EDITOR_KEYS)}`;
