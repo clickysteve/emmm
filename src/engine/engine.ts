@@ -114,6 +114,15 @@ export function neutralMod(): Modulation {
   return { density: [null, null, null, null], transpose: [0, 0, 0, 0], velocity: [0, 0, 0, 0], legato: [1, 1, 1, 1] };
 }
 
+/** EXTENDED control over M's Baton robot (see MEngine.robotGate). */
+export interface RobotGate {
+  on(): boolean;
+  /** held still at this tick (its timer keeps time, the Baton does not move) */
+  held(t: number): boolean;
+  /** a Variable it must not change now */
+  skip(v: VariableName): boolean;
+}
+
 export class MEngine {
   comp: Composition;
   state: EngineState = 'stopped';
@@ -147,6 +156,19 @@ export class MEngine {
    * Density replaces the active Position's value; the others add to (or scale) it.
    */
   mod = neutralMod();
+  /**
+   * EXTENDED hooks — both null in Classic, where the engine runs exactly as before. The
+   * Session sets them only while Extended is on (app/conductor.ts):
+   *   robotGate  whether M's Baton robot runs, when it is held still, and which Variables it
+   *              must leave alone (being Returned Home).
+   *   observer   called inside `render` after every Voice event, action and Baton-robot move,
+   *              at that tick, with what it produced; whatever it returns is emitted at that
+   *              tick. This is where Robots' Rules react, so their timing never depends on
+   *              how finely the scheduler renders.
+   */
+  robotGate: RobotGate | null = null;
+  observer: ((t: number, cause: 'voice' | 'action' | 'robot', produced: EngineEvent[], step: StepEvent | null) => EngineEvent[] | void) | null = null;
+  private robotWasOn = false;
 
   constructor(comp: Composition, opts: EngineOptions = {}) {
     this.comp = comp;
@@ -436,7 +458,12 @@ export class MEngine {
       if (++guard > 100000) break; // defensive: never hang the audio thread
       const offT = this.offs.length ? this.offs[0].tick : Infinity;
       const actT = this.actions.length ? this.actions[0].tick : Infinity;
-      const robT = this.comp.conducting.robot.enabled ? this.robotNext : Infinity;
+      const gate = this.robotGate;
+      const robOn = gate ? gate.on() : this.comp.conducting.robot.enabled;
+      // Extended: a Baton robot switched on while playing joins its grid (no catching up)
+      if (gate && robOn && !this.robotWasOn) this.alignRobot();
+      this.robotWasOn = robOn;
+      const robT = robOn ? this.robotNext : Infinity;
       const seqT = this.seqNextTick();
       let vT = Infinity;
       let vIdx = -1;
@@ -463,10 +490,13 @@ export class MEngine {
         const ev = a.run(t);
         if (ev) out.push(...ev);
         this.opts.onChange?.(a.label);
+        if (this.observer) this.observe(out, t, 'action', ev || []);
         continue;
       }
       if (robT === t) {
-        out.push(...this.robotStep(t));
+        const ev = this.robotStep(t);
+        out.push(...ev);
+        if (this.observer) this.observe(out, t, 'robot', ev);
         continue;
       }
       if (seqT === t) {
@@ -475,10 +505,30 @@ export class MEngine {
         if (this.comp.sequenceEnable) out.push(...this.noteOn(-1, n.channel, n.pitch, n.velocity, t, t + Math.max(1, n.dur)));
         continue;
       }
-      out.push(...this.voiceEvent(vIdx, Math.max(t, this.tick)));
+      const vt = Math.max(t, this.tick);
+      const ev = this.voiceEvent(vIdx, vt);
+      out.push(...ev);
+      if (this.observer) this.observe(out, vt, 'voice', ev);
     }
     if (toTick > this.tick) this.tick = toTick;
     return out;
+  }
+
+  private observe(out: EngineEvent[], t: number, cause: 'voice' | 'action' | 'robot', produced: EngineEvent[]): void {
+    const step = cause === 'voice' && produced[0]?.kind === 'step' ? produced[0] : null;
+    const r = this.observer?.(t, cause, produced, step);
+    if (r && r.length) out.push(...r);
+  }
+
+  /** Put the Baton robot's next jump on its grid at or after the render frontier. */
+  alignRobot(): void {
+    const step = noteValueTicks(Math.max(1, this.comp.conducting.robot.rate));
+    this.robotNext = Math.max(this.robotNext, Math.ceil((this.tick - 1e-9) / step) * step);
+  }
+
+  /** When the Baton robot jumps next (display). */
+  get robotNextTick(): number {
+    return this.robotNext;
   }
 
   private pickLevel(step: CycleStep | undefined, rng: Rng): number {
@@ -732,21 +782,29 @@ export class MEngine {
 
   /** Automatic Conducting (§10): one jump. */
   private robotStep(t: number): EngineEvent[] {
+    this.robotNext = t + noteValueTicks(Math.max(1, this.comp.conducting.robot.rate));
+    return this.robotJump(t);
+  }
+
+  /** One Baton-robot jump at `t` without moving its timer (robotStep; EXTENDED Rules). */
+  robotJump(t: number): EngineEvent[] {
     const r = this.comp.conducting.robot;
-    this.robotNext = t + noteValueTicks(Math.max(1, r.rate));
     const b = this.comp.conducting.baton;
     const dx = (this.robotRng.next() * 2 - 1) * r.hRange;
     const dy = (this.robotRng.next() * 2 - 1) * r.vRange;
     const nx = Math.max(0, Math.min(0.999, b.x + dx));
     const ny = Math.max(0, Math.min(0.999, b.y + dy));
-    return this.conduct(nx, ny, t, false);
+    const gate = this.robotGate;
+    if (gate?.held(t)) return [];
+    return this.conduct(nx, ny, t, false, gate ? (v) => gate.skip(v) : undefined);
   }
 
-  /** Move the baton and apply the result (manual, robot, MIDI conduct). */
-  conduct(x: number, y: number, t: number, fresh: boolean): EngineEvent[] {
+  /** Move the baton and apply the result (manual, robot, MIDI conduct). `skip`: Variables
+   * left alone (EXTENDED: being Returned Home; never set in Classic). */
+  conduct(x: number, y: number, t: number, fresh: boolean, skip?: (v: VariableName) => boolean): EngineEvent[] {
     const res = conductAt(this.comp, x, y, fresh);
     const out: EngineEvent[] = [];
-    for (const p of res.positions) out.push(...this.selectPosition(p.variable, p.position, t));
+    for (const p of res.positions) if (!skip?.(p.variable)) out.push(...this.selectPosition(p.variable, p.position, t));
     if (res.tempo !== null) this.comp.tempo.value = res.tempo;
     if (res.snapshot !== null) {
       const s = this.comp.snapshots[res.snapshot];

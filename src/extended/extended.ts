@@ -13,6 +13,9 @@ import { Rng } from '../engine/rng';
  */
 import type { Cycle, VariableName } from '../engine/types';
 import { defaultTrajectories, type Trajectory } from './trajectory';
+import { defaultRobots, defaultWeights, type RobotDef, type Weights } from './conductors';
+import { defaultHome, defaultReturnSettings, type HomeState, type ReturnSettings } from './home';
+import type { Rule } from './rules';
 
 export type LearnTarget =
   /** a controller sweeps the six Positions; a key steps to the next one */
@@ -111,6 +114,15 @@ export interface ExtendedSettings {
   ab: { a: PerfStateData | null; b: PerfStateData | null; last: 'a' | 'b' | null };
   /** Trajectories (trajectory.ts): four slots */
   trajectories: Trajectory[];
+  /** Robot Conductors (conductors.ts): four; Robot 1 is M's Robot Conductor (format v5) */
+  robots: RobotDef[];
+  /** per-Variable Position weights for the Robots' choices (format v5) */
+  weights: Weights;
+  /** conditional Rules (rules.ts), at most 16 (format v5) */
+  rules: Rule[];
+  /** Home State and Return settings (home.ts) (format v5) */
+  home: HomeState;
+  returnSettings: ReturnSettings;
 }
 
 const VARS: VariableName[] = ['patternGroup', 'noteDensity', 'velocityRange', 'noteOrder', 'transposition', 'timeDistortion', 'rhythm', 'legato', 'accent', 'orchestration', 'soundChoice'];
@@ -203,6 +215,11 @@ export function defaultExtended(): ExtendedSettings {
     voiceSeeds: [null, null, null, null],
     ab: { a: null, b: null, last: null },
     trajectories: defaultTrajectories(),
+    robots: defaultRobots(),
+    weights: defaultWeights(),
+    rules: [],
+    home: defaultHome(),
+    returnSettings: defaultReturnSettings(),
   };
 }
 
