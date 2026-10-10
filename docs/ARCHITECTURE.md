@@ -161,19 +161,23 @@ workflow builds with `--base=/<repository>/`. A small build-time plugin renders
 About windows link to. No server, no third-party requests.
 
 ### Persistence (`src/persistence`)
-`format.ts`: `{ format: "emmm", version, mode, savedAt, composition, ui }` JSON (version 4).
+`format.ts`: `{ format: "emmm", version, mode, savedAt, composition, ui }` JSON (version 5).
 `migrate` upgrades old versions and fills missing fields from defaults; `validate` clamps
 values. Version 1 → 2: Extended gains Locks, Mutation, A/B and per-voice seeds (filled from
 defaults); MIDI Learn mappings leave the document and are handed once to the preferences.
 2 → 3: Trajectories. 3 → 4: `extended.clockIn` moves to `midi.clockIn` (on only if it was on
 *and* Extended was on, so an old file behaves as before); `scaleLock` arrives, off.
+4 → 5: Robot Conductors, Position weights, Rules, Home and Return settings arrive from the
+defaults (Robot 1 = M's Robot Conductor with its settings; Robots 2–4 off; no Rules; no Home),
+all validated on load (docs/CONDUCTORS.md §7).
 
 State lives in four separate places:
 
 | What | Where | Examples |
 |---|---|---|
 | Classic musical document | `Composition` (saved file) | Patterns, Variables, Positions, Snapshots, routing, seed |
-| Extended musical / performance state | `Composition.extended` (saved file) | Locks, Mutation amount, A/B states, voice seeds, CC Cycles, Trajectories |
+| Extended musical / performance state | `Composition.extended` (saved file) | Locks, Mutation amount, A/B states, voice seeds, CC Cycles, Trajectories, Robots, weights, Rules, Home |
+| Extended runtime (never saved) | `Session.traj`, `Session.conductor` | Trajectory steps; Robot positions, Rule counters, Return progress, the activity log |
 | Pattern editing metadata | `Pattern.scale` (saved file, optional) | each Pattern's Root + Scale |
 | emmm Transposition Scale Lock | `Composition.scaleLock` (saved file, default off) | Transposition counts scale degrees |
 | Application preferences | `app/prefs.ts` → `emmm.prefs`; `ui/palette.ts` | tips, Performance Feedback, MIDI Learn mappings; palettes |
@@ -192,9 +196,10 @@ Extended features live in `src/extended/` and the `Composition.extended` setting
 (`enabled` is false by default). The Session consults them at the MIDI-input boundary
 (`extendedLearn`) and in explicit actions (Reroll, Mutate, A/B); the
 engine never reads them, so Classic note generation cannot be affected — tests check this.
-The one engine hook is generic: `MEngine.seedOverride` (per-voice seeds, all `null` = the
-document seed = Classic), which the Session fills from `extended.voiceSeeds` only when
-Extended is on.
+The engine hooks are generic and inert by default: `MEngine.seedOverride` (per-voice seeds,
+all `null` = the document seed = Classic), which the Session fills from `extended.voiceSeeds`
+only when Extended is on; and `MEngine.robotGate` / `MEngine.observer` (both `null` in Classic),
+which the Conductor installs only while Extended is on (see below).
 
 * `extended.ts` — settings, MIDI Learn targets / validation / conflict rule (`learnInto`).
 * `mutation.ts` — `mutate(comp, amount, locks, rng)`: changes the active Positions' values,
@@ -212,6 +217,20 @@ Extended is on.
   Undo steps; definitions are in `extended.trajectories` (document v3).
 * `perfState.ts` — A/B capture / recall of the performance state (a plain object keyed by
   composition field, ready for interpolation if morphing is added later).
+* `conductors.ts`, `home.ts`, `rules.ts` — Robot Conductors (model, ten personalities as pure
+  `decide` functions, weighted candidates, validation, cycle checks), Home / Return paths by
+  musical value and distance, and the Rule model (conditions, actions, timing, summaries,
+  validation). Pure; no Session, no engine. Design and every algorithm: docs/CONDUCTORS.md.
+* `app/conductor.ts` — the runtime (`Session.conductor`). Robot decisions, interval Rules and
+  Return steps are exact-tick engine actions (labels `cond`, `rule`, `return`); Rules react
+  through `MEngine.observer` (called inside `render` after every Voice event, action and
+  Baton-robot move), so results do not depend on render granularity; `poke()` lets Rules see a
+  hand at once (from `Session.changed`, never inside `render`, flagged by `MEngine.rendering`).
+  `robotGate` parks, holds or fences M's Baton robot. Ownership of a Variable's Position is
+  RETURN > TRAJECTORY > ROBOT (`Conductor.owns`); Trajectories ask it in `trajApply`. A bounded
+  FIFO queue, once-per-moment firing and a depth limit of 3 keep Rules finite.
+* `ui/robotsWindow.ts` — the Robots window (overview, activity log, ROBOT / WEIGHTS / RULES /
+  HOME tabs); every control calls a Session method (one Undo step each).
 
 A Pattern's Root + Scale (`Pattern.scale`, `app/scales.ts`) is editing metadata: pitch-class
 sets that shade the grid, snap new notes, and — when changed with `Session.setPatternScale` —
