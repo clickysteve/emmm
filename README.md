@@ -120,15 +120,19 @@ moves the notes by scale degree) and an optional Transposition **Scale Lock** (T
 counts degrees of each Pattern's scale), typing any number directly, keyboard shortcuts
 (Return = Play / Pause, Space = Stop / Play), mouse-wheel and trackpad scrolling in the Pattern Editor, MIDI clock
 in and out in one MIDI Settings window, emmm-style tooltips and pop-up menus, and full
-screen. 373 automated tests (including a seeded
+screen. 477 automated tests (including a seeded
 fuzz test, worked examples, and the whole app driven through its menus in a simulated browser)
-cover the engine, timing maths, persistence, session logic, the interface and Extended.
+cover the engine, timing maths, persistence, session logic, the interface and Extended, and
+`npm run test:browser` drives the real app in headless Chrome with a fake MIDI device.
 
 **Extended** (Options ▸ Extended…, off by default) explores what M might have become: Seed and
 Reroll, Locks, controlled Mutation (subtle → chaos), A/B performance states, MIDI Learn for
 almost every control, Performance Feedback, CC Cycles and
 Trajectory (rows of values moved through at musical rates, driving MIDI controllers or
-parameters).
+parameters), and **Robot Conductors** (Options ▸ Robots, Rules & Home…, ⌥W): four Robots —
+Robot 1 is M's own — each moving its own Variables at its own rate with one of ten
+personalities, per-Variable Position weights, conditional Rules (WHEN … THEN …) and a Home the
+music can be brought back to gradually. See [docs/CONDUCTORS.md](docs/CONDUCTORS.md).
 These are modern additions, not features of the original M, and they never change how Classic
 generates notes.
 
@@ -161,6 +165,7 @@ The same note appears in the app under **emmm ▸ About emmm…**.
 * [docs/M-BEHAVIOUR.md](docs/M-BEHAVIOUR.md) — the reconstructed behavioural specification
 * [docs/EXAMPLES.md](docs/EXAMPLES.md) — worked input → output examples (also tests)
 * [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — how emmm works
+* [docs/CONDUCTORS.md](docs/CONDUCTORS.md) — Extended Robot Conductors, weights, Rules, Home
 * [docs/UNCERTAINTIES.md](docs/UNCERTAINTIES.md) — what still needs checking against M
 * [docs/ROADMAP.md](docs/ROADMAP.md) — remaining Classic work and Extended ideas
 * [docs/PROVENANCE.md](docs/PROVENANCE.md) — sources and licensing notes

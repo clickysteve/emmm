@@ -801,6 +801,7 @@ The most useful:
 | ⌥T | metronome on/off |
 | ⌥↩ | full screen |
 | ⌥X · ⌥R · ⌥A ⌥B · ⇧⌥A ⇧⌥B · ⌥O · ⌥J | Extended: Mutate · Reroll · recall A / B · capture A / B · Performance Feedback · Trajectory |
+| ⌥W · ⇧⌥H | Extended: Robots window (again: keyboard into it) · Return Home |
 
 In the **Pattern Editor** (when it is the front window): **← →** move through the steps (**⇧**
 selects), **⌘A** selects all, **⌫** deletes the selected steps (with nothing selected,
@@ -854,6 +855,8 @@ all does nothing.
   the velocity and the channels — plus the active Positions, Locks and A/B state.
 - **CC Cycles** drive MIDI controllers with M-style cyclic patterns, one per Voice.
 - **Trajectory** (Extended button **Traject…**, **⌥J**, or **Windows ▸ Trajectory**) — see below.
+- **Robots, Rules & Home** (Extended button **Robots…**, **⌥W**, or **Options ▸ Robots, Rules &
+  Home…**) — four Robot Conductors, Position weights, Rules and a Home to return to; see below.
 
 ### Trajectory
 
@@ -887,6 +890,67 @@ and Cyclic Variables carry on as before. It is emmm's idea, not part of M.
 - The current step is outlined and its bar marked; **Performance Feedback** lists each
   Trajectory's step and value. Controller messages go into the MIDI **Movie** (and so into the
   exported file). Trajectories are saved with the document; editing them is undoable.
+
+### Robots, Rules and Home
+
+M had one Robot Conductor: it jumps the Baton around the Conducting Grid. Extended gives you
+**four**, each with its own Variables, speed and *personality*, plus **weights** that make some
+Positions likelier, **Rules** that react to what happens, and a **Home** the music can be
+brought back to. The design notes, with every algorithm, are in [CONDUCTORS.md](CONDUCTORS.md).
+
+![The Robots window: the four Robots, the activity log and the ROBOT tab](images/qs-robots.png)
+
+- **Switch a Robot on:** click its number in the overview (inverted = on). **Robot 1 is M's own
+  Robot Conductor** — the same switch as the Conducting window's robot button, playing M's
+  algorithm (*Baton (M)*) unless you give it another personality. Robots 2–4 start off.
+- **Give it Variables:** in the **ROBOT** tab, click the Variable toggles (Note Density,
+  Velocity, Legato …). A Robot holds one Position (1–6) and puts all its Variables there — the
+  overview shows it inverted. Click a row of the overview to edit another Robot.
+- **Speed:** the **rate** is a Time Base like a Pattern's: one decision every `n | d` of a whole
+  note — `1|4` a beat, `1|1` a bar, `2|1` two bars, `16|1` sixteen bars. Type `2/1` to set both.
+  **sa** = it moves only when a Rule tells it to.
+- **Personality:** how it chooses. **Drunk** wanders to nearby Positions; **Tourist** avoids
+  where it has just been; **Homebody** keeps going back to its Home; **Restless** gets likelier
+  to move the longer it stays; **Orbit** goes 1 2 3 4 5 6 1 …; **Pendulum** goes up and back;
+  **Chaotic** jumps far; **Curious** returns to favourites and sometimes explores;
+  **Follower** goes where another Robot is (or copies its moves); **Contrarian** goes the other
+  way. Only the chosen personality's settings are shown, with a description of what it does;
+  **Defaults** resets them. A Follower cannot watch a Robot that watches it back (the choice is
+  greyed out).
+- **Who wins:** Robots may share a Variable. If two change it at the same moment, the lower
+  number wins; otherwise the latest change stands. Your own clicks always work.
+- **WEIGHTS:** choose a Variable, then drag its six bars (or type the numbers): a taller bar is
+  picked more often; the % under each is its chance; **0** = never picked by a Robot (hatched,
+  "excluded"). One Position always stays allowed. **Equalise**, **Random**, **Favour now**,
+  **Favour ⌂** and **Reset** do the whole row. Orbit, Pendulum and Follower only use which
+  Positions are allowed, not how heavy they are.
+- **RULES:** **+ New Rule**, then choose **WHEN** (a Voice completes a cycle, a Robot moves or
+  reaches a Position or its Home, a Variable reaches a Position, every *n* bars, Home is
+  reached, a Return finishes; **every Nth** time if you like) and **THEN** (advance a Robot,
+  make it choose a new Position, switch it on / off, change its personality, set a Position,
+  recall a Snapshot, Return Home, pause a Robot for a while), and **AT** — *now*, the next
+  **Q** (Snapshot quantization) point, the next **beat** or the next **bar**. The list shows
+  each Rule in words and when it last fired. Rules react to your clicks at once, even while
+  stopped (a timed one then waits for Start); they never start the music or play notes by
+  themselves. Each Rule fires at most once a moment, and chains stop after three steps, so
+  Rules cannot run away.
+
+![The HOME tab during a Return](images/qs-robots-home.png)
+
+- **HOME:** **Capture Home** remembers where every Variable is. Let the Robots wander, then
+  press **RETURN HOME** (or **⇧⌥H**, or a Rule): over the **duration** (`2|1` = two bars) the
+  included Variables walk back through the Positions *in between* — by musical value, so a
+  Density at 10 % comes back via 40 % and 70 % to 100 % — and the list shows each one
+  returning, home, or excluded. **Immediate** jumps Home at once. While a Variable is
+  returning, and for the **rest** beats afterwards, only the Return moves it: Robots and
+  Trajectories wait, then carry on from Home. Press the button again to stop a Return.
+- **Activity:** the log (top right) says what just happened — which Robot moved and what it
+  changed, which Rule fired, how the Return is going. **Clear** empties it.
+- **Keyboard:** clicks never take the keys away from the music (Space / Return stay Stop /
+  Play / Pause). Press **⌥W** again on the open window to move the keyboard into it, then
+  **← →** to move, **Enter / Space** to act, **Escape** to give the keys back.
+- Everything is saved with the document (not the Robots' positions or the log), every edit is
+  one **⌘Z**, and with Extended off none of it runs: Classic M plays exactly as before.
 
 ---
 

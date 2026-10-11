@@ -86,6 +86,15 @@
   16 steps × levels 0–4, random ranges) sends a controller value before each played note on the
   voice's orchestrated channels; six Positions; a global level → value table. Runs in the
   Session from the engine's step events with its own random stream.
+* **Robot Conductors** (docs/CONDUCTORS.md): four Robots (Robot 1 = M's Robot Conductor,
+  unchanged), each with its own Variables, Time Base rate and one of ten personalities (Drunk,
+  Tourist, Homebody, Restless, Orbit, Pendulum, Chaotic, Curious, Follower, Contrarian);
+  deterministic priority when they share a Variable; per-Variable **Position weights**;
+  **Rules** (WHEN condition THEN action, at now / Q / beat / bar; bounded, once per moment,
+  depth 3; they see manual changes at once, also while stopped); **Home and Return** along
+  musical-value paths, with Return owning its Variables (Return > Trajectory > Robot) through
+  a rest period. The Robots window, document format 5, unit, simulated-browser and real-Chrome
+  (fake MIDI) tests.
 * Tests prove Classic note output is unchanged by Extended settings.
 
 ## Extended — further ideas (keep separate from Classic)
@@ -94,6 +103,10 @@
 * Tempo sharing beyond MIDI clock (e.g. Link-style network sync).
 * Learnable mappings for every on-screen control (numericals, range bars, edit windows).
 * Morphing between A and B (the A/B state format is field-by-field, ready for it).
+* Robot / Rule ideas not in version 1: per-Variable Positions for one Robot, Rules on
+  Trajectory steps or MIDI input, Return ownership against Slideshows and Snapshots too,
+  suspending note-level Trajectory modulation during a Return, Tab-style focus order inside
+  windows (Tab is M's Pause key), test with real MIDI hardware.
 * Trajectory ideas not in version 1: per-step probability or durations, restart-on-Sync,
   Trajectories driving other Trajectories, MIDI Learn for single Trajectory values.
 * Scale-constrained *output* as an explicit Extended option (a Pattern's scale only

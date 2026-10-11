@@ -293,7 +293,7 @@ describe('Scale Lock in the document', () => {
     doc.version = 3;
     delete doc.composition.scaleLock;
     const back = deserialize(JSON.stringify(doc));
-    expect(back.version).toBe(4);
+    expect(back.version).toBe(5);
     expect(back.composition.scaleLock).toBe(false);
   });
   it('a hand-edited non-boolean value is refused (off)', () => {

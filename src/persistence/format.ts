@@ -19,6 +19,12 @@
  *      MIDI infrastructure and now works whether or not Extended is on. It only ever ran with
  *      Extended on, so an older file's clock input is carried over switched on only if both
  *      were on — the file behaves as it did. The emmm Transposition `scaleLock` arrives (off).
+ *   5  Extended gains Robot Conductors, Position weights, Rules, Home and Return settings
+ *      (docs/CONDUCTORS.md), filled from the defaults for older files: Robot 1 is M's Robot
+ *      Conductor with its existing settings (personality "Baton (M)"; its Position-robot rate
+ *      is taken from M's robot rate), Robots 2–4 off, equal weights, no Rules, no Home — the
+ *      file plays exactly as before. All of it is validated on load (references clamped,
+ *      Follower cycles broken, unknown rules dropped).
  *
  * Each Pattern may carry an emmm `scale` ({ root, scale }); files without it load as
  * Chromatic with their notes untouched (no version change was needed: it is optional).
@@ -31,9 +37,13 @@ import { defaultComposition } from '../engine/defaults';
 import type { Composition } from '../engine/types';
 import { cleanChoice } from '../app/scales';
 import { cleanTrajectory } from '../extended/trajectory';
+import { cleanRobots, cleanWeights } from '../extended/conductors';
+import { cleanHome, cleanReturnSettings } from '../extended/home';
+import { cleanRules } from '../extended/rules';
+import type { ExtendedSettings } from '../extended/extended';
 
 export const FORMAT_ID = 'emmm';
-export const FORMAT_VERSION = 4;
+export const FORMAT_VERSION = 5;
 
 export interface UiState {
   windows?: Record<string, { x: number; y: number; open: boolean }>;
@@ -132,6 +142,13 @@ function restoreVariableArrays(comp: Composition, raw: Composition): void {
   // Trajectory value lists have their own lengths (never padded from the defaults)
   const rt = (raw.extended as { trajectories?: unknown[] } | undefined)?.trajectories;
   comp.extended.trajectories = comp.extended.trajectories.map((d, i) => cleanTrajectory(Array.isArray(rt) && rt[i] ? rt[i] : d));
+  // Robot Conductors, weights, Rules, Home (v5): user-length lists, validated from the file
+  const rx = raw.extended as Partial<ExtendedSettings> | undefined;
+  comp.extended.robots = cleanRobots(rx?.robots ?? comp.extended.robots);
+  comp.extended.weights = cleanWeights(rx?.weights ?? comp.extended.weights);
+  comp.extended.rules = cleanRules(rx?.rules);
+  comp.extended.home = cleanHome(rx?.home);
+  comp.extended.returnSettings = cleanReturnSettings(rx?.returnSettings);
   comp.snapshots = comp.snapshots.map((_, i) => (raw.snapshots?.[i] ? structuredClone(raw.snapshots[i]) : null));
   comp.slideshows = comp.slideshows.map((_, i) => (raw.slideshows?.[i] ? structuredClone(raw.slideshows[i]) : null));
 }
@@ -143,6 +160,7 @@ export function migrate(doc: Record<string, unknown>): EmmmDocument {
   if (!Number.isFinite(version) || version < 1) throw new FormatError('Unknown emmm document version');
   if (version > FORMAT_VERSION) throw new FormatError(`This document was saved by a newer emmm (format v${version})`);
   const raw = (doc.composition ?? {}) as Composition;
+  const before5 = version < 5;
   let legacyLearn: unknown[] | undefined;
   if (version < 4) {
     // v3 → v4: Extended's clock input becomes the MIDI settings' clock input
@@ -174,6 +192,14 @@ export function migrate(doc: Record<string, unknown>): EmmmDocument {
   delete (comp.extended as { learn?: unknown }).learn;
   delete (comp.extended as { clockIn?: unknown }).clockIn;
   restoreVariableArrays(comp, raw);
+  if (before5) {
+    // v4 → v5: Robot 1 is M's Robot Conductor; should it become a Position robot, it keeps
+    // M's robot rate (one move per note value)
+    const r0 = comp.extended.robots[0];
+    r0.personality = 'baton';
+    r0.rateNum = 1;
+    r0.rateDen = [1, 2, 4, 8].includes(comp.conducting.robot.rate) ? comp.conducting.robot.rate : 1;
+  }
   validate(comp);
   return { format: FORMAT_ID, version, mode: doc.mode === 'extended' ? 'extended' : 'classic', savedAt: String(doc.savedAt ?? ''), composition: comp, ui: (doc.ui as UiState) ?? {}, legacyLearn };
 }

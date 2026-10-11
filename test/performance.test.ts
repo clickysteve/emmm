@@ -444,7 +444,7 @@ describe('persistence: Classic document, Extended state, preferences', () => {
     s.abCapture('a');
     const doc = deserialize(serialize(s.comp));
     expect(doc.version).toBe(FORMAT_VERSION);
-    expect(FORMAT_VERSION).toBe(4);
+    expect(FORMAT_VERSION).toBe(5);
     expect(doc.mode).toBe('extended');
     expect(doc.composition.extended.locks.dims.accent).toBe(true);
     expect(doc.composition.extended.mutation.amount).toBe(70);
@@ -471,7 +471,7 @@ describe('persistence: Classic document, Extended state, preferences', () => {
     onLegacyLearn((l) => (adopted = l));
     const doc = deserialize(JSON.stringify(v1));
     onLegacyLearn(null);
-    expect(doc.version).toBe(4);
+    expect(doc.version).toBe(5);
     expect('learn' in doc.composition.extended).toBe(false);
     expect(doc.composition.extended.locks).toEqual(defaultLocks());
     expect(doc.composition.extended.voiceSeeds).toEqual([null, null, null, null]);

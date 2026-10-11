@@ -28,13 +28,21 @@ import { freshSeed } from '../engine/rng';
 import { assignDeep } from './assign';
 import { History } from './history';
 import { CHROMATIC, cleanChoice, transformSteps, type ScaleChoice } from './scales';
+import { Conductor } from './conductor';
+import { cleanParams, createsCycle, DEFAULT_WEIGHT, defaultParams, MAX_WEIGHT, personalityInfo, ROBOT_VARS, VAR_LONG, type RobotDef, type RobotParams, type RobotVar } from '../extended/conductors';
+import { captureHome, cleanReturnSettings, type ReturnSettings } from '../extended/home';
+import { cleanRule, defaultRule, MAX_RULES, type Rule } from '../extended/rules';
 
 function trajTargetKey(t: TrajTarget): string {
   return t.kind === 'position' ? 'position:' + t.variable : t.kind === 'cc' ? `cc:${t.channel}:${t.cc}` : t.kind;
 }
 
 /** Changes that are about playing or viewing, not editing: they never make an Undo step. */
-const TRANSIENT = new Set(['editor', 'baton', 'tempo', 'transport', 'select', 'window', 'step', 'mouse', 'learn', 'hold', 'movie', 'sync', 'load', 'undo', 'midi', 'transpose', 'ics', 'clock', 'feedback', 'ab-recall', 'trajectory']);
+const TRANSIENT = new Set(['editor', 'baton', 'tempo', 'transport', 'select', 'window', 'step', 'mouse', 'learn', 'hold', 'movie', 'sync', 'load', 'undo', 'midi', 'transpose', 'ics', 'clock', 'feedback', 'ab-recall', 'trajectory', 'conductor']);
+/** Changes after which the Robot Conductors re-join their grids (app/conductor.ts). */
+const CONDUCTOR_SYNC = new Set(['extended', 'robot', 'conductors']);
+/** Changes by a hand (or a definition edit) that Rules should see at once (Conductor.poke). */
+const CONDUCTOR_POKE = new Set(['patternGroup', 'noteDensity', 'velocityRange', 'noteOrder', 'transposition', 'timeDistortion', 'accent', 'legato', 'rhythm', 'orchestration', 'soundChoice', 'snapshot', 'ab-recall', 'mutation', 'baton', 'conductors', 'arrows', 'undo']);
 
 export interface VisualEvent {
   ms: number;
@@ -117,8 +125,11 @@ export class Session {
   constructor(comp?: Composition) {
     this.comp = comp ?? defaultComposition();
     this.editRng = new Rng(this.comp.seed, 500);
-    // Trajectory actions ('traj') report their own visible changes (see trajApply)
-    this.engine = new MEngine(this.comp, { onChange: (w) => w !== 'traj' && this.changed(w) });
+    // Trajectory actions ('traj') and the Conductor's ('cond', 'rule', 'return') report their
+    // own visible changes (see trajApply, conductor.ts)
+    this.engine = new MEngine(this.comp, { onChange: (w) => w !== 'traj' && w !== 'cond' && w !== 'rule' && w !== 'return' && this.changed(w) });
+    this.conductor = new Conductor(this);
+    this.conductor.attach();
     this.scheduler = new Scheduler(
       this.engine,
       () => this.comp.tempo.value,
@@ -146,6 +157,8 @@ export class Session {
     this.dirty = true;
     this.rev++;
     if (what !== 'trajectory') this.trajManual(what);
+    if (CONDUCTOR_SYNC.has(what)) this.conductor.sync();
+    if (CONDUCTOR_POKE.has(what) && this.comp.extended.enabled) this.emitNow(this.conductor.poke());
     if (!TRANSIENT.has(what)) this.historySoon();
     this.listeners.forEach((f) => f(what));
   }
@@ -236,14 +249,14 @@ export class Session {
 
   undo(): boolean {
     if (this.historyTimer) clearTimeout(this.historyTimer), (this.historyTimer = null);
-    const ok = this.history.undo((st) => (this.restoreDoc(st), this.trajSync()));
+    const ok = this.history.undo((st) => (this.restoreDoc(st), this.trajSync(), this.conductor.sync()));
     if (ok) this.notify('undo');
     return ok;
   }
 
   redo(): boolean {
     if (this.historyTimer) clearTimeout(this.historyTimer), (this.historyTimer = null);
-    const ok = this.history.redo((st) => (this.restoreDoc(st), this.trajSync()));
+    const ok = this.history.redo((st) => (this.restoreDoc(st), this.trajSync(), this.conductor.sync()));
     if (ok) this.notify('undo');
     return ok;
   }
@@ -389,6 +402,7 @@ export class Session {
       if (this.clockOut) this.midi.send(this.clockOut, msg.START);
       this.ccRunner.reset(this.comp.seed);
       this.trajStart();
+      this.conductor.start();
       this.scheduler.started();
       if (this.slideshowPlay?.waiting) this.beginSlideshowPlayback();
       if (this.slideshowRec && !this.comp.options.slideshowRecordWait) this.slideshowRec.start = 0;
@@ -412,6 +426,7 @@ export class Session {
     const evs = this.engine.stop();
     if (evs.length) this.dispatch(evs, () => offAt);
     this.trajStop();
+    this.conductor.stop();
     this.scheduler.stopped();
     this.scheduler.limitTick = Infinity;
     this.tapConduct.active = false;
@@ -1373,14 +1388,17 @@ export class Session {
         this.comp.extended.mutation.amount = Math.round(value);
         this.dirty = true;
         return;
+      // Return > Trajectory > Robot: a Variable being Returned Home (or resting there) is not
+      // written by a Trajectory; its phase runs on, and it writes again at its next step
       case 'batonX':
         this.dirty = true;
-        return this.engine.conduct(value / 100, this.comp.conducting.baton.y, t, false);
+        return this.engine.conduct(value / 100, this.comp.conducting.baton.y, t, false, (v) => this.conductor.owns(v, t));
       case 'batonY':
         this.dirty = true;
-        return this.engine.conduct(this.comp.conducting.baton.x, value / 100, t, false);
+        return this.engine.conduct(this.comp.conducting.baton.x, value / 100, t, false, (v) => this.conductor.owns(v, t));
       case 'position': {
         const pos = Math.max(0, Math.min(5, Math.round(value) - 1));
+        if (this.conductor.owns(tg.variable, t)) return;
         if ((this.comp[tg.variable] as { active: number }).active === pos) return;
         return this.engine.selectPosition(tg.variable, pos, t);
       }
@@ -1511,6 +1529,223 @@ export class Session {
     this.changed('trajectory-edit');
   }
 
+  // ------------------------------------------------------------------ EXTENDED: Robot Conductors, Weights, Rules, Home
+
+  /** Robots, Rules and Return at run time (app/conductor.ts). */
+  readonly conductor: Conductor;
+
+  /** Recall a Snapshot at an exact tick (a Rule's action), keeping Restore working. */
+  recallSnapshotAt(index: number, t: number): EngineEvent[] | null {
+    const s = this.comp.snapshots[index];
+    if (!s) return null;
+    this.undoSnapshot = captureLike(this.comp, s);
+    this.currentSnapshot = index;
+    return this.engine.applySnapshot(s, t);
+  }
+
+  /** A Robot's on / off as the document has it (Robot 1 = M's robot button). */
+  robotEnabled(i: number): boolean {
+    return i === 0 ? this.comp.conducting.robot.enabled : !!this.comp.extended.robots[i]?.enabled;
+  }
+
+  setRobotEnabled(i: number, on: boolean): void {
+    if (i === 0) this.comp.conducting.robot.enabled = on;
+    else if (this.comp.extended.robots[i]) this.comp.extended.robots[i].enabled = on;
+    this.conductor.enabledOverride[i] = null; // the hand takes over from a Rule
+    this.changed('conductors');
+  }
+
+  /** Change a Robot's definition (one Undo step). Refuses a Follower cycle. */
+  setRobot(i: number, patch: Partial<Omit<RobotDef, 'params' | 'enabled'>>): boolean {
+    const robots = this.comp.extended.robots;
+    const cur = robots[i];
+    if (!cur) return false;
+    const next = { ...cur, ...patch };
+    if (next.personality === 'baton' && i !== 0) return false;
+    if ((next.personality === 'follower' || next.personality === 'contrarian') && createsCycle(robots.map((r, k) => (k === i ? next : r)), i, next.target)) {
+      this.status = `Robot ${i + 1} cannot watch Robot ${(next.target ?? 0) + 1}: they would be watching each other`;
+      this.changed('conductor');
+      return false;
+    }
+    if (patch.personality) this.conductor.personalityOverride[i] = null;
+    for (const [k, v] of Object.entries(patch)) if (v !== undefined) (cur as unknown as Record<string, unknown>)[k] = v;
+    this.changed('conductors');
+    return true;
+  }
+
+  setRobotParam<K extends keyof RobotParams>(i: number, k: K, value: RobotParams[K]): void {
+    const r = this.comp.extended.robots[i];
+    if (!r) return;
+    r.params = cleanParams({ ...r.params, [k]: value });
+    this.changed('conductors');
+  }
+
+  /** Put the selected personality's own parameters back to their defaults (others untouched). */
+  resetRobotParams(i: number): void {
+    const r = this.comp.extended.robots[i];
+    if (!r) return;
+    const d = defaultParams() as unknown as Record<string, unknown>;
+    const p = { ...r.params } as unknown as Record<string, unknown>;
+    for (const k of personalityInfo(r.personality).params) p[k] = d[k];
+    r.params = cleanParams(p);
+    this.changed('conductors');
+  }
+
+  /** Could Robot i watch Robot t (Follower / Contrarian) without a cycle? */
+  canWatch(i: number, t: number): boolean {
+    const robots = this.comp.extended.robots;
+    if (t === i || !robots[t]) return false;
+    return !createsCycle(robots.map((r, k) => (k === i ? { ...r, personality: 'follower' as const, target: t } : r)), i, t);
+  }
+
+  /** M's Baton robot (Robot 1's Baton personality): rate as a note value, jump ranges 0–1. */
+  setBatonRobot(patch: Partial<{ rate: number; hRange: number; vRange: number }>): void {
+    const r = this.comp.conducting.robot;
+    if (patch.rate !== undefined && [1, 2, 4, 8].includes(patch.rate)) r.rate = patch.rate;
+    if (patch.hRange !== undefined) r.hRange = Math.max(0, Math.min(1, patch.hRange));
+    if (patch.vRange !== undefined) r.vRange = Math.max(0, Math.min(1, patch.vRange));
+    this.changed('robot');
+  }
+
+  toggleRobotVariable(i: number, v: RobotVar): void {
+    const r = this.comp.extended.robots[i];
+    if (!r) return;
+    r.variables = r.variables.includes(v) ? r.variables.filter((x) => x !== v) : ROBOT_VARS.filter((x) => x === v || r.variables.includes(x));
+    this.changed('conductors');
+  }
+
+  /** One Position weight (0 excludes it from random choices; one must stay above 0). */
+  setWeight(v: RobotVar, p: number, w: number): void {
+    const row = this.comp.extended.weights[v];
+    if (!row || p < 0 || p >= row.length || !Number.isFinite(w)) return;
+    const x = Math.max(0, Math.min(MAX_WEIGHT, Math.round(w)));
+    if (x === 0 && row.every((y, k) => k === p || y === 0)) {
+      this.status = `${VAR_LONG[v]}: at least one Position must stay eligible`;
+      this.changed('conductor');
+      return;
+    }
+    row[p] = x;
+    this.changed('conductors');
+  }
+
+  /**
+   * Whole-row weight operations: Equalise (eligible Positions equal, exclusions kept), Random
+   * (new weights for the eligible ones, from the editing stream), Favour current / Home (that
+   * Position 60, other eligible ones 10), Reset (all 10).
+   */
+  weightOp(v: RobotVar, op: 'equal' | 'random' | 'current' | 'home' | 'reset'): void {
+    const row = this.comp.extended.weights[v];
+    if (!row) return;
+    const fav = (p: number) => row.forEach((w, k) => (row[k] = k === p ? 60 : w > 0 ? DEFAULT_WEIGHT : 0));
+    switch (op) {
+      case 'equal':
+        row.forEach((w, k) => (row[k] = w > 0 ? DEFAULT_WEIGHT : 0));
+        break;
+      case 'random':
+        row.forEach((w, k) => (row[k] = w > 0 ? this.editRng.int(1, MAX_WEIGHT) : 0));
+        break;
+      case 'current':
+        fav((this.comp[v] as { active: number }).active);
+        break;
+      case 'home': {
+        const h = this.comp.extended.home.positions?.[v];
+        if (h === undefined) {
+          this.status = 'No Home captured yet (Home tab ▸ Capture)';
+          this.changed('conductor');
+          return;
+        }
+        fav(h);
+        break;
+      }
+      case 'reset':
+        row.forEach((_, k) => (row[k] = DEFAULT_WEIGHT));
+        break;
+    }
+    this.changed('conductors');
+  }
+
+  /** Add a Rule (at most 16); returns its index or -1. */
+  addRule(rule: Rule = defaultRule()): number {
+    const rules = this.comp.extended.rules;
+    if (rules.length >= MAX_RULES) return -1;
+    const r = cleanRule(rule);
+    if (!r) return -1;
+    rules.push(r);
+    this.changed('conductors');
+    return rules.length - 1;
+  }
+
+  setRule(i: number, patch: Partial<Rule>): void {
+    const rules = this.comp.extended.rules;
+    const r = rules[i] && cleanRule({ ...rules[i], ...patch });
+    if (!r) return;
+    rules[i] = r; // a new object: its counters start again
+    this.changed('conductors');
+  }
+
+  duplicateRule(i: number): number {
+    const r = this.comp.extended.rules[i];
+    if (!r || this.comp.extended.rules.length >= MAX_RULES) return -1;
+    this.comp.extended.rules.splice(i + 1, 0, structuredClone(r));
+    this.changed('conductors');
+    return i + 1;
+  }
+
+  moveRule(i: number, d: number): number {
+    const rules = this.comp.extended.rules;
+    const j = i + d;
+    if (!rules[i] || j < 0 || j >= rules.length) return i;
+    [rules[i], rules[j]] = [rules[j], rules[i]];
+    this.changed('conductors');
+    return j;
+  }
+
+  deleteRule(i: number): void {
+    if (!this.comp.extended.rules[i]) return;
+    this.comp.extended.rules.splice(i, 1);
+    this.changed('conductors');
+  }
+
+  /** Capture (or replace) Home: every Variable's active Position and the Baton. */
+  captureHome(): void {
+    const ext = this.comp.extended;
+    ext.home = captureHome(this.comp, ext.home);
+    this.conductor.homeChanged();
+    this.status = 'Home captured';
+    this.changed('conductors');
+  }
+
+  clearHome(): void {
+    const ext = this.comp.extended;
+    this.conductor.cancelReturn();
+    ext.home = { positions: null, baton: null, include: ext.home.include };
+    this.conductor.homeChanged();
+    this.changed('conductors');
+  }
+
+  setHomeInclude(v: VariableName, on: boolean): void {
+    this.comp.extended.home.include[v] = on;
+    this.conductor.homeChanged();
+    this.changed('conductors');
+  }
+
+  setReturnSettings(patch: Partial<ReturnSettings>): void {
+    const ext = this.comp.extended;
+    ext.returnSettings = cleanReturnSettings({ ...ext.returnSettings, ...patch });
+    this.changed('conductors');
+  }
+
+  /** Return Home (gradual unless `immediate` or the setting says so); again while returning cancels. */
+  returnHome(immediate = false): void {
+    if (!this.comp.extended.enabled) return;
+    if (this.conductor.ret) {
+      this.conductor.cancelReturn();
+    } else {
+      this.emitNow(this.conductor.returnHome(this.scheduler.frontierTick(), immediate));
+    }
+    this.changed('conductor');
+  }
+
   // ------------------------------------------------------------------ EXTENDED: seed, locks, mutation, A/B
 
   /** Seeds for the engine: per-voice overrides only count in Extended mode. */
@@ -1532,6 +1767,7 @@ export class Session {
     this.applySeedOverrides();
     if (this.engine.state !== 'stopped') this.engine.voices.forEach((_, v) => !ext.locks.voices[v] && this.engine.reseedVoice(v, this.comp.seed));
     this.trajRngs = this.trajRngs.map((_, i) => trajRng(this.comp.seed, i));
+    this.conductor.reseed();
     this.status = `Reroll: seed ${this.comp.seed}`;
     this.changed('seed');
   }
@@ -1855,6 +2091,8 @@ export class Session {
     if (comp.midi.outputs.every((o) => !o.port)) comp.midi = structuredClone(this.comp.midi);
     this.comp = comp;
     this.emitNow(this.engine.load(comp));
+    this.conductor.stop();
+    this.conductor.attach();
     this.editRng = new Rng(comp.seed, 500);
     this.hold = null;
     this.currentSnapshot = null;
