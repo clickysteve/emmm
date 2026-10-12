@@ -72,7 +72,7 @@ beforeEach(() => {
 });
 
 describe('opening', () => {
-  it('Options ▸ Robots, Rules & Home… opens it; Windows lists it; the Extended window has a button; ⌥W too', () => {
+  it('Options ▸ Robots, Rules & Home… opens it; Windows lists it; the Mutation & Variation window has a button; ⌥W too', () => {
     pd([...document.querySelectorAll('#menubar .menu')].find((m) => m.firstChild?.textContent === 'Options')!);
     const item = [...document.querySelectorAll<HTMLDivElement>('.dropdown .item')].find((i) => i.firstElementChild!.textContent!.startsWith('Robots, Rules & Home'))!;
     expect(item.querySelector('.key')!.textContent).toMatch(/W/);
@@ -86,10 +86,10 @@ describe('opening', () => {
     const z0 = [...document.querySelectorAll<HTMLDivElement>('.mwin')].map((w) => Number(w.style.zIndex || 0));
     expect(Number(win().style.zIndex)).toBe(Math.max(...z0));
     pd([...document.querySelectorAll('#menubar .menu')].find((m) => m.firstChild?.textContent === 'Windows')!);
-    expect([...document.querySelectorAll('.dropdown .item')].map((i) => i.firstElementChild!.textContent)).toContain('Robots  (Extended)');
+    expect([...document.querySelectorAll('.dropdown .item')].map((i) => i.firstElementChild!.textContent)).toContain('Robots');
     window.dispatchEvent(new PointerEvent('pointerdown'));
     pd([...document.querySelectorAll('#menubar .menu')].find((m) => m.firstChild?.textContent === 'Options')!);
-    pu([...document.querySelectorAll<HTMLDivElement>('.dropdown .item')].find((i) => i.firstElementChild!.textContent!.startsWith('Extended…'))!);
+    pu([...document.querySelectorAll<HTMLDivElement>('.dropdown .item')].find((i) => i.firstElementChild!.textContent!.startsWith('Mutation & Variation…'))!);
     draw();
     const ext = document.querySelector('[data-win="extended"]')!;
     const rb = [...ext.querySelectorAll<HTMLDivElement>('.btn')].find((b) => b.textContent === 'Robots…')!;
@@ -98,16 +98,38 @@ describe('opening', () => {
     const zs = [...document.querySelectorAll<HTMLDivElement>('.mwin')].map((w) => Number(w.style.zIndex || 0));
     expect(Number(win().style.zIndex)).toBe(Math.max(...zs));
   });
-  it('with Extended off it says so and the switches are disabled', () => {
-    s.comp.extended.enabled = false;
-    s.changed('extended');
+  it('Classic Mode closes the window, greys its commands and keeps every Robot setting', () => {
+    const pers = s.comp.extended.robots[1].personality;
+    s.comp.extended.robots[1].personality = 'orbit';
+    const before = JSON.stringify(s.comp.extended.robots);
+    const options = () => {
+      window.dispatchEvent(new PointerEvent('pointerdown'));
+      pd([...document.querySelectorAll('#menubar .menu')].find((m) => m.firstChild?.textContent === 'Options')!);
+      return [...document.querySelectorAll<HTMLDivElement>('.dropdown .item')];
+    };
+    const item = (t: string) => options().find((i) => i.firstElementChild!.textContent === t)!;
+    // a new document is the full instrument: Classic Mode is off
+    expect(item('Enable Classic Mode').getAttribute('aria-checked')).toBe('false');
+    pu(item('Enable Classic Mode'));
     draw();
-    expect(win().textContent).toMatch(/EXTENDED IS OFF/);
-    const on = win().querySelector('[aria-label="Robot 2 on / off"]')!;
-    pd(on);
-    expect(s.comp.extended.robots[1].enabled).toBe(false);
-    s.comp.extended.enabled = true;
-    s.changed('extended');
+    expect(s.comp.extended.enabled).toBe(false);
+    expect(isOpen()).toBe(false);
+    expect(item('Robots, Rules & Home…').classList.contains('disabled')).toBe(true);
+    expect(item('Mutation & Variation…').classList.contains('disabled')).toBe(true);
+    // modern utilities stay available
+    expect(item('MIDI Learn…').classList.contains('disabled')).toBe(false);
+    expect(item('Follow Playing Pattern').classList.contains('disabled')).toBe(false);
+    window.dispatchEvent(new PointerEvent('pointerdown'));
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'w', code: 'KeyW', altKey: true, bubbles: true, cancelable: true }));
+    expect(isOpen()).toBe(false);
+    pu(item('Enable Classic Mode'));
+    expect(s.comp.extended.enabled).toBe(true);
+    expect(JSON.stringify(s.comp.extended.robots)).toBe(before);
+    expect(s.comp.extended.robots[1].enabled).toBe(false); // nothing switched on by itself
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'w', code: 'KeyW', altKey: true, bubbles: true, cancelable: true }));
+    draw();
+    expect(isOpen()).toBe(true);
+    s.comp.extended.robots[1].personality = pers;
     draw();
   });
 });
@@ -370,6 +392,9 @@ describe('keyboard, focus, Undo', () => {
     render(1600);
     expect(s.conductor.log.length).toBeGreaterThan(n);
     s.stop();
+    // Classic Mode closed the window: open it again
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'w', code: 'KeyW', altKey: true, bubbles: true, cancelable: true }));
+    draw();
   });
 });
 
