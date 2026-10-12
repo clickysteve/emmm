@@ -25,7 +25,7 @@ export class ExtendedWindow {
   openTrajectory: (() => void) | null = null;
   openRobots: (() => void) | null = null;
   constructor(private ctx: UiContext, parent: HTMLElement) {
-    this.win = new MWindow(parent, { id: 'extended', title: 'Extended', x: 150, y: 20, w: 300, h: 244, closable: true });
+    this.win = new MWindow(parent, { id: 'extended', title: 'Mutation & Variation', x: 150, y: 20, w: 300, h: 244, closable: true });
   }
 
   private toggle(x: number, y: number, w: number, get: () => boolean, set: (v: boolean) => void, text: string, title = '', what = 'extended'): HTMLDivElement {
@@ -66,14 +66,11 @@ export class ExtendedWindow {
     const note = el('div', 'label small', b, [6, 3, 288, 20]);
     note.style.whiteSpace = 'normal';
     note.style.lineHeight = '10px';
-    note.innerHTML = 'Not part of Classic M — emmm’s ideas for what M might have become. Classic note generation is never changed.';
-    this.toggle(6, 25, 78, () => ext.enabled, (v) => (ext.enabled = v), 'Extended on', 'Switch the Extended features on for this document');
+    note.innerHTML = 'emmm’s generative tools. Options ▸ Enable Classic Mode switches them all off (their settings are kept).';
     this.button(88, 25, 50, 'Robots…', `Robots (${keyLabel('robotsWindow')}): four Robot Conductors, Position weights, Rules, Home and Return`, () => this.openRobots?.());
     this.button(141, 25, 50, 'Learn…', 'MIDI Learn: map controllers and keys to emmm controls', () => this.openLearn?.());
     this.button(194, 25, 50, 'Traject…', `Trajectory (${keyLabel('trajectoryWindow')}): rows of values moved through at a musical rate, driving a parameter or a MIDI controller`, () => this.openTrajectory?.());
     this.button(247, 25, 47, 'CC Cyc…', 'CC Cycles: cyclic patterns of MIDI controller values, one per Voice', () => this.openCc?.());
-    const off = el('div', 'label tiny', b, [6, 43, 288, 8]);
-    this.parts.push({ update: () => (off.textContent = ext.enabled ? '' : 'Extended is off: the controls below are inactive until you switch it on.') });
 
     // seed / reroll
     label(b, 6, 56, '<b>Seed</b>');
@@ -234,7 +231,7 @@ export class LearnWindow {
     this.note.style.lineHeight = '10px';
     this.note.setAttribute('aria-live', 'polite');
     const off = el('div', 'label tiny', b, [6, 270, 288, 8]);
-    this.rows.push({ update: () => (off.textContent = s.comp.extended.enabled ? '' : 'Extended is off: switch it on (Extended window) to use these mappings.') });
+    this.rows.push({ update: () => (off.textContent = s.comp.extended.enabled ? '' : 'Classic Mode is on: Mutation, Reroll, A/B and Trajectory mappings wait until it is off.') });
   }
 
   private renderList(): void {

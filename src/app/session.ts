@@ -42,6 +42,8 @@ const TRANSIENT = new Set(['editor', 'baton', 'tempo', 'transport', 'select', 'w
 /** Changes after which the Robot Conductors re-join their grids (app/conductor.ts). */
 const CONDUCTOR_SYNC = new Set(['extended', 'robot', 'conductors']);
 /** Changes by a hand (or a definition edit) that Rules should see at once (Conductor.poke). */
+/** MIDI Learn targets that drive the advanced generative features (off in Classic Mode). */
+const ADVANCED_LEARN = new Set(['mutate', 'mutationAmount', 'reroll', 'abRecall', 'abCapture', 'abToggle', 'trajToggle']);
 const CONDUCTOR_POKE = new Set(['patternGroup', 'noteDensity', 'velocityRange', 'noteOrder', 'transposition', 'timeDistortion', 'accent', 'legato', 'rhythm', 'orchestration', 'soundChoice', 'snapshot', 'ab-recall', 'mutation', 'baton', 'conductors', 'arrows', 'undo']);
 
 export interface VisualEvent {
@@ -274,6 +276,11 @@ export class Session {
 
   pattern(v: number): Pattern {
     return this.comp.patternGroups[this.comp.patternGroup.active].patterns[v];
+  }
+
+  /** Voice v's Pattern in Pattern Group g (the active Group when g is undefined). */
+  patternIn(g: number | undefined, v: number): Pattern {
+    return this.comp.patternGroups[g ?? this.comp.patternGroup.active].patterns[v];
   }
 
   // ------------------------------------------------------------------ output routing
@@ -850,10 +857,12 @@ export class Session {
     this.changed('voices');
   }
 
-  setTimeBase(v: number, num: number, den: number): void {
-    const p = this.pattern(v);
+  setTimeBase(v: number, num: number, den: number, group?: number): void {
+    const p = this.patternIn(group, v);
     p.tbNum = Math.max(1, Math.min(99, num));
-    this.engine.setTimeBaseDen(v, den, this.scheduler.frontierTick());
+    // only the playing Group's Time Base reaches the engine; another Group's is stored
+    if (group === undefined || group === this.comp.patternGroup.active) this.engine.setTimeBaseDen(v, den, this.scheduler.frontierTick());
+    else p.tbDen = den;
     this.changed('patterns');
   }
 
@@ -874,8 +883,8 @@ export class Session {
    * transformPitch for the exact rule); choosing Chromatic leaves them as they are. One
    * Undo step restores the scale and every pitch.
    */
-  setPatternScale(v: number, choice: ScaleChoice): void {
-    const p = this.pattern(v);
+  setPatternScale(v: number, choice: ScaleChoice, group?: number): void {
+    const p = this.patternIn(group, v);
     const from = p.scale ? cleanChoice(p.scale) : CHROMATIC;
     const to = cleanChoice(choice);
     p.steps = transformSteps(p.steps, from, to);
@@ -884,15 +893,16 @@ export class Session {
   }
 
   /**
-   * Give the scale `choice` to this Pattern, every Pattern of the active Pattern Group (all four
+   * Give the scale `choice` to this Pattern, every Pattern of one Pattern Group (all four
    * Voices), or every Pattern of all six Groups (emmm). Each Pattern changes exactly as
    * setPatternScale changes one — its notes move from its own scale to the new one — and gets
    * its own copy, so it can be changed alone afterwards. Nothing else of a Pattern changes. One
-   * Undo step. Returns how many Patterns changed.
+   * Undo step. Returns how many Patterns changed. `group` is the Group edited (default: the
+   * active one).
    */
-  applyPatternScale(choice: ScaleChoice, scope: 'pattern' | 'group' | 'all', voice: number): number {
+  applyPatternScale(choice: ScaleChoice, scope: 'pattern' | 'group' | 'all', voice: number, group = this.comp.patternGroup.active): number {
     const to = cleanChoice(choice);
-    const groups = scope === 'all' ? this.comp.patternGroups : [this.comp.patternGroups[this.comp.patternGroup.active]];
+    const groups = scope === 'all' ? this.comp.patternGroups : [this.comp.patternGroups[group]];
     let n = 0;
     for (const g of groups)
       g.patterns.forEach((p, v) => {
@@ -904,14 +914,14 @@ export class Session {
         n++;
       });
     const name = `${ROOT_NAMES[to.root]} ${scaleById(to.scale).name}`;
-    const where = scope === 'pattern' ? 'this Pattern' : scope === 'group' ? `Group ${'abcdef'[this.comp.patternGroup.active]} (4 Patterns)` : 'all Patterns';
+    const where = scope === 'pattern' ? `Pattern ${'abcdef'[group]}${voice + 1}` : scope === 'group' ? `Group ${'abcdef'[group]} (4 Patterns)` : 'all Patterns';
     this.status = n ? `${name} applied to ${where}: ${n} Pattern${n === 1 ? '' : 's'} changed` : `Nothing to change: ${where} already in ${name}`;
     this.changed(n ? 'patterns' : 'select');
     return n;
   }
 
-  setOutputLength(v: number, len: number, withRests: boolean): void {
-    const p = this.pattern(v);
+  setOutputLength(v: number, len: number, withRests: boolean, group?: number): void {
+    const p = this.patternIn(group, v);
     if (withRests) ops.setLengthWithRests(p, len, this.editRng, this.comp.options.dontScrambleRests);
     else p.outputLength = Math.max(0, Math.min(p.steps.length, Math.round(len)));
     this.changed('patterns');
@@ -924,11 +934,11 @@ export class Session {
   }
 
   /** Apply a Pattern-menu operation to each selected pattern (or `only`). */
-  patternOp(op: string, only?: { voice: number; region?: [number, number] }): void {
+  patternOp(op: string, only?: { voice: number; region?: [number, number]; group?: number }): void {
     const dsr = this.comp.options.dontScrambleRests;
     const targets = only ? [only.voice] : this.selected.map((s, i) => (s ? i : -1)).filter((i) => i >= 0);
     for (const v of targets) {
-      const p = this.pattern(v);
+      const p = this.patternIn(only?.group, v);
       const r = only?.region;
       switch (op) {
         case 'transposeUp':
@@ -978,11 +988,13 @@ export class Session {
     this.changed('patterns');
   }
 
-  editOp(op: 'cut' | 'copy' | 'paste' | 'clear' | 'pasteNotes' | 'changeToRests' | 'fillWithRests' | 'pasteAtEnd', only?: { voice: number; region?: [number, number] }): void {
+  editOp(op: 'cut' | 'copy' | 'paste' | 'clear' | 'pasteNotes' | 'changeToRests' | 'fillWithRests' | 'pasteAtEnd', only?: { voice: number; region?: [number, number]; group?: number }): void {
     const dsr = this.comp.options.dontScrambleRests;
     const targets = only ? [only.voice] : this.selected.map((s, i) => (s ? i : -1)).filter((i) => i >= 0);
     if (!targets.length) return;
-    const g = this.comp.patternGroups[this.comp.patternGroup.active];
+    const gi = only?.group ?? this.comp.patternGroup.active;
+    const g = this.comp.patternGroups[gi];
+    const dens = g.patterns.map((p) => p.tbDen);
     for (const v of targets) {
       const p = g.patterns[v];
       const r = only?.region;
@@ -1027,7 +1039,74 @@ export class Session {
           break;
       }
     }
+    this.wakeTimeBases(gi, dens);
     this.changed('patterns');
+  }
+
+  /**
+   * After Patterns of Group gi were replaced: a playing Group's changed Time Base must reach
+   * the engine (as after Undo), so a step-advance Voice that no longer is gets woken.
+   */
+  private wakeTimeBases(gi: number, dens: number[]): void {
+    if (gi !== this.comp.patternGroup.active) return;
+    const tick = this.scheduler.frontierTick();
+    this.comp.patternGroups[gi].patterns.forEach((p, v) => {
+      if (dens[v] === p.tbDen) return;
+      const den = p.tbDen;
+      p.tbDen = dens[v];
+      this.engine.setTimeBaseDen(v, den, tick);
+    });
+  }
+
+  // ------------------------------------------------------------------ whole Groups (emmm)
+
+  /** The copied Pattern Group: four independent Pattern copies (Copy Group). */
+  groupClipboard: { from: number; patterns: Pattern[] } | null = null;
+
+  /** Whether any Pattern of Group g (or only Voice v's) has a note. */
+  hasNotes(g: number, v?: number): boolean {
+    return this.comp.patternGroups[g].patterns.some((p, i) => (v === undefined || i === v) && p.steps.some((st) => st.length > 0));
+  }
+
+  /** Copy all four Patterns of Group g (notes, timing, scale and every other Pattern property). */
+  copyGroup(g: number): void {
+    this.groupClipboard = { from: g, patterns: this.comp.patternGroups[g].patterns.map((p) => ops.clonePattern(p)) };
+    this.status = `Copied Group ${'abcdef'[g]} (4 Patterns)`;
+    this.changed('select');
+  }
+
+  /**
+   * Replace Group g's four Patterns with independent copies of `patterns` (each Voice's into
+   * the same Voice). Nothing else changes and the playing Group stays as it is. One Undo step.
+   */
+  private replaceGroup(g: number, patterns: Pattern[], what: string): void {
+    const dens = this.comp.patternGroups[g].patterns.map((p) => p.tbDen);
+    this.comp.patternGroups[g].patterns = patterns.map((p) => ops.clonePattern(p));
+    this.wakeTimeBases(g, dens);
+    this.status = `${what} (Undo restores it)`;
+    this.changed('patterns');
+  }
+
+  /** Paste the copied Group into Group g (all four Voices). */
+  pasteGroup(g: number): boolean {
+    const c = this.groupClipboard;
+    if (!c) return false;
+    this.replaceGroup(g, c.patterns, `Pasted Group ${'abcdef'[c.from]} into Group ${'abcdef'[g]}`);
+    return true;
+  }
+
+  /** Duplicate Group `from` into Group `to` (all four Voices), without using the clipboard. */
+  duplicateGroup(from: number, to: number): void {
+    if (from === to) return;
+    this.replaceGroup(to, this.comp.patternGroups[from].patterns, `Duplicated Group ${'abcdef'[from]} into Group ${'abcdef'[to]}`);
+  }
+
+  /** Duplicate Voice v's Pattern of Group `from` into the same Voice of Group `to`. */
+  duplicatePattern(from: number, v: number, to: number): void {
+    if (from === to) return;
+    const pats = this.comp.patternGroups[to].patterns.slice();
+    pats[v] = this.comp.patternGroups[from].patterns[v];
+    this.replaceGroup(to, pats, `Duplicated Pattern ${'abcdef'[from]}${v + 1} into ${'abcdef'[to]}${v + 1}`);
   }
 
   /** Play a step's notes through the voice's orchestration (Editor Sound). */
@@ -1189,7 +1268,6 @@ export class Session {
 
   /** MIDI Learn: arm a mapping, or apply learnt mappings. Returns true if consumed. */
   private extendedLearn(m: msg.ParsedMessage): boolean {
-    if (!this.comp.extended.enabled) return false;
     if (m.type !== 'cc' && m.type !== 'noteon' && m.type !== 'noteoff') return false;
     const src: LearnSource = { type: m.type === 'cc' ? 'cc' : 'note', channel: m.channel, number: m.data1 };
     if (this.learnArmed) {
@@ -1219,6 +1297,8 @@ export class Session {
     this.learnLast.set(key, val);
     const rising = val >= 64 && prev < 64;
     const t = map.target;
+    // MIDI Learn works in both modes; Classic Mode only holds back the generative targets
+    if (!this.comp.extended.enabled && ADVANCED_LEARN.has(t.kind)) return;
     switch (t.kind) {
       case 'variable': {
         const n = t.variable === 'soundChoice' ? 16 : 6;

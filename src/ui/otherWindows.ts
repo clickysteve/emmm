@@ -296,23 +296,25 @@ export class MonitorWindow {
 export class AboutWindow {
   win: MWindow;
   constructor(_ctx: UiContext, parent: HTMLElement) {
-    this.win = new MWindow(parent, { id: 'about', title: 'About emmm', x: 190, y: 96, w: 340, h: 262, closable: true });
+    this.win = new MWindow(parent, { id: 'about', title: 'About emmm', x: 190, y: 90, w: 340, h: 290, closable: true });
     const b = this.win.body;
-    const t = el('div', 'label', b, [12, 8, 316, 236]);
+    const t = el('div', 'label', b, [12, 8, 316, 264]);
     t.style.whiteSpace = 'normal';
     t.style.lineHeight = '12px';
     t.style.fontSize = '10px';
     t.style.pointerEvents = 'auto';
     t.innerHTML = `<div style="font-size:22px;font-weight:600;line-height:24px">emmm</div>
       <div>An interactive composing and performing instrument for MIDI, after <b>M</b>.</div>
-      <br><div>emmm is an independent, unofficial recreation of the concepts and workflow of M, the
-      interactive composition program originally developed at Intelligent Music by Joel Chadabe,
+      <br><div>emmm is an independent, unofficial spiritual successor to M, the interactive
+      composition program originally developed at Intelligent Music by Joel Chadabe,
       David Zicarelli, John Offenhartz and Antony Widoff.</div>
       <br><div>It is not affiliated with or endorsed by Intelligent Music, Cycling '74, David Zicarelli,
-      or the original developers or rights holders. emmm is an independently written implementation
-      and does not distribute the original M application or its original assets.</div>
+      or the original developers or rights holders, and does not claim to continue M officially.
+      emmm is an independently written implementation and does not distribute the original M
+      application or its original assets.</div>
       <br><div>Runs entirely in your browser: your music and MIDI stay on this computer.</div>
-      <br><div><a href="docs/quick-start.html" target="_blank" rel="noopener" style="color:inherit">Quick Start guide</a> · emmm ▸ Help…</div>`;
+      <br><div><a href="docs/quick-start.html" target="_blank" rel="noopener" style="color:inherit">Quick Start guide</a> · emmm ▸ Help…</div>
+      <br><div><a class="btn" id="about-more" href="https://slopfactory.allmyfriendsaresynths.com/" target="_blank" rel="noopener" title="Opens slopfactory.allmyfriendsaresynths.com in a new tab" style="position:static;display:inline-block;padding:1px 8px;color:inherit;text-decoration:none;font-weight:600">MORE LIKE THIS ↗</a></div>`;
   }
   update(): void {}
 }
@@ -555,9 +557,15 @@ pencil = Edit Snapshot · frames = Restore. <b>Slideshows</b> 1–9: Alt-click t
 n/d of a whole note (1|8 = eighths); Rhythm multiplies each step; Time Distortion bends the timing;
 Phase delays the start. Also in the Pattern Editor (Length, T Base, Phase).<br>
 <b>Pattern Editor</b> — Length = steps the Voice plays (Alt: cut / extend the Pattern) · Clear
-Pattern · Root + Scale of the Pattern (changing it moves the notes by scale degree; new notes snap
-into it; M plays the notes as written) · Apply … to… gives it to this Pattern, the current Group or
-all Patterns. <b>Scale Lock</b> (Transposition window, emmm): Transposition
+Pattern · <b>Scale</b>: choose a Root + Scale, choose <b>Apply to</b> (This Pattern, This Group or
+All Groups), then press <b>Apply Scale</b> — it moves the notes by scale degree (one Undo); nothing
+changes before that. New notes snap into the Pattern's scale. <b>Grp a–f</b> chooses the Group you
+edit (the playing one is underlined); it stays put while the music changes Group unless
+<b>Follow playing</b> (also Options ▸ Follow Playing Pattern) is on.<br>
+<b>Copy &amp; paste</b> — in the Pattern Editor ⌘C / ⌘V copy and paste the whole Pattern (or the
+selected steps): pick another Group with Grp to paste there. Edit ▸ Copy Group / Paste Group copy all
+four Patterns; Edit ▸ Duplicate Group… / Duplicate Pattern… copy straight into the Group you pick.
+All are one Undo, and never change which Group plays. <b>Scale Lock</b> (Transposition window, emmm): Transposition
 counts degrees of each Pattern's scale instead of semitones.<br>
 <b>Typing numbers</b> — click any number, type the value, Return (Escape cancels); ↑ ↓ step it.
 Time Base takes "3/8". Range bars take "40-100". emmm ▸ Keyboard Shortcuts… (⌥H) lists every key.<br>
@@ -570,14 +578,19 @@ Set a voice's Use to <b>C</b> to drive emmm from a MIDI keyboard: middle C (C3) 
 B3 Hold/Do, F3 Sync, black keys + white keys select Positions.<br><br>
 <b>Seed</b> — emmm's randomness is seeded (Conducting window). Same document + seed + gestures =
 same music from Start.<br><br>
-<b>Extended</b> (emmm's additions, not M) — Options ▸ Extended…: Seed &amp; Reroll, Locks, Mutation
-(subtle → chaos), A/B states, MIDI Learn, CC Cycles, and <b>Trajectory</b> (⌥J):
+<b>Generative tools</b> — Options ▸ Mutation &amp; Variation…: Seed &amp; Reroll, Locks, Mutation
+(subtle → chaos), A/B states, CC Cycles; and <b>Trajectory</b> (⌥J):
 rows of values moved through at a musical rate, driving a MIDI controller, Density, Transposition,
 Tempo, the Baton or a Position. <b>Robots</b> (⌥W): four Robot Conductors (Robot 1 is M's) with
 personalities, Position weights, Rules (WHEN … THEN …) and Home / Return (⇧⌥H). Click a Robot's
 number to edit it (it stays on or off); ON / OFF switches it. Groups a–f: the Pattern Groups that
 Robot may wander to (you can still choose any).
-Options ▸ Performance Feedback shows what M decides for each note.<br>
+Options ▸ Performance Feedback shows what M decides for each note; Options ▸ MIDI Learn… maps
+controllers and keys.<br>
+<b>Classic Mode</b> — Options ▸ Enable Classic Mode (off by default) is a narrower instrument closer to
+M: Robots 2–4, Rules, Return, Mutation, Reroll, A/B, Trajectory and CC Cycles stop and their windows
+close; their settings are kept for when you switch it off. Editing, scales, copy/paste, MIDI, files
+and Undo work in both.<br>
 <b>Comfort</b> — rest the mouse on a control for a tip (Options ▸ Show Tips) · ⤢ in the menu bar =
 full screen.<br><br>
 <b>Colours</b> — Options ▸ Palette… changes emmm's colours (Classic, Dark, Colour or your own).

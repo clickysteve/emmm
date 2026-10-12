@@ -4,7 +4,7 @@
  * Tools: Selector, Eraser, Plunger (insert), Scissors (delete) operate in the strip above
  * the grid. View 1–4 (Shift: show a second pattern in grey). MIDI Edit Counter and Range.
  */
-import { CHROMATIC, inScale, isChromatic, isRoot, ROOT_NAMES, SCALES, SHORT_SCALE_NAMES, snapToScale, type ScaleChoice } from '../app/scales';
+import { CHROMATIC, inScale, isChromatic, isRoot, ROOT_NAMES, SCALES, snapToScale, type ScaleChoice } from '../app/scales';
 import { MAX_PATTERN_STEPS, noteName } from '../engine/constants';
 import * as ops from '../engine/patternOps';
 import type { UiContext } from './context';
@@ -27,6 +27,9 @@ const GY = 18;
 export class PatternEditor {
   win: MWindow;
   voice = 0;
+  /** the Pattern Group being edited: kept apart from the playing Group unless Follow Playing
+   * Pattern is on (an editor display choice only; it never changes what plays) */
+  group = 0;
   ghost: number | null = null;
   low = 48; // lowest visible pitch
   scroll = 0; // first visible step
@@ -47,10 +50,15 @@ export class PatternEditor {
   private parts: { update(): void }[] = [];
   private legend: HTMLDivElement;
   private soundBtn: HTMLDivElement;
+  private groupEls: HTMLDivElement[] = [];
+  /** the scale chosen in the Scale box, not yet applied (null: the edited Pattern's own) */
+  private pendingScale: ScaleChoice | null = null;
+  private applyScope: 'pattern' | 'group' | 'all' = 'pattern';
+  private pendingFor = -1;
 
   constructor(private ctx: UiContext, parent: HTMLElement) {
     const s = ctx.s;
-    this.win = new MWindow(parent, { id: 'edit-pattern', title: 'Pattern Editor a', x: 120, y: 40, w: 420, h: 292, closable: true, area: 'patterns' });
+    this.win = new MWindow(parent, { id: 'edit-pattern', title: 'Pattern Editor a', x: 120, y: 40, w: 420, h: 312, closable: true, area: 'patterns' });
     const b = this.win.body;
     // tools in the title bar area, top right
     const tb = this.win.el.querySelector('.titlebar') as HTMLDivElement;
@@ -129,7 +137,7 @@ export class PatternEditor {
       const step = this.scroll + Math.floor((p.x - 1) / CW);
       let pitch = this.low + ROWS - 1 - Math.floor((p.y - 1) / RH);
       const sc = this.scaleOf();
-      const pat = s.pattern(this.voice);
+      const pat = this.pattern;
       if (!isChromatic(sc) && !pat.steps[step]?.includes(pitch)) pitch = snapToScale(sc, pitch);
       this.hover = { step, pitch };
       this.draw();
@@ -138,7 +146,7 @@ export class PatternEditor {
       this.hover = null;
       this.draw();
     });
-    this.legend = el('div', 'label', b, [GX + COLS * CW + 8, 176, 94, 10]);
+    this.legend = el('div', 'label', b, [GX + 6 * 17 + 110, GY + ROWS * RH + 39, 90, 10]);
     this.legend.style.whiteSpace = 'pre';
     this.legend.style.lineHeight = '10px';
     this.legend.style.pointerEvents = 'none';
@@ -180,7 +188,7 @@ export class PatternEditor {
           `Voice ${v + 1} record: Drum Machine Record (repeat recording while playing) on/off`,
         ][k];
         m.addEventListener('pointerdown', (ev) => {
-          const p = s.pattern(v);
+          const p = this.pat(v);
           if (k === 0)
             pictureMatrix(m, ev, [
               { value: 'single', icon: iconSvg('note'), title: 'Single Note' },
@@ -206,9 +214,9 @@ export class PatternEditor {
     label(b, RX, 92, 'Size', 'small');
     this.parts.push(
       new Numerical(b, RX + 34, 88, 34, 15, {
-        get: () => s.pattern(this.voice).size,
+        get: () => this.pattern.size,
         set: (x) => {
-          const p = s.pattern(this.voice);
+          const p = this.pattern;
           p.size = Math.max(x, p.steps.length);
           s.changed('patterns');
         },
@@ -221,66 +229,114 @@ export class PatternEditor {
     label(b, RX, 108, 'Length', 'small');
     label(b, RX, 125, 'T Base', 'small');
     label(b, RX, 142, 'Phase', 'small');
-    const timing = timingControls(ctx, b, () => this.voice, { len: [RX + 34, 104, 30, 15], num: [RX + 34, 121, 22, 15], den: [RX + 60, 121, 22, 15], phase: [RX + 34, 138, 28, 15] });
+    const timing = timingControls(ctx, b, () => this.voice, { len: [RX + 34, 104, 30, 15], num: [RX + 34, 121, 22, 15], den: [RX + 60, 121, 22, 15], phase: [RX + 34, 138, 28, 15] }, undefined, () => this.group);
     this.parts.push(timing);
     const ofSteps = el('div', 'label small', b, [RX + 66, 108, 30, 10]);
     ofSteps.title = 'Steps in the Pattern (Length plays from the first)';
-    this.parts.push({ update: () => (ofSteps.textContent = '/' + s.pattern(this.voice).steps.length) });
+    this.parts.push({ update: () => (ofSteps.textContent = '/' + this.pattern.steps.length) });
     const words = el('div', 'label tiny', b, [RX, 156, 94, 16]);
     words.style.whiteSpace = 'pre';
     words.style.lineHeight = '8px';
     words.title = 'How fast this Voice moves: Tempo sets the beat for all Voices; the Time Base sets this Voice’s step; Rhythm multiplies each step (level values in the Cyclic Editor); Time Distortion then bends the timing.';
     this.parts.push({
       update: () => {
-        const t = timeBaseWords(s.pattern(this.voice), s.comp.tempo.value).replace(' · ', '\n');
+        const t = timeBaseWords(this.pattern, s.comp.tempo.value).replace(' · ', '\n');
         if (words.textContent !== t) words.textContent = t;
       },
     });
-    // the Pattern's Root + Scale (emmm): changing it moves the notes to the new scale
-    const cur = () => this.scaleOf();
+    // Scale (emmm): choose a Root + Scale and what it goes to, then Apply Scale moves the notes
+    // (nothing changes until Apply; the choice box shows the edited Pattern's own scale)
+    const cur = () => this.pendingScale ?? this.scaleOf();
     this.parts.push(
-      new Selector(b, RX, 174, 30, 14, {
-        label: 'Root of this Pattern’s scale. Changing it moves the notes to the new key, keeping their scale degrees and register (⌘Z undoes).',
+      new Selector(b, RX, 172, 30, 14, {
+        label: 'Scale root to apply. Nothing changes until you press Apply Scale.',
         options: () => ROOT_NAMES.map((n, i) => ({ value: String(i), text: n })),
         value: () => String(cur().root),
-        onChange: (v) => s.setPatternScale(this.voice, { root: Number(v), scale: cur().scale }),
+        onChange: (v) => ((this.pendingScale = { root: Number(v), scale: cur().scale }), s.changed('editor')),
       }),
-      new Selector(b, RX + 32, 174, 62, 14, {
-        label: 'Scale of this Pattern. Changing it moves the notes to the matching degrees of the new scale; Chromatic leaves them as they are. New notes snap into the scale; notes outside it are shaded. (⌘Z undoes.)',
+      new Selector(b, RX + 32, 172, 62, 14, {
+        label: 'Scale to apply. Nothing changes until you press Apply Scale.',
         options: () => SCALES.map((x) => ({ value: x.id, text: x.name })),
         value: () => cur().scale,
-        onChange: (v) => s.setPatternScale(this.voice, { root: cur().root, scale: v }),
+        onChange: (v) => ((this.pendingScale = { root: cur().root, scale: v }), s.changed('editor')),
       }),
     );
-    // give this Pattern's Root + Scale to more Patterns (each moves its own notes, as above)
-    const apply = new Selector(b, RX, 191, 94, 14, {
-      label: 'Apply scale to: give this Pattern’s Root + Scale to the other Patterns of this Group, or to every Pattern. Each Pattern’s notes move to the new scale as when you change its own; nothing else changes. One Undo step (⌘Z).',
-      fontSize: 8,
-      options: () => {
-        const g = 'abcdef'[s.comp.patternGroup.active];
-        return [
-          { value: 'pattern', text: `This Pattern (Group ${g}, Voice ${this.voice + 1})` },
-          { value: 'group', text: `Group ${g}: all 4 Patterns` },
-          { value: 'all', text: 'All Patterns: Groups a–f' },
-        ];
-      },
-      value: () => '',
-      missingText: () => `Apply ${ROOT_NAMES[cur().root]} ${SHORT_SCALE_NAMES[cur().scale] ?? ''} to…`,
-      onChange: (v) => s.applyPatternScale(cur(), v as 'pattern' | 'group' | 'all', this.voice),
+    label(b, RX, 188, 'Apply to', 'tiny');
+    (['pattern', 'group', 'all'] as const).forEach((scope, i) => {
+      const r = el('div', 'label tiny', b, [RX, 197 + i * 9, 94, 9]);
+      r.setAttribute('role', 'radio');
+      r.style.cursor = 'pointer';
+      r.style.pointerEvents = 'auto';
+      r.title = ['Apply the scale to the Pattern you are editing only', 'Apply the scale to all four Patterns of the Group you are editing', 'Apply the scale to every Pattern of Groups a–f'][i];
+      r.addEventListener('pointerdown', (ev) => {
+        ev.preventDefault();
+        this.applyScope = scope;
+        s.changed('editor');
+      });
+      this.parts.push({
+        update: () => {
+          const g = 'abcdef'[this.group];
+          const t = (this.applyScope === scope ? '◉ ' : '○ ') + ['This Pattern (' + g + (this.voice + 1) + ')', `This Group (${g})`, 'All Groups (a–f)'][i];
+          if (r.textContent !== t) r.textContent = t;
+          r.setAttribute('aria-checked', String(this.applyScope === scope));
+        },
+      });
     });
-    apply.el.classList.add('mmenu');
-    this.parts.push(apply);
-    const clear = el('div', 'btn', b, [RX, 208, 94, 14], 'Clear Pattern');
+    const applyBtn = el('div', 'btn on', b, [RX, 225, 94, 14], 'Apply Scale');
+    applyBtn.id = 'pe-apply-scale';
+    applyBtn.style.fontSize = '9px';
+    applyBtn.style.fontWeight = '700';
+    applyBtn.setAttribute('role', 'button');
+    applyBtn.title = 'Apply Scale: moves the notes of the chosen Patterns to the matching degrees of this scale (Chromatic leaves them as they are). Changes the music; ⌘Z undoes it in one step.';
+    applyBtn.addEventListener('pointerdown', (ev) => {
+      ev.preventDefault();
+      s.applyPatternScale(cur(), this.applyScope, this.voice, this.group);
+      this.pendingScale = null;
+    });
+    const clear = el('div', 'btn', b, [RX, 242, 94, 14], 'Clear Pattern');
     clear.style.fontSize = '9px';
     clear.title = `Clear Pattern (${keyLabel('clearPattern')}): remove every step of this Voice’s Pattern (Time Base, Phase and Size stay). ${keyLabel('undo')} undoes it.`;
     clear.setAttribute('role', 'button');
     clear.addEventListener('pointerdown', (ev) => {
       ev.preventDefault();
       this.region = null;
-      s.editOp('clear', { voice: this.voice });
+      s.editOp('clear', { voice: this.voice, group: this.group });
+    });
+    // the Group being edited (a–f) and Follow Playing Pattern
+    const GYB = GY + ROWS * RH + 36;
+    label(b, 2, GYB + 3, 'Grp', 'small');
+    for (let g = 0; g < 6; g++) {
+      const d = el('div', 'num', b, [GX + g * 17, GYB, 16, 14], 'abcdef'[g]);
+      d.title = `Edit Pattern Group ${'abcdef'[g]} (does not change what plays; the playing Group is underlined)`;
+      d.addEventListener('pointerdown', (ev) => {
+        ev.preventDefault();
+        this.group = g;
+        this.region = null;
+        s.changed('editor');
+      });
+      this.groupEls.push(d);
+    }
+    const follow = el('div', 'label small', b, [GX + 6 * 17 + 6, GYB + 3, 96, 10]);
+    follow.setAttribute('role', 'switch');
+    follow.style.cursor = 'pointer';
+    follow.style.pointerEvents = 'auto';
+    follow.title = 'Follow Playing Pattern: show the Group that is playing as it changes (also in Options). Off: the editor stays on the Group you choose.';
+    follow.addEventListener('pointerdown', (ev) => {
+      ev.preventDefault();
+      ctx.prefs.editor.followPlaying = !ctx.prefs.editor.followPlaying;
+      ctx.prefs.saveEditor();
+      s.changed('editor');
+    });
+    this.parts.push({
+      update: () => {
+        const on = ctx.prefs.editor.followPlaying;
+        const t = (on ? '☒' : '☐') + ' Follow playing';
+        if (follow.textContent !== t) follow.textContent = t;
+        follow.setAttribute('aria-checked', String(on));
+      },
     });
     // edit-range buttons, sound
-    const allBtn = el('div', 'btn', b, [RX, 250, 20, 14], 'All');
+    const allBtn = el('div', 'btn', b, [RX + 52, 262, 20, 14], 'All');
     allBtn.style.fontSize = '9px';
     allBtn.title = 'MIDI Edit Range = whole pattern';
     allBtn.addEventListener('pointerdown', (ev) => {
@@ -288,7 +344,7 @@ export class PatternEditor {
       s.recorders[this.voice].range = null;
       s.changed('editor');
     });
-    const ctrBtn = el('div', 'btn', b, [RX + 21, 250, 20, 14], 'Ctr');
+    const ctrBtn = el('div', 'btn', b, [RX + 73, 262, 20, 14], 'Ctr');
     ctrBtn.style.fontSize = '9px';
     ctrBtn.title = 'MIDI Edit Range = the counter step';
     ctrBtn.addEventListener('pointerdown', (ev) => {
@@ -297,7 +353,7 @@ export class PatternEditor {
       r.range = { start: r.counter, end: r.counter + 1 };
       s.changed('editor');
     });
-    this.soundBtn = el('div', 'btn', b, [RX, 228, 20, 18]);
+    this.soundBtn = el('div', 'btn', b, [RX, 260, 20, 18]);
     this.soundBtn.title = 'Editor Sound Enable';
     this.soundBtn.addEventListener('pointerdown', (ev) => {
       ev.preventDefault();
@@ -305,7 +361,7 @@ export class PatternEditor {
       s.changed('editor');
     });
     this.parts.push(
-      new Numerical(b, RX + 22, 230, 26, 15, {
+      new Numerical(b, RX + 22, 262, 26, 15, {
         get: () => this.velocity,
         set: (x) => (this.velocity = x),
         min: 1,
@@ -317,7 +373,12 @@ export class PatternEditor {
   }
 
   private get pattern() {
-    return this.ctx.s.pattern(this.voice);
+    return this.pat(this.voice);
+  }
+
+  /** Voice v's Pattern in the Group being edited. */
+  pat(v: number) {
+    return this.ctx.s.patternIn(this.group, v);
   }
 
   /** The edited Pattern's scale (Chromatic if it has none). */
@@ -471,7 +532,7 @@ export class PatternEditor {
     const s = this.ctx.s;
     const p = this.pattern;
     const len = p.steps.length;
-    const playing = s.engine.state !== 'stopped' && s.nowPlaying[this.voice] && this.ctx.flash.notes[this.voice].until > this.ctx.now() ? this.ctx.flash.notes[this.voice].step : -1;
+    const playing = s.engine.state !== 'stopped' && this.group === s.comp.patternGroup.active && s.nowPlaying[this.voice] && this.ctx.flash.notes[this.voice].until > this.ctx.now() ? this.ctx.flash.notes[this.voice].step : -1;
     const pc = playing - this.scroll;
     const show = playing >= 0 && pc >= 0 && pc < COLS;
     const d = show ? '' : 'none';
@@ -515,7 +576,7 @@ export class PatternEditor {
     }
     // ghost pattern
     if (this.ghost !== null && this.ghost !== this.voice) {
-      const gp = s.pattern(this.ghost);
+      const gp = this.pat(this.ghost);
       for (let c = 0; c < COLS; c++) {
         const st = gp.steps[this.scroll + c];
         if (!st) continue;
@@ -588,7 +649,21 @@ export class PatternEditor {
 
   update(): void {
     const s = this.ctx.s;
-    this.win.setTitle('Pattern Editor ' + 'abcdef'[s.comp.patternGroup.active]);
+    const active = s.comp.patternGroup.active;
+    if (this.ctx.prefs.editor.followPlaying && this.group !== active) {
+      this.group = active;
+      this.region = null;
+    }
+    const editing = this.group * 4 + this.voice;
+    if (editing !== this.pendingFor) {
+      this.pendingScale = null;
+      this.pendingFor = editing;
+    }
+    this.win.setTitle(`Pattern Editor ${'abcdef'[this.group]}${this.group === active ? '' : `  (playing: ${'abcdef'[active]})`}`);
+    this.groupEls.forEach((d, g) => {
+      d.classList.toggle('inv', g === this.group);
+      d.style.textDecoration = g === active ? 'underline' : '';
+    });
     (Object.keys(this.toolEls) as Tool[]).forEach((t) => {
       const on = t === this.tool;
       this.toolEls[t].classList.toggle('on', on);
@@ -603,7 +678,7 @@ export class PatternEditor {
       d.style.outline = this.ghost === v ? '1px dotted var(--ink)' : '';
     });
     this.modeEls.forEach((m, v) => {
-      const p = s.pattern(v);
+      const p = this.pat(v);
       const icons = [{ single: 'note', chord: 'chord', build: 'plus' }[p.chordMode], p.insertMode, p.drumMachine ? 'repeat' : 'dash'];
       m.forEach((e, k) => {
         if (e.dataset.v !== icons[k]) {
@@ -715,7 +790,7 @@ export class PatternEditor {
       case 'Backspace':
       case 'Delete':
         if (!r || r[1] <= r[0]) return false; // no steps selected: Backspace stays Hold/Do
-        s.editOp('clear', { voice: this.voice, region: [r[0], r[1]] });
+        s.editOp('clear', { voice: this.voice, region: [r[0], r[1]], group: this.group });
         this.region = this.keyRegion = [r[0], r[0]];
         this.anchor = this.caret = r[0];
         return true;
@@ -736,10 +811,12 @@ export class PatternEditor {
   }
 
   openFor(voice: number): void {
+    // opened afresh from the Patterns window: edit the Group it shows (the playing one)
+    if (!this.win.open) this.group = this.ctx.s.comp.patternGroup.active;
     this.voice = voice;
     this.region = null;
     // centre the view on the pattern's notes
-    const notes = this.ctx.s.pattern(voice).steps.flat();
+    const notes = this.pattern.steps.flat();
     if (notes.length) this.low = clamp(Math.round((Math.min(...notes) + Math.max(...notes)) / 2) - ROWS / 2, 0, 127 - ROWS + 1);
     this.win.show();
     this.ctx.s.changed('editor');

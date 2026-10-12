@@ -1,7 +1,7 @@
 # Robot Conductors, Weights, Rules and Home (Extended)
 
 Design notes for emmm's generative-conducting extension. Everything here is **Extended**
-(Options ▸ Extended…, off by default) and is not part of Classic M. Classic note generation,
+(on unless Options ▸ Enable Classic Mode is ticked; `extended.enabled` internally) and is not part of Classic M. Classic note generation,
 M's own Robot Conductor, Snapshots, Slideshows, Trajectories, MIDI routing, clock and
 transport behave exactly as before; tests prove it.
 

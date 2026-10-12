@@ -4,7 +4,8 @@
  *
  *   app preferences:  tooltips on/off, Performance Feedback on/off, MIDI Learn mappings
  *                     (they describe the user's hardware), full-screen on start
- *   editor assistance: reserved (the scale is now part of each Pattern, see Pattern.scale)
+ *   editor assistance: Follow Playing Pattern (the Pattern Editor shows the playing Group);
+ *                     the scale is part of each Pattern, see Pattern.scale
  *
  * (Colour palettes keep their own store, see ui/palette.ts.) Everything is versioned and
  * validated on load, and every storage access is guarded: private windows simply start
@@ -21,6 +22,8 @@ export interface AppPrefs {
 
 export interface EditorPrefs {
   version: 1;
+  /** the Pattern Editor switches to the playing Pattern Group as it changes (default off) */
+  followPlaying: boolean;
 }
 
 export interface PrefStore {
@@ -68,7 +71,7 @@ export class Prefs {
       feedback: a.feedback === true,
       learn: cleanLearnMappings(a.learn),
     };
-    this.editor = { version: 1 };
+    this.editor = { version: 1, followPlaying: read(store, KEY_EDITOR).followPlaying === true };
   }
 
   saveApp(): void {

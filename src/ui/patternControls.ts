@@ -39,15 +39,16 @@ export function timingControls(
   voice: () => number,
   at: Record<'len' | 'num' | 'den' | 'phase', Rect>,
   hold?: (k: TimingKey) => (ev: PointerEvent) => boolean,
+  group: () => number | undefined = () => undefined,
 ): TimingControls {
   const s = ctx.s;
-  const pat = (): Pattern => s.pattern(voice());
+  const pat = (): Pattern => s.patternIn(group(), voice());
   const len = new Numerical(parent, ...at.len, {
     get: () => pat().outputLength,
     set: (x, i) => {
       if (i.alt) {
-        if (i.final) s.setOutputLength(voice(), x, true);
-      } else s.setOutputLength(voice(), x, false);
+        if (i.final) s.setOutputLength(voice(), x, true, group());
+      } else s.setOutputLength(voice(), x, false, group());
     },
     min: 0,
     max: 999,
@@ -62,19 +63,19 @@ export function timingControls(
     const n = Number(m[1]);
     const d = /^s/i.test(m[2]) ? STEP_ADVANCE : Number(m[2]);
     if (n < 1 || n > 99 || !(TIME_BASE_DENOMINATORS as readonly number[]).includes(d)) return false;
-    s.setTimeBase(voice(), n, d);
+    s.setTimeBase(voice(), n, d, group());
     return true;
   };
   const num = new Numerical(parent, ...at.num, {
     get: () => pat().tbNum,
-    set: (x) => s.setTimeBase(voice(), x, pat().tbDen),
+    set: (x) => s.setTimeBase(voice(), x, pat().tbDen, group()),
     min: 1,
     max: 99,
     chars: '/sa',
     entry: (t) => {
       if (t.includes('/')) return both(t);
       if (!/^\d+$/.test(t)) return false;
-      s.setTimeBase(voice(), Math.max(1, Math.min(99, Number(t))), pat().tbDen);
+      s.setTimeBase(voice(), Math.max(1, Math.min(99, Number(t))), pat().tbDen, group());
       return true;
     },
     intercept: hold?.('tbNum'),
@@ -84,7 +85,7 @@ export function timingControls(
   bar.setAttribute('aria-hidden', 'true');
   const den = new Numerical(parent, ...at.den, {
     get: () => pat().tbDen,
-    set: (x) => s.setTimeBase(voice(), pat().tbNum, x),
+    set: (x) => s.setTimeBase(voice(), pat().tbNum, x, group()),
     values: TIME_BASE_DENOMINATORS,
     format: (x) => (x === STEP_ADVANCE ? 'sa' : String(x)),
     chars: '/sa',
@@ -93,7 +94,7 @@ export function timingControls(
       if (t.includes('/')) return both(t);
       const d = /^s/i.test(t) ? STEP_ADVANCE : /^\d+$/.test(t) ? Number(t) : NaN;
       if (!(TIME_BASE_DENOMINATORS as readonly number[]).includes(d)) return false;
-      s.setTimeBase(voice(), pat().tbNum, d);
+      s.setTimeBase(voice(), pat().tbNum, d, group());
       return true;
     },
     intercept: hold?.('tbDen'),
