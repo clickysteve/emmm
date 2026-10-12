@@ -28,7 +28,8 @@ generic, inert-by-default engine hooks were added (`robotGate`, `observer`); wit
 ```
 extended.robots[4]      RobotDef: enabled, personality, variables[], rateNum|rateDen,
                         home (Position or none), params, target (Follower/Contrarian),
-                        groups[6] (Allowed Groups a–f, default all)
+                        groups[6] (Allowed Groups a–f, default all),
+                        sync (Change Sync in beats: 0 FREE, 1, 4, 8, 16, 32)
 extended.weights        per Variable: six weights 0–100 (default 10 each)
 extended.rules[≤16]     Rule: on, when (Condition), every N, then (Action), at (timing)
 extended.home           captured Positions (all eleven Variables) + Baton; which are included
@@ -37,7 +38,8 @@ extended.returnSettings duration n|d, immediate, rest (beats the Variables stay 
 
 Runtime only (never saved, never in Undo): Robot positions, visit history, dwell, pendulum
 direction, suspensions, rule counters and last-fired times, Return progress and rest,
-rule-made overrides (on / off, personality), timed Rule actions waiting, the activity log.
+rule-made overrides (on / off, personality), timed Rule actions waiting, the activity log,
+Change Sync's waiting moves, Smart / Genius section and arc state.
 Start rebuilds it (keeping overrides and waiting actions made while stopped); Stop clears it.
 
 ### A Robot's Position
@@ -73,6 +75,29 @@ Rule advances it. All Robots and interval Rules share one chain (label `cond`): 
 due Robots decide in priority order, then interval Rules fire. Pause freezes it, Continue
 resumes, Stop clears it, Start rebuilds it from tick 0; tempo changes and external MIDI clock
 only change how fast ticks pass, never where decisions fall. Nothing uses a wall-clock timer.
+
+### Change Sync
+
+Each Robot's **sync** (FREE · BEAT · BAR · 2 · 4 · 8 BARS) sets *when* its own timer moves take
+effect, never *where*. Boundaries are multiples of 96 · sync ticks from Start (M is 4/4: 96
+ticks a beat, 384 a bar), so tempo changes, Pause and external clock never move them.
+
+* **FREE** (default; every older document): the decision takes effect at once — the code path
+  is the old one (the Allowed Groups fingerprint test still passes).
+* Otherwise a Robot keeps deciding at its rate. A decision **on** a boundary takes effect at
+  once; a *move* decided between boundaries becomes the Robot's one **waiting move**
+  (`Conductor.pending[i]`), taking effect at the next boundary; a later move replaces it
+  (latest wins, never a backlog), a decision to stay leaves it waiting. The hub chain wakes at
+  the boundary; waiting moves are applied in Robot order with the same per-tick claims, so
+  priority is unchanged and a Variable changes at most once per tick.
+* **On landing** it is re-checked: Robot still on and not paused, sync unchanged, and the
+  Position resolved against the *current* weights and Allowed Groups (nearest candidate; if
+  that is where it is, nothing happens). Return ownership applies as for any move.
+* **Cancelled** by: switching the Robot off (also by a Rule), changing its sync, becoming
+  Baton (M), a Rule pausing it, Stop, Start, loading a document. A Rule's *advance* / *choose*
+  acts at once and drops any waiting move. The hand, Rules' *set Position*, Snapshots,
+  Trajectories and Return are never synced. Baton (M) ignores sync (it is M's engine).
+* Followers see their target's moves when they *land*.
 
 ### Conflicts
 
@@ -132,12 +157,17 @@ Robot's own stream; every algorithm terminates in O(6) with no loops over draws.
 | **Curious** | with *explore %* the least-visited Positions; otherwise familiar ones, weighted `w · (1 + visits)` | explore 0–100 % | yes |
 | **Follower** | copy: goes to the target's Position; echo: repeats the target's last move (size and direction); with *fidelity %* | target, mode, fidelity | eligibility only |
 | **Contrarian** | mirror: Position 7 − target's; avoid: at least *distance* away from the target, weighted `w · distance` | target, mode, distance | avoid: yes |
+| **Smart** | stays for its *section* (bars since its last move ≥ section), then moves on a bar line (if its grid meets every bar line). Theme = Home (else its start). Away from the theme: back to it with 50 %; else *explore %* → least-visited, otherwise familiar (`w · (1 + visits)`, not the Position it just left). Next section: theme 8 or 4 bars, elsewhere 4 (70 %), 2 (20 %), 8 (10 %). Surprise: 8 % chance to break off an 8-bar section after 4 | explore | yes |
+| **Genius** | Smart's phrasing plus a read-only view of the others (`MusicView`: Robots on, moves in the last 2 bars, bars since the latest other move, where it went if it shares a Variable). *Listen*: another moved this bar → hold (unless 2× overdue). *Respond*: another moved ≤ 4 bars ago, not yet answered, own section half done → 60 % answer now. *Contrast*: ≥ 2 others busy → sections ×2; all static ≥ 8 bars → ÷2. *Arc*: leave the theme, 2–4 moves (sections 4, 4, 2 …, never straight back), then release to the theme for 8. *Memory*: never onto the Position the other just took on a shared Variable. *Restraint*: 15 % of due moves → section +2 bars | explore | yes |
 
 Edge cases: no eligible Position → stays; one → goes there and stays. Follower / Contrarian
 whose target is off, has never moved, or is itself → holds its Position (shown as "waiting").
 Following works in Position numbers, so overlapping Variables are not required. **Cycles**
 (1 follows 2 follows 1) are refused in the editor and broken on load (the later Robot loses its
 target); even so, a Follower only *reads* its target's last state, so nothing can recurse.
+Genius likewise only reads (at its own decision ticks) and never triggers another Robot's
+decision, changes its settings or its Allowed Groups. Smart / Genius section state lives in
+the Robot's runtime memory and is taken up only when the planned move actually lands.
 
 ## 4. Home and Return
 
@@ -283,7 +313,9 @@ area. Every control calls a Session method; the window keeps no musical state.
   personality's parameters only), Home Position (– or 1–6), where it is, its priority, and the
   description of the algorithm from §3 with whether weights shape it and which Positions are
   allowed now. For Baton (M): M's rate and jump ranges (the same settings as the Conducting
-  window). **Groups a–f**: the Robot's Allowed Groups (inverted = allowed; **All** allows every
+  window). **sync** pop-up (FREE … 8 BARS; `— (M)` for Baton (M)) beside the rate, and the
+  description says when its moves take effect; the overview's state shows a waiting move as
+  `→3 5:1`. **Groups a–f**: the Robot's Allowed Groups (inverted = allowed; **All** allows every
   Group again), with the set in words ("chooses only Groups a b"; "used when it moves Pattern
   Group" if Pattern Group is not one of its Variables).
 * **WEIGHTS**: a Variable strip (each with a miniature of its weights), six bars (drag up /
@@ -326,7 +358,10 @@ references clamped to existing Voices / Robots / Positions / Snapshots, rest cla
 Allowed Groups (`groups`, six booleans per Robot) needed no new version: a document without
 them — every document before them — loads with all six allowed; a missing entry counts as
 allowed, only `false` forbids, and none allowed (or nonsense) loads as all six.
-Saved: definitions, weights, rules, Home, Return settings. Not saved: everything runtime.
+Change Sync (`sync`) and the Smart / Genius personalities likewise need no new version: a
+missing or invalid `sync` loads as FREE (0); older documents never contain the new
+personalities. Saved: definitions, weights, rules, Home, Return settings. Not saved:
+everything runtime (waiting moves included).
 Robot randomness comes from the document seed (streams 6000 + n), re-seeded at Start and by
 Reroll. Editing any of it is one Undo step; Robot moves, rule firings and Returns never enter
 the history.
@@ -343,6 +378,10 @@ the history.
   Rule advance / choose, Follower, Baton (M) and its Snapshot cell, Classic untouched, the hand
   and Rules unrestricted, persistence, old and broken data, Undo; and all Groups allowed =
   the exact music recorded before the feature (fingerprint).
+* `test/robot-sync.test.ts` — Change Sync (FREE vs BAR, BEAT, 4 BARS boundaries, cancelling,
+  Allowed Groups re-checked on landing, priority at one boundary), Smart (phrase gating,
+  96-bar behaviour, with 4 BARS), Genius (listen / respond / restraint, alone, with others, no
+  runaway decisions), persistence.
 * `test/robots-ui.test.ts` — the window in a simulated browser (happy-dom), driven by pointer
   and key events; including: selecting a Robot (number, row, keyboard) never switches it, an
   OFF Robot can be fully configured, selecting while playing leaves the music identical, and

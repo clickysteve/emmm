@@ -925,7 +925,12 @@ brought back to. The design notes, with every algorithm, are in [CONDUCTORS.md](
   to move the longer it stays; **Orbit** goes 1 2 3 4 5 6 1 …; **Pendulum** goes up and back;
   **Chaotic** jumps far; **Curious** returns to favourites and sometimes explores;
   **Follower** goes where another Robot is (or copies its moves); **Contrarian** goes the other
-  way. Only the chosen personality's settings are shown, with a description of what it does;
+  way. **Smart** thinks in phrases: it lets a section play 2, 4 or 8 bars, moves on a bar line,
+  and keeps coming back to its Home (its *theme*) between familiar and new material, with the
+  odd surprise. **Genius** phrases like Smart and also *listens*: it holds back while other
+  Robots change, answers a change a bar or so later with something different, builds arcs away
+  from its Home (shorter and shorter sections) and releases back to it — and sometimes simply
+  lets the music be. Alone, it still phrases. Neither ever changes another Robot. Only the chosen personality's settings are shown, with a description of what it does;
   **Defaults** resets them. A Follower cannot watch a Robot that watches it back (the choice is
   greyed out).
 - **Allowed Groups:** the **Groups a–f** switches in the ROBOT tab say which Pattern Groups this
@@ -936,6 +941,15 @@ brought back to. The design notes, with every algorithm, are in [CONDUCTORS.md](
   Robot's next decision goes to an allowed Group. It limits the Robots only — you can still
   click any Group, and Snapshots and Rules that set a Group still do. The overview shows a
   restricted Robot as `PGrp:ab`.
+- **Change Sync:** the **sync** pop-up beside the rate says *when* the Robot's own moves take
+  effect: **FREE** (default, and every older document) = as soon as it decides; **BEAT**,
+  **BAR**, **2 / 4 / 8 BARS** = a move decided in between waits for that boundary, counted from
+  Start (4/4, so a bar is four beats). The Robot keeps deciding at its rate; a newer move
+  replaces a waiting one (one waits at most, shown as `→3 5:1` in the overview), and a decision
+  to stay leaves it waiting. When it lands it is checked again — a Group no longer allowed
+  goes to the nearest allowed one, or the Robot stays. Switching the Robot off, changing its
+  sync, or Stop cancels it. Sync never chooses *where*, and your clicks, Rules and Snapshots
+  stay immediate. Baton (M) ignores it (it is M's own robot).
 - **Who wins:** Robots may share a Variable. If two change it at the same moment, the lower
   number wins; otherwise the latest change stands. Your own clicks always work.
 - **WEIGHTS:** choose a Variable, then drag its six bars (or type the numbers): a taller bar is
