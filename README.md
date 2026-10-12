@@ -116,11 +116,11 @@ Sequence), Web MIDI input and output with timestamped scheduling, save/load and 
 randomness, and colour palettes (Options ▸ Palette…; Classic black-and-white by default).
 Everyday comforts that do not change M's music: Undo / Redo, the Pattern's Length, Time Base
 and Phase right in the Pattern Editor, Clear Pattern, a Root + Scale per Pattern (changing it
-moves the notes by scale degree) and an optional Transposition **Scale Lock** (Transposition
+moves the notes by scale degree; it can be given to a whole Group or every Pattern at once) and an optional Transposition **Scale Lock** (Transposition
 counts degrees of each Pattern's scale), typing any number directly, keyboard shortcuts
 (Return = Play / Pause, Space = Stop / Play), mouse-wheel and trackpad scrolling in the Pattern Editor, MIDI clock
 in and out in one MIDI Settings window, emmm-style tooltips and pop-up menus, and full
-screen. 477 automated tests (including a seeded
+screen. 520 automated tests (including a seeded
 fuzz test, worked examples, and the whole app driven through its menus in a simulated browser)
 cover the engine, timing maths, persistence, session logic, the interface and Extended, and
 `npm run test:browser` drives the real app in headless Chrome with a fake MIDI device.

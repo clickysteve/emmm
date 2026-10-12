@@ -88,6 +88,9 @@ export interface RobotDef {
   /** Follower / Contrarian: the Robot it watches (0–3), or null */
   target: number | null;
   params: RobotParams;
+  /** Allowed Groups: the Pattern Groups (a–f) it may choose by itself; at least one. Restricts
+   * only its own automatic choices of Pattern Group, never a hand, Rule or Snapshot. */
+  groups: boolean[];
 }
 
 export interface PersonalityInfo {
@@ -145,7 +148,7 @@ export function defaultRobot(i: number): RobotDef {
     { personality: 'orbit', variables: ['transposition'], rateNum: 16, rateDen: 1 },
     { personality: 'restless', variables: ['rhythm'], rateNum: 1, rateDen: 1 },
   ];
-  return { enabled: false, home: null, target: null, params: defaultParams(), ...structuredClone(presets[i] ?? presets[1]) };
+  return { enabled: false, home: null, target: null, params: defaultParams(), groups: allGroups(), ...structuredClone(presets[i] ?? presets[1]) };
 }
 
 export function defaultRobots(): RobotDef[] {
@@ -187,6 +190,17 @@ export function cleanParams(v: unknown): RobotParams {
 
 const RATE_DENS = TIME_BASE_DENOMINATORS as readonly number[];
 
+/** Every Pattern Group allowed (the default, and what older documents had). */
+export function allGroups(): boolean[] {
+  return Array.from({ length: NUM_POSITIONS }, () => true);
+}
+
+/** Allowed Groups: one boolean per Pattern Group; missing → allowed; none allowed → all. */
+export function cleanGroups(v: unknown): boolean[] {
+  const g = Array.from({ length: NUM_POSITIONS }, (_, k) => !(Array.isArray(v) && v[k] === false));
+  return g.some((x) => x) ? g : allGroups();
+}
+
 export function cleanRobot(v: unknown, i: number): RobotDef {
   const d = defaultRobot(i);
   const o = (v && typeof v === 'object' ? v : {}) as Partial<RobotDef>;
@@ -203,6 +217,7 @@ export function cleanRobot(v: unknown, i: number): RobotDef {
     home: typeof o.home === 'number' && Number.isInteger(o.home) && o.home >= 0 && o.home < NUM_POSITIONS ? o.home : null,
     target,
     params: cleanParams(o.params),
+    groups: cleanGroups(o.groups),
   };
 }
 
@@ -250,6 +265,28 @@ export function resolvePosition(weights: Weights, v: VariableName, p: number): n
     if (p + d < NUM_POSITIONS && row[p + d] > 0) return p + d;
   }
   return p;
+}
+
+/** The allowed Pattern Group nearest to `p` (ties → the lower); `p` itself if allowed. */
+export function nearestGroup(groups: readonly boolean[], p: number): number {
+  if (groups[p] !== false) return p;
+  for (let d = 1; d < NUM_POSITIONS; d++) {
+    if (p - d >= 0 && groups[p - d] !== false) return p - d;
+    if (p + d < NUM_POSITIONS && groups[p + d] !== false) return p + d;
+  }
+  return p;
+}
+
+/**
+ * The weights a Robot chooses with: the shared weights, with Pattern Group Positions outside
+ * its Allowed Groups at 0. If that leaves none, its Allowed Groups count equally (the Allowed
+ * Groups win over the weights). With every Group allowed this is `weights` itself.
+ */
+export function robotWeights(weights: Weights, groups: readonly boolean[]): Weights {
+  if (groups.every((g) => g !== false)) return weights;
+  const row = weightRow(weights, 'patternGroup').map((w, k) => (groups[k] === false ? 0 : w));
+  const pg = row.some((w) => w > 0) ? row : row.map((_, k) => (groups[k] === false ? 0 : DEFAULT_WEIGHT));
+  return { ...weights, patternGroup: pg };
 }
 
 export interface Candidate {

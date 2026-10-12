@@ -121,6 +121,8 @@ export interface RobotGate {
   held(t: number): boolean;
   /** a Variable it must not change at this tick (owned by an Extended Return) */
   skip(v: VariableName, t: number): boolean;
+  /** the Position it may move Variable v to instead of `p` (EXTENDED Allowed Groups) */
+  place(v: VariableName, p: number): number;
 }
 
 export class MEngine {
@@ -808,18 +810,21 @@ export class MEngine {
     const ny = Math.max(0, Math.min(0.999, b.y + dy));
     const gate = this.robotGate;
     if (gate?.held(t)) return [];
-    return this.conduct(nx, ny, t, false, gate ? (v) => gate.skip(v, t) : undefined);
+    return this.conduct(nx, ny, t, false, gate ? (v) => gate.skip(v, t) : undefined, gate ? (v, p) => gate.place(v, p) : undefined);
   }
 
   /** Move the baton and apply the result (manual, robot, MIDI conduct). `skip`: Variables
-   * left alone (EXTENDED: being Returned Home; never set in Classic). */
-  conduct(x: number, y: number, t: number, fresh: boolean, skip?: (v: VariableName) => boolean): EngineEvent[] {
+   * left alone (EXTENDED: being Returned Home); `place`: where a Variable may go instead
+   * (EXTENDED: the Baton robot's Allowed Groups). Neither is ever set in Classic. */
+  conduct(x: number, y: number, t: number, fresh: boolean, skip?: (v: VariableName) => boolean, place?: (v: VariableName, p: number) => number): EngineEvent[] {
     const res = conductAt(this.comp, x, y, fresh);
     const out: EngineEvent[] = [];
-    for (const p of res.positions) if (!skip?.(p.variable)) out.push(...this.selectPosition(p.variable, p.position, t));
+    for (const p of res.positions) if (!skip?.(p.variable)) out.push(...this.selectPosition(p.variable, place ? place(p.variable, p.position) : p.position, t));
     if (res.tempo !== null) this.comp.tempo.value = res.tempo;
     if (res.snapshot !== null) {
-      const s = this.comp.snapshots[res.snapshot];
+      let s = this.comp.snapshots[res.snapshot];
+      const pg = s?.positions.patternGroup;
+      if (s && place && pg !== undefined && place('patternGroup', pg) !== pg) s = { ...s, positions: { ...s.positions, patternGroup: place('patternGroup', pg) } };
       if (s) out.push(...this.applySnapshot(s, t));
     }
     out.push({ kind: 'change', tick: t, what: 'baton' });

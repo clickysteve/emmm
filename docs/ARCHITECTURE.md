@@ -226,7 +226,9 @@ which the Conductor installs only while Extended is on (see below).
   through `MEngine.observer` (called inside `render` after every Voice event, action and
   Baton-robot move), so results do not depend on render granularity; `poke()` lets Rules see a
   hand at once (from `Session.changed`, never inside `render`, flagged by `MEngine.rendering`).
-  `robotGate` parks, holds or fences M's Baton robot. Ownership of a Variable's Position is
+  `robotGate` parks, holds or fences M's Baton robot, and `robotGate.place` keeps its Pattern
+  Group to Robot 1's Allowed Groups. A Position Robot's Allowed Groups act as per-Robot
+  weights (`robotWeights`) for its candidates and resolution. Ownership of a Variable's Position is
   RETURN > TRAJECTORY > ROBOT (`Conductor.owns`); Trajectories ask it in `trajApply`. A bounded
   FIFO queue, once-per-moment firing and a depth limit of 3 keep Rules finite.
 * `ui/robotsWindow.ts` — the Robots window (overview, activity log, ROBOT / WEIGHTS / RULES /
@@ -235,7 +237,8 @@ which the Conductor installs only while Extended is on (see below).
 A Pattern's Root + Scale (`Pattern.scale`, `app/scales.ts`) is editing metadata: pitch-class
 sets that shade the grid, snap new notes, and — when changed with `Session.setPatternScale` —
 transform the Pattern's notes by scale degree (`transformPitch` documents the exact rule;
-one Undo step). There is no real-time quantiser. The engine reads it only for the emmm
+one Undo step). `Session.applyPatternScale` does the same to this Pattern, every Pattern of the
+active Group, or all Patterns, each from its own scale and with its own copy (one Undo step). There is no real-time quantiser. The engine reads it only for the emmm
 **Transposition Scale Lock** (`Composition.scaleLock`, off by default): `MEngine.transposePitch`
 then moves each note by `shiftDegrees` (degrees of that Voice's current Pattern scale; a note
 outside the scale keeps its chromatic offset from the degree below; Chromatic = semitones)

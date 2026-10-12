@@ -15,7 +15,7 @@
  * (default: a temporary folder, printed at the end); PORT (default 4179).
  */
 import { spawn } from 'node:child_process';
-import { mkdtempSync, readdirSync, readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { mkdtempSync, readdirSync, readFileSync, writeFileSync, existsSync, mkdirSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -514,6 +514,177 @@ try {
   await send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 860, deviceScaleFactor: 1, mobile: false });
   await sleep(200);
   await shot('07-final');
+
+  // ---------------------------------------------------------------- A–G: Robot selection,
+  // Apply scale to, Allowed Groups — a fresh document, every Pattern of every Group with notes
+  console.log('  — selection vs activation, Apply scale to, Allowed Groups —');
+  await load(`${BASE}?new&seed=5150`);
+  await evaluate(`document.querySelectorAll('.mdialog').forEach((d) => d.remove())`);
+  await evaluate(`(() => { const s = emmm; s.comp.midi.outputs.forEach((o, i) => { o.port = 'fake-out'; o.channel = i + 1; }); s.comp.voices.forEach((v) => (v.playEnable = true)); s.comp.patternGroups.forEach((g, gi) => g.patterns.forEach((p, i) => { p.steps = [[60 + i * 3 + gi], [62 + i * 3], [], [64 + i * 3, 71], [67 + i * 3 - gi]]; p.scrambled = [0, 1, 2, 3, 4]; p.outputLength = 5; p.tbDen = 8; })); s.comp.extended.enabled = true; s.changed('extended'); s.changed('midi'); })()`);
+  const onOff = () => evaluate(`JSON.stringify([0, 1, 2, 3].map((i) => emmm.conductor.robotOn(i)))`);
+  await key('w', { code: 'KeyW', mods: 1 });
+  await waitFor(`!${W}.classList.contains('hidden')`, 2000, 'Robots window');
+  // Robots 1 and 4 ON, 2 and 3 OFF — with the ON / OFF boxes
+  await click(inRobots('[aria-label="Robot 1 on / off"]'));
+  await click(inRobots('[aria-label="Robot 4 on / off"]'));
+  check('A. ON / OFF boxes: Robot 1 ON, 2 OFF, 3 OFF, 4 ON', (await onOff()) === '[true,false,false,true]', await onOff());
+  // A: select Robot 3 (OFF) by its number and configure it completely
+  await click(inRobots('[aria-label="Edit Robot 3"]'));
+  check('A. clicking Robot 3’s number selects it (ROBOT tab shows Robot 3) …', await evaluate(`emmmUi.robotsWin.sel === 2 && emmmUi.robotsWin.tab === 'robot' && ${inRobots('[aria-label="Edit Robot 3"]')}.getAttribute('aria-pressed') === 'true'`));
+  check('A. … and leaves it OFF (1 and 4 still ON)', (await onOff()) === '[true,false,false,true]', await onOff());
+  await chooseItem(inRobots('.msel[aria-label="Robot 3 personality"]'), 'Tourist');
+  await click(byText('[role=switch]', 'Transposition'));
+  await click(byText('[role=switch]', 'Pattern Group'));
+  await click(`${tipped('[role=spinbutton]', '/Rate \\(M’s Time Base\\)/')}[0]`);
+  await typeText('1/8');
+  await key('Enter');
+  await click(byText('[role=switch]', 'b'));
+  await click(byText('[role=switch]', 'd'));
+  await click(byText('[role=switch]', 'e'));
+  await click(byText('[role=switch]', 'f'));
+  const r3 = await evaluate(`JSON.stringify(emmm.comp.extended.robots[2])`);
+  check('A. Robot 3 edited while OFF: Tourist, Pattern Group, 1|8, Groups a c', /"personality":"tourist"/.test(r3) && /"variables":\["patternGroup"\]/.test(r3) && /"rateNum":1,"rateDen":8/.test(r3) && /"groups":\[true,false,true,false,false,false\]/.test(r3), r3);
+  check('A. Robot 3 is still OFF after all that editing', (await onOff()) === '[true,false,false,true]', await onOff());
+  await shot('08-robot3-selected-off');
+  // selecting while playing: nothing switches
+  await key(' ');
+  await sleep(400);
+  await click(inRobots('[aria-label="Edit Robot 2"]'));
+  await click(inRobots('[aria-label="Edit Robot 1"]'));
+  await click(inRobots('[aria-label="Edit Robot 3"]'));
+  check('A. selecting Robots while playing switches none of them', (await onOff()) === '[true,false,false,true]' && (await evaluate(`emmm.engine.state === 'playing'`)), await onOff());
+  await key(' ');
+  // D: Robot 1 — Chaotic over Pattern Group, Groups a b only — in the music
+  await click(inRobots('[aria-label="Edit Robot 1"]'));
+  await chooseItem(inRobots('.msel[aria-label="Robot 1 personality"]'), 'Chaotic');
+  for (const v of await evaluate(`emmm.comp.extended.robots[0].variables.map((v) => ({ noteDensity: 'Note Density', noteOrder: 'Note Order' })[v] ?? v)`)) await click(byText('[role=switch]', v));
+  await click(byText('[role=switch]', 'Pattern Group'));
+  await click(`${tipped('[role=spinbutton]', '/Rate \\(M’s Time Base\\)/')}[0]`);
+  await typeText('1/16');
+  await key('Enter');
+  for (const g of ['c', 'd', 'e', 'f']) await click(byText('[role=switch]', g));
+  check('D. Robot 1: Chaotic, Pattern Group only, 1|16, Groups a b', await evaluate(`(() => { const r = emmm.comp.extended.robots[0]; return r.personality === 'chaotic' && JSON.stringify(r.variables) === '["patternGroup"]' && r.rateDen === 16 && JSON.stringify(r.groups) === '[true,true,false,false,false,false]'; })()`));
+  check('D. the overview shows the restriction (PGrp:ab)', await evaluate(`${W}.textContent.includes('PGrp:ab')`));
+  // the last allowed Group cannot be switched off
+  await click(byText('[role=switch]', 'b'));
+  await click(byText('[role=switch]', 'a'));
+  check('D. switching off the last allowed Group is refused, with a message', await evaluate(`emmm.comp.extended.robots[0].groups[0] === true && ${W}.textContent.includes('at least one Pattern Group must stay allowed')`));
+  await click(byText('[role=switch]', 'b'));
+  // only Robot 1 playing; every Pattern Group change recorded
+  await click(inRobots('[aria-label="Robot 4 on / off"]'));
+  await evaluate(`(() => { window.__pg = []; const e = emmm.engine; const o = e.selectPosition.bind(e); e.selectPosition = (v, p, t, x) => { if (v === 'patternGroup') window.__pg.push(p); return o(v, p, t, x); }; })()`);
+  await key(' ');
+  await sleep(5000);
+  const pgD = await evaluate(`window.__pg.slice()`);
+  const decD = await evaluate(`emmm.conductor.mem[0].decisions`);
+  check('D. many automatic decisions; Pattern Group only ever a or b', decD >= 30 && pgD.length >= 5 && pgD.every((g) => g < 2) && new Set(pgD).size === 2, `${decD} decisions, Groups ${[...new Set(pgD)].map((g) => 'abcdef'[g]).join(' ')} (${pgD.length} changes)`);
+  // E: Robot 3 (Groups a c, 1|8) on too: each Robot keeps to its own set. Robot 1 goes to 3|16
+  // so that most of Robot 3's decisions fall where Robot 1 does not decide (at a shared tick
+  // Robot 1 wins Pattern Group: priority)
+  await key(' ');
+  await click(`${tipped('[role=spinbutton]', '/Rate \\(M’s Time Base\\)/')}[0]`);
+  await typeText('3/16');
+  await key('Enter');
+  await click(inRobots('[aria-label="Robot 3 on / off"]'));
+  await key(' ');
+  await evaluate(`emmm.conductor.clearLog()`);
+  await sleep(5000);
+  const movesE = await evaluate(`emmm.conductor.log.filter((l) => l.kind === 'move').map((l) => [l.robot, Number(/→ (\\d)/.exec(l.text)[1])])`);
+  const r1to = movesE.filter((m) => m[0] === 0).map((m) => m[1]);
+  const r3to = movesE.filter((m) => m[0] === 2).map((m) => m[1]);
+  const pgE = await evaluate(`window.__pg.slice(${pgD.length})`);
+  check('E. Robot 1 keeps to a b, Robot 3 to a c — at the same time, independently', r1to.length >= 5 && r3to.length >= 5 && r1to.every((p) => p === 1 || p === 2) && r3to.every((p) => p === 1 || p === 3), `R1 → ${[...new Set(r1to)].sort()} · R3 → ${[...new Set(r3to)].sort()}`);
+  check('E. together they never put the music in Groups d e f; b and c both appear', pgE.length > 5 && pgE.every((g) => g <= 2) && pgE.includes(1) && pgE.includes(2), [...new Set(pgE)].map((g) => 'abcdef'[g]).join(' '));
+  await key(' ');
+  // manual selection is not restricted: click Group f in the Variables window
+  await click(`${W}.querySelector('.close')`);
+  await click(`document.querySelector('.pos[data-var="patternGroup"][data-pos="5"]')`, { wait: 300 });
+  check('D/E. a hand may still choose a forbidden Group (f)', await evaluate(`emmm.comp.patternGroup.active === 5`));
+  await shot('09-allowed-groups');
+  // B: Apply scale to the current Group (b)
+  await click(`document.querySelector('.pos[data-var="patternGroup"][data-pos="1"]')`, { wait: 300 });
+  await evaluate(`emmmUi.openEditor('patternEditor', { voice: 0 })`);
+  const PE = `document.querySelector('[data-win="edit-pattern"]')`;
+  const peSel = (start) => `[...${PE}.querySelectorAll('.msel')].find((e) => (e.getAttribute('aria-label') || '').startsWith(${JSON.stringify(start)}))`;
+  const scalesNow = () => evaluate(`JSON.stringify(emmm.comp.patternGroups.map((g) => g.patterns.map((p) => (p.scale ? p.scale.root + p.scale.scale : '-'))))`);
+  const groupsBefore = await evaluate(`JSON.stringify(emmm.comp.patternGroups)`);
+  await chooseItem(peSel('Root of this Pattern'), 'D');
+  await chooseItem(peSel('Scale of this Pattern'), 'Natural Minor / Aeolian');
+  await click(peSel('Apply scale to'));
+  const items = await evaluate(`[...document.querySelectorAll('.msel-item')].map((i) => i.textContent)`);
+  check('B. the Apply menu offers This Pattern / the current Group / All Patterns', JSON.stringify(items) === JSON.stringify(['Apply D Minor to…', 'This Pattern (Group b, Voice 1)', 'Group b: all 4 Patterns', 'All Patterns: Groups a–f']), items.join(' | '));
+  await click(`[...document.querySelectorAll('.msel-item')].find((i) => i.textContent === 'Group b: all 4 Patterns')`, { wait: 150 });
+  const sB = JSON.parse(await scalesNow());
+  check('B. every Pattern of Group b gets D minor', JSON.stringify(sB[1]) === '["2minor","2minor","2minor","2minor"]', JSON.stringify(sB[1]));
+  const othersB = await evaluate(`(() => { const b = JSON.parse(${JSON.stringify(groupsBefore)}); return emmm.comp.patternGroups.every((g, i) => i === 1 || JSON.stringify(g) === JSON.stringify(b[i])); })()`);
+  check('B. Groups a, c, d, e, f are exactly as they were', othersB);
+  check('B. Group b keeps its timing, lengths and rests (only notes and scale change)', await evaluate(`(() => { const b = JSON.parse(${JSON.stringify(groupsBefore)})[1]; return emmm.comp.patternGroups[1].patterns.every((p, v) => p.tbDen === b.patterns[v].tbDen && p.outputLength === b.patterns[v].outputLength && p.steps.length === b.patterns[v].steps.length && p.steps[2].length === 0); })()`));
+  // C: a scale for everything, then one Pattern on its own
+  await chooseItem(peSel('Scale of this Pattern'), 'Dorian');
+  await chooseItem(peSel('Apply scale to'), 'All Patterns: Groups a–f');
+  check('C. All Patterns: all 24 get D Dorian', JSON.stringify(JSON.parse(await scalesNow()).flat()) === JSON.stringify(Array(24).fill('2dorian')));
+  await click(`${PE}.querySelector('.close')`);
+  await click(`document.querySelector('.pos[data-var="patternGroup"][data-pos="2"]')`, { wait: 300 });
+  await evaluate(`emmmUi.openEditor('patternEditor', { voice: 2 })`);
+  await chooseItem(peSel('Root of this Pattern'), 'E');
+  const sC = JSON.parse(await scalesNow()).flat();
+  check('C. Group c Voice 3 changed alone to E Dorian; the other 23 stay D Dorian', sC[2 * 4 + 2] === '4dorian' && sC.filter((x) => x === '2dorian').length === 23, sC.join(' '));
+  await shot('10-apply-scale');
+  await click(`${PE}.querySelector('.close')`);
+  // F: save, reload (autosave), open the saved file
+  const confF = await evaluate(`JSON.stringify({ g: emmm.comp.patternGroups, r: emmm.comp.extended.robots })`);
+  // (the same name as the earlier save: Chrome may overwrite it, so look for a fresh file)
+  const t0F = Date.now() - 1000;
+  await key('s', { code: 'KeyS', mods: process.platform === 'darwin' ? 4 : 2 });
+  let fileF = null;
+  for (let i = 0; i < 40 && !fileF; i++) {
+    await sleep(100);
+    fileF = readdirSync(DOWNLOADS).find((f) => f.endsWith('.emmm.json') && statSync(join(DOWNLOADS, f)).mtimeMs > t0F && /"groups"/.test(readFileSync(join(DOWNLOADS, f), 'utf8')));
+  }
+  const savedF = fileF ? JSON.parse(readFileSync(join(DOWNLOADS, fileF), 'utf8')) : null;
+  check('F. saved: format still 5, with every Pattern’s scale and every Robot’s Allowed Groups', !!savedF && savedF.version === 5 && JSON.stringify(savedF.composition.extended.robots.map((r) => r.groups)) === JSON.stringify([[true, true, false, false, false, false], [true, true, true, true, true, true], [true, false, true, false, false, false], [true, true, true, true, true, true]]) && savedF.composition.patternGroups[2].patterns[2].scale.root === 4, fileF ?? 'nothing downloaded');
+  await evaluate(`emmm.changed('conductors')`);
+  await sleep(1700);
+  await load(BASE);
+  await evaluate(`document.querySelectorAll('.mdialog').forEach((d) => d.remove())`);
+  const afterF = await evaluate(`JSON.stringify({ g: emmm.comp.patternGroups, r: emmm.comp.extended.robots })`);
+  check('F. reload: scales and Allowed Groups come back exactly', diff(confF, afterF) === '', diff(confF, afterF));
+  if (fileF) {
+    await click(`[...document.querySelectorAll('#menubar .menu')].find((m) => m.firstChild?.textContent === 'File')`);
+    await click(`[...document.querySelectorAll('.dropdown .item')].find((i) => i.firstElementChild.textContent === 'New')`);
+    await key('Enter');
+    await sleep(200);
+    check('F. File ▸ New first: Allowed Groups and scales back to defaults', await evaluate(`emmm.comp.extended.robots.every((r) => r.groups.every((g) => g)) && emmm.comp.patternGroups.every((g) => g.patterns.every((p) => !p.scale))`));
+    chooser = null;
+    await key('o', { code: 'KeyO', mods: process.platform === 'darwin' ? 4 : 2 });
+    for (let i = 0; i < 30 && !chooser; i++) await sleep(100);
+    if (chooser) await send('DOM.setFileInputFiles', { files: [join(DOWNLOADS, fileF)], backendNodeId: chooser.backendNodeId });
+    await sleep(800);
+    await evaluate(`document.querySelectorAll('.mdialog').forEach((d) => d.remove())`);
+  }
+  const openedF = await evaluate(`JSON.stringify({ g: emmm.comp.patternGroups, r: emmm.comp.extended.robots })`);
+  check('F. File ▸ Open of the saved file: scales and Allowed Groups exactly', diff(confF, openedF) === '', diff(confF, openedF));
+  // G: an older project (no Allowed Groups, no scales) opens with the old behaviour
+  if (savedF) {
+    const old = structuredClone(savedF);
+    for (const r of old.composition.extended.robots) delete r.groups;
+    for (const g of old.composition.patternGroups) for (const p of g.patterns) delete p.scale;
+    const oldPath = join(DOWNLOADS, 'older-project.json');
+    writeFileSync(oldPath, JSON.stringify(old));
+    chooser = null;
+    await key('o', { code: 'KeyO', mods: process.platform === 'darwin' ? 4 : 2 });
+    for (let i = 0; i < 30 && !chooser; i++) await sleep(100);
+    if (chooser) await send('DOM.setFileInputFiles', { files: [oldPath], backendNodeId: chooser.backendNodeId });
+    await sleep(800);
+    await evaluate(`document.querySelectorAll('.mdialog').forEach((d) => d.remove())`);
+    check('G. older project: every Robot allows every Group; Patterns without a scale (Chromatic), notes as saved', await evaluate(`emmm.comp.extended.robots.every((r) => r.groups.every((g) => g)) && emmm.comp.patternGroups.every((g) => g.patterns.every((p) => p.scale === undefined)) && JSON.stringify(emmm.comp.patternGroups[1].patterns[0].steps) === ${JSON.stringify(JSON.stringify(old.composition.patternGroups[1].patterns[0].steps))}`));
+    await evaluate(`(() => { emmm.comp.midi.outputs.forEach((o, i) => { o.port = 'fake-out'; o.channel = i + 1; }); window.__pg = []; const e = emmm.engine; const o = e.selectPosition.bind(e); e.selectPosition = (v, p, t, x) => { if (v === 'patternGroup') window.__pg.push(p); return o(v, p, t, x); }; })()`);
+    await key(' ');
+    await sleep(4000);
+    await key(' ');
+    const pgG = await evaluate(`window.__pg.slice()`);
+    check('G. older project plays: Robot 1 wanders over Groups beyond a and b again', new Set(pgG).size > 2, [...new Set(pgG)].map((g) => 'abcdef'[g]).join(' '));
+  }
 
   check('no console errors', consoleErrors.length === 0, consoleErrors.slice(0, 3).join(' | '));
 } catch (e) {

@@ -15,7 +15,7 @@
  */
 import { NUM_POSITIONS, NUM_SNAPSHOTS, STEP_ADVANCE, TIME_BASE_DENOMINATORS } from '../engine/constants';
 import type { VariableName } from '../engine/types';
-import { candidates, NUM_ROBOTS, PARAM_INFO, PERSONALITIES, personalityInfo, rateLabel, rateWords, ROBOT_VARS, VAR_LONG, VAR_SHORT, weightRow, type Personality, type RobotParams, type RobotVar } from '../extended/conductors';
+import { candidates, NUM_ROBOTS, PARAM_INFO, PERSONALITIES, personalityInfo, rateLabel, rateWords, ROBOT_VARS, robotWeights, VAR_LONG, VAR_SHORT, weightRow, type Personality, type RobotParams, type RobotVar } from '../extended/conductors';
 import { activeOf, HOME_VARS, returnPath } from '../extended/home';
 import { ACTION_KINDS, CONDITION_KINDS, CYCLE_NAMES, defaultAction, defaultCondition, MAX_RULES, ruleSummary, TIMINGS, type Action, type Condition, type Rule, type RuleTiming } from '../extended/rules';
 import type { UiContext } from './context';
@@ -37,6 +37,8 @@ const TABS: { id: Tab; name: string; help: string }[] = [
 const DENS = (TIME_BASE_DENOMINATORS as readonly number[]).filter((x) => x !== STEP_ADVANCE);
 const barBeat = (t: number) => `${Math.floor(t / 384) + 1}:${Math.floor((t % 384) / 96) + 1}`;
 const letter = (i: number) => String.fromCharCode(65 + i);
+/** The allowed Pattern Groups as letters: "ab", "abcdef". */
+const groupLetters = (groups: readonly boolean[]) => groups.map((x, k) => (x ? 'abcdef'[k] : '')).join('');
 
 interface Part {
   update(): void;
@@ -272,22 +274,25 @@ export class RobotsWindow {
     const row = el('div', '', b, [0, y - 1, 336, 15]);
     row.style.position = 'absolute';
     row.style.outlineOffset = '-1px';
-    row.addEventListener('pointerdown', () => {
-      this.sel = i;
-      this.tab = 'robot';
-      s.changed('window');
-    });
-    const on = el('div', 'num', b, [2, y, 16, 13], String(i + 1));
+    row.addEventListener('pointerdown', () => this.selectRobot(i));
+    // the number selects the Robot for editing (never switches it); ON / OFF beside it is the
+    // only switch in the row
+    const num = el('div', 'num', b, [2, y, 14, 13], String(i + 1));
+    num.setAttribute('role', 'button');
+    num.setAttribute('aria-label', `Edit Robot ${i + 1}`);
+    this.activatable(num, () => this.selectRobot(i));
+    const on = el('div', 'num', b, [18, y, 21, 13]);
+    on.style.fontSize = '7px';
     on.setAttribute('role', 'switch');
     on.setAttribute('aria-label', `Robot ${i + 1} on / off`);
-    this.activatable(on, () => ((this.sel = i), s.setRobotEnabled(i, !this.c.robotOn(i))), () => this.ext.enabled);
-    const name = el('div', 'label small', b, [21, y + 3, 62, 9]);
+    this.activatable(on, () => s.setRobotEnabled(i, !this.c.robotOn(i)), () => this.ext.enabled);
+    const name = el('div', 'label small', b, [42, y + 3, 60, 9]);
     const cells = svgEl(66, 13, '');
-    const cbox = el('div', '', b, [84, y, 66, 13]);
+    const cbox = el('div', '', b, [102, y, 66, 13]);
     cbox.style.position = 'absolute';
     cbox.appendChild(cells);
-    const rate = el('div', 'label small', b, [154, y + 3, 26, 9]);
-    const vars = el('div', 'label small', b, [182, y + 3, 78, 9]);
+    const rate = el('div', 'label small', b, [172, y + 3, 26, 9]);
+    const vars = el('div', 'label small', b, [200, y + 3, 60, 9]);
     vars.style.overflow = 'hidden';
     vars.style.textOverflow = 'ellipsis';
     const st = el('div', 'label small', b, [262, y + 3, 74, 9]);
@@ -298,10 +303,18 @@ export class RobotsWindow {
         const def = this.ext.robots[i];
         const active = c.robotOn(i);
         const docOn = s.robotEnabled(i);
+        const onText = active ? 'ON' : 'OFF';
+        if (on.textContent !== onText) on.textContent = onText;
         on.classList.toggle('inv', active);
         on.setAttribute('aria-checked', String(active));
-        setTip(on, `Robot ${i + 1}: ${active ? 'ON' : 'off'}${active !== docOn && this.ext.enabled ? ' (switched by a Rule while playing)' : ''}${i === 0 ? ' — Robot 1 is M’s Robot Conductor: the robot button in the Conducting window' : ''}. Click to switch.`);
-        row.style.outline = this.sel === i ? '1px dotted var(--ink)' : 'none';
+        on.style.opacity = this.ext.enabled ? '1' : '0.4';
+        setTip(on, `Robot ${i + 1}: ${active ? 'ON' : 'off'}${active !== docOn && this.ext.enabled ? ' (switched by a Rule while playing)' : ''}${i === 0 ? ' — Robot 1 is M’s Robot Conductor: the robot button in the Conducting window' : ''}. Click to switch it ${active ? 'off' : 'on'}.`);
+        const selected = this.sel === i;
+        num.style.outline = selected ? '1px solid var(--ink)' : 'none';
+        num.style.outlineOffset = '1px';
+        num.setAttribute('aria-pressed', String(selected));
+        setTip(num, selected ? `Robot ${i + 1} is being edited (ROBOT tab)` : `Edit Robot ${i + 1} (it stays ${active ? 'on' : 'off'})`);
+        row.style.outline = selected ? '1px dotted var(--ink)' : 'none';
         const p = c.personality(i);
         const pName = personalityInfo(p).name + (c.personalityOverride[i] ? '*' : '');
         if (name.textContent !== pName) name.textContent = pName;
@@ -310,7 +323,7 @@ export class RobotsWindow {
         const pos = c.displayPos(i);
         const home = c.robotHome(i);
         const vlist = c.variables(i);
-        const ok = new Set(candidates(this.ext.weights, c.isBaton(i) ? [] : vlist).map((x) => x.pos));
+        const ok = new Set(candidates(robotWeights(this.ext.weights, def.groups), c.isBaton(i) ? [] : vlist).map((x) => x.pos));
         let g = '';
         for (let k = 0; k < NUM_POSITIONS; k++) {
           const x = k * 11;
@@ -324,9 +337,13 @@ export class RobotsWindow {
         const rt = c.isBaton(i) ? `1|${s.comp.conducting.robot.rate}` : rateLabel(def);
         if (rate.textContent !== rt) rate.textContent = rt;
         setTip(rate, c.isBaton(i) ? `M’s robot jumps once every 1/${s.comp.conducting.robot.rate} note` : `One decision ${rateWords(def)} (${rt} of a whole note, M’s Time Base)`);
-        const vt = vlist.length ? vlist.map((v) => VAR_SHORT[v]).join(' ') : c.isBaton(i) ? 'no arrows on' : '—';
+        // Pattern Group with some Groups not allowed: "PGrp:ab"
+        const allowed = groupLetters(def.groups);
+        const pg = (v: VariableName) => (v === 'patternGroup' && allowed.length < NUM_POSITIONS ? `${VAR_SHORT[v]}:${allowed}` : VAR_SHORT[v]);
+        const vt = vlist.length ? vlist.map(pg).join(' ') : c.isBaton(i) ? 'no arrows on' : '—';
         if (vars.textContent !== vt) vars.textContent = vt;
-        setTip(vars, c.isBaton(i) ? `Baton (M): the Variables whose conducting arrows are on — ${vt}` : `Moves: ${vlist.map((v) => VAR_LONG[v]).join(', ') || 'no Variables (it still moves, for Rules)'}`);
+        const groupsTip = vlist.includes('patternGroup') && allowed.length < NUM_POSITIONS ? ` · Allowed Groups: ${allowed.split('').join(' ')}` : '';
+        setTip(vars, (c.isBaton(i) ? `Baton (M): the Variables whose conducting arrows are on — ${vt}` : `Moves: ${vlist.map((v) => VAR_LONG[v]).join(', ') || 'no Variables (it still moves, for Rules)'}`) + groupsTip);
         const status = this.robotStatus(i);
         if (st.textContent !== status.text) st.textContent = status.text;
         st.style.fontWeight = status.strong ? '700' : '400';
@@ -334,6 +351,13 @@ export class RobotsWindow {
         setTip(st, status.tip);
       },
     });
+  }
+
+  /** Show Robot i in the ROBOT tab. Only the view changes: never its on / off or anything musical. */
+  selectRobot(i: number): void {
+    this.sel = i;
+    this.tab = 'robot';
+    this.s.changed('window');
   }
 
   /** What a Robot is doing, in a few words (never only a colour). */
@@ -528,7 +552,7 @@ export class RobotsWindow {
         const lines = [`<b>${pi.name}</b> — ${pi.help}`];
         if (!c.isBaton(i)) {
           lines.push(pi.weighted ? 'Weights shape its choices (WEIGHTS tab): taller bars are likelier; 0 = never.' : 'Weights only decide which Positions are allowed (0 = not allowed); their sizes do not change its path.');
-          const cands = candidates(this.ext.weights, def().variables).map((x) => x.pos + 1);
+          const cands = candidates(robotWeights(this.ext.weights, def().groups), def().variables).map((x) => x.pos + 1);
           lines.push(`Allowed Positions now: ${cands.join(' ')}.`);
           if (c.personalityOverride[i]) lines.push(`A Rule changed it to ${personalityInfo(c.personalityOverride[i]!).name} while playing (* in the overview); Stop puts it back.`);
           if ((def().personality === 'follower' || def().personality === 'contrarian') && def().target === null) lines.push('<b>Choose a Robot to watch</b> — until then it holds its Position.');
@@ -541,7 +565,29 @@ export class RobotsWindow {
         if (desc.innerHTML !== html) desc.innerHTML = html;
       },
     });
-    this.text(p, 2, 178, 470, 40, () => (this.ext.enabled ? 'Click a row in the overview to edit another Robot. Rate “sa” = it moves only when a Rule tells it to.' : 'Extended is off: these settings are kept but nothing runs. Switch it on in Options ▸ Extended….'), 'label tiny');
+    // Allowed Groups: the Pattern Groups this Robot may choose by itself
+    label(p, 2, 182, 'Groups', 'tiny');
+    for (let g = 0; g < NUM_POSITIONS; g++) {
+      const letterG = 'abcdef'[g];
+      this.toggle(
+        p,
+        46 + g * 18,
+        178,
+        16,
+        () => letterG,
+        () => def().groups[g],
+        () => s.setRobotGroup(i, g, !def().groups[g]),
+        () => (def().groups[g] ? `Pattern Group ${letterG}: allowed — Robot ${i + 1} may choose it. Click to forbid it (one Group must stay allowed).` : `Pattern Group ${letterG}: not allowed — Robot ${i + 1} never chooses it by itself (you, Rules and Snapshots still can). Click to allow it.`),
+      );
+    }
+    this.button(p, 46 + NUM_POSITIONS * 18 + 2, 178, 24, 'All', `Allow every Pattern Group for Robot ${i + 1} again`, () => s.allowAllGroups(i), () => def().groups.some((x) => !x));
+    this.text(p, 186, 181, 286, 9, () => {
+      const allowed = groupLetters(def().groups);
+      const moves = c.variables(i).includes('patternGroup');
+      const which = allowed.length === NUM_POSITIONS ? 'any Pattern Group' : allowed.length === 1 ? `only Group ${allowed} (it stays there)` : `only Groups ${allowed.split('').join(' ')}`;
+      return moves ? `Allowed Groups: chooses ${which}` : `Allowed Groups: ${which} — used when it moves Pattern Group`;
+    });
+    this.text(p, 2, 198, 470, 30, () => (this.ext.enabled ? 'Click a Robot’s number or row to edit it — ON / OFF beside the number is the only switch. Rate “sa” = it moves only when a Rule tells it to.' : 'Extended is off: these settings are kept but nothing runs. Switch it on in Options ▸ Extended….'), 'label tiny');
   }
 
   // ------------------------------------------------------------------ WEIGHTS

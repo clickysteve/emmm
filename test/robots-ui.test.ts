@@ -372,3 +372,159 @@ describe('keyboard, focus, Undo', () => {
     s.stop();
   });
 });
+
+describe('selecting a Robot is not switching it', () => {
+  const on = (i: number) => s.conductor.robotOn(i);
+  const num = (i: number) => win().querySelector<HTMLDivElement>(`[aria-label="Edit Robot ${i + 1}"]`)!;
+  const sw = (i: number) => win().querySelector<HTMLDivElement>(`[aria-label="Robot ${i + 1} on / off"]`)!;
+  it('clicking an OFF Robot’s number selects it for editing and leaves it OFF; others keep running', () => {
+    s.setRobotEnabled(0, true);
+    s.setRobotEnabled(1, false);
+    s.setRobotEnabled(2, false);
+    s.setRobotEnabled(3, true);
+    draw();
+    pd(num(2));
+    draw();
+    expect(ui.robotsWin.sel).toBe(2);
+    expect(ui.robotsWin.tab).toBe('robot');
+    expect([0, 1, 2, 3].map(on)).toEqual([true, false, false, true]);
+    expect(num(2).getAttribute('aria-pressed')).toBe('true');
+    expect(num(1).getAttribute('aria-pressed')).toBe('false');
+    expect(sw(2).textContent).toBe('OFF');
+    expect(sw(3).textContent).toBe('ON');
+    expect(win().textContent).toMatch(/Robot 3/);
+  });
+  it('an OFF Robot can be configured completely, and stays OFF', () => {
+    choose('Robot 3 personality', 'Chaotic');
+    pd(byText('[role=switch]', 'Pattern Group'));
+    typeInto(/Rate \(M’s Time Base\)/, '1/2');
+    typeInto(/Chaotic: smallest jump/, '2');
+    pd(byText('[role=switch]', 'c'));
+    draw();
+    const r = s.comp.extended.robots[2];
+    expect(r.personality).toBe('chaotic');
+    expect(r.variables).toContain('patternGroup');
+    expect([r.rateNum, r.rateDen]).toEqual([1, 2]);
+    expect(r.params.minJump).toBe(2);
+    expect(r.groups[2]).toBe(false);
+    expect(r.enabled).toBe(false);
+    expect([0, 1, 2, 3].map(on)).toEqual([true, false, false, true]);
+  });
+  it('selecting an ON Robot does not switch it off; going back to another keeps every setting', () => {
+    const before = structuredClone(s.comp.extended.robots);
+    pd(num(3));
+    draw();
+    expect(ui.robotsWin.sel).toBe(3);
+    expect(on(3)).toBe(true);
+    pd(within('div').filter((d) => d.style.width === '336px')[0]); // the row
+    draw();
+    expect(ui.robotsWin.sel).toBe(0);
+    expect(on(0)).toBe(true);
+    pd(num(2));
+    draw();
+    expect(s.comp.extended.robots).toEqual(before);
+    expect(selector('Robot 3 personality').textContent).toBe('Chaotic');
+  });
+  it('the keyboard follows the same split: Enter / Space on a number selects; on ON / OFF they switch', () => {
+    num(1).focus();
+    key(num(1), 'Enter');
+    draw();
+    expect(ui.robotsWin.sel).toBe(1);
+    expect(on(1)).toBe(false);
+    key(num(2), ' ');
+    draw();
+    expect(ui.robotsWin.sel).toBe(2);
+    expect(on(2)).toBe(false);
+    expect(s.engine.state).toBe('stopped');
+    sw(2).focus();
+    key(sw(2), 'Enter');
+    draw();
+    expect(on(2)).toBe(true);
+    expect(sw(2).getAttribute('aria-checked')).toBe('true');
+    expect(ui.robotsWin.sel).toBe(2);
+    pd(sw(2));
+    draw();
+    expect(on(2)).toBe(false);
+    expect(sw(2).textContent).toBe('OFF');
+  });
+  it('selecting Robots while playing changes nothing in the music', () => {
+    s.setRobotEnabled(1, true);
+    // Stop leaves the Variables where the Robots put them: every run starts from the same place
+    const comp = s.comp as unknown as Record<string, { active?: number }>;
+    const start = Object.fromEntries(Object.keys(comp).filter((k) => typeof comp[k]?.active === 'number').map((k) => [k, comp[k].active]));
+    const baton = { ...s.comp.conducting.baton };
+    const notes = () => {
+      const out: string[] = [];
+      for (const [k, a] of Object.entries(start)) comp[k].active = a;
+      s.comp.conducting.baton = { ...baton };
+      s.start();
+      for (let t = 24; t <= 384 * 6; t += 24) {
+        const evs = s.engine.render(t);
+        s.emitNow(evs);
+        for (const e of evs) if (e.kind === 'on' || e.kind === 'change') out.push(JSON.stringify({ ...e, id: undefined })); // (note ids count on)
+        if (clicking && t % 96 === 0) {
+          pd(num((t / 96) % 4));
+          pd(within('div').filter((d) => d.style.width === '336px')[(t / 96 + 1) % 4]);
+          draw();
+        }
+      }
+      s.stop();
+      return out;
+    };
+    let clicking = false;
+    const plain = notes();
+    expect(notes()).toEqual(plain); // the control: two runs without clicks are identical
+    clicking = true;
+    const clicked = notes();
+    expect(clicked).toEqual(plain);
+    expect(plain.length).toBeGreaterThan(20);
+  });
+});
+
+describe('Allowed Groups (ROBOT tab)', () => {
+  it('six Group switches a–f; the last allowed one cannot be switched off; All allows every Group again', () => {
+    pd(win().querySelector(`[aria-label="Edit Robot 2"]`)!);
+    draw();
+    s.allowAllGroups(1);
+    draw();
+    const g = (l: string) => byText('[role=switch]', l);
+    expect(['a', 'b', 'c', 'd', 'e', 'f'].map((l) => g(l).getAttribute('aria-checked'))).toEqual(Array(6).fill('true'));
+    expect(win().textContent).toMatch(/Allowed Groups: (chooses )?any Pattern Group/);
+    for (const l of ['c', 'd', 'e', 'f', 'b']) pd(g(l));
+    draw();
+    expect(s.comp.extended.robots[1].groups).toEqual([true, false, false, false, false, false]);
+    pd(g('a')); // refused
+    draw();
+    expect(s.comp.extended.robots[1].groups[0]).toBe(true);
+    expect(win().textContent).toMatch(/at least one Pattern Group must stay allowed/);
+    expect(win().textContent).toMatch(/only Group a/);
+    pd(g('c'));
+    draw();
+    expect(win().textContent).toMatch(/only Groups a c/);
+    // the overview shows the restriction when the Robot moves Pattern Group
+    if (!s.comp.extended.robots[1].variables.includes('patternGroup')) pd(byText('[role=switch]', 'Pattern Group'));
+    draw();
+    expect(win().textContent).toMatch(/PGrp:ac/);
+    pd(byText('.btn', 'All'));
+    draw();
+    expect(s.comp.extended.robots[1].groups).toEqual([true, true, true, true, true, true]);
+  });
+  it('a Robot keeps to its Groups in the music, also when switched on from the overview', () => {
+    s.allowAllGroups(1);
+    for (const g of [2, 3, 4, 5]) s.setRobotGroup(1, g, false);
+    s.setRobot(1, { personality: 'chaotic', variables: ['patternGroup'], rateNum: 1, rateDen: 8 });
+    s.setRobotEnabled(1, false);
+    draw();
+    pd(win().querySelector('[aria-label="Robot 2 on / off"]')!);
+    expect(s.conductor.robotOn(1)).toBe(true);
+    s.start();
+    const seen = new Set<number>();
+    for (let t = 48; t <= 384 * 12; t += 48) {
+      render(t);
+      seen.add(act('patternGroup'));
+    }
+    s.stop();
+    expect(seen).toEqual(new Set([0, 1]));
+    s.allowAllGroups(1);
+  });
+});

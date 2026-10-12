@@ -27,9 +27,9 @@ import { capturePerfState, recallPerfState } from '../extended/perfState';
 import { freshSeed } from '../engine/rng';
 import { assignDeep } from './assign';
 import { History } from './history';
-import { CHROMATIC, cleanChoice, transformSteps, type ScaleChoice } from './scales';
+import { CHROMATIC, cleanChoice, ROOT_NAMES, scaleById, transformSteps, type ScaleChoice } from './scales';
 import { Conductor } from './conductor';
-import { cleanParams, createsCycle, DEFAULT_WEIGHT, defaultParams, MAX_WEIGHT, personalityInfo, ROBOT_VARS, VAR_LONG, type RobotDef, type RobotParams, type RobotVar } from '../extended/conductors';
+import { allGroups, cleanParams, createsCycle, DEFAULT_WEIGHT, defaultParams, MAX_WEIGHT, personalityInfo, ROBOT_VARS, VAR_LONG, type RobotDef, type RobotParams, type RobotVar } from '../extended/conductors';
 import { captureHome, cleanReturnSettings, type ReturnSettings } from '../extended/home';
 import { cleanRule, defaultRule, MAX_RULES, type Rule } from '../extended/rules';
 
@@ -883,6 +883,33 @@ export class Session {
     this.changed('patterns');
   }
 
+  /**
+   * Give the scale `choice` to this Pattern, every Pattern of the active Pattern Group (all four
+   * Voices), or every Pattern of all six Groups (emmm). Each Pattern changes exactly as
+   * setPatternScale changes one — its notes move from its own scale to the new one — and gets
+   * its own copy, so it can be changed alone afterwards. Nothing else of a Pattern changes. One
+   * Undo step. Returns how many Patterns changed.
+   */
+  applyPatternScale(choice: ScaleChoice, scope: 'pattern' | 'group' | 'all', voice: number): number {
+    const to = cleanChoice(choice);
+    const groups = scope === 'all' ? this.comp.patternGroups : [this.comp.patternGroups[this.comp.patternGroup.active]];
+    let n = 0;
+    for (const g of groups)
+      g.patterns.forEach((p, v) => {
+        if (scope === 'pattern' && v !== voice) return;
+        const from = p.scale ? cleanChoice(p.scale) : CHROMATIC;
+        if (from.root === to.root && from.scale === to.scale && p.scale) return;
+        p.steps = transformSteps(p.steps, from, to);
+        p.scale = { ...to };
+        n++;
+      });
+    const name = `${ROOT_NAMES[to.root]} ${scaleById(to.scale).name}`;
+    const where = scope === 'pattern' ? 'this Pattern' : scope === 'group' ? `Group ${'abcdef'[this.comp.patternGroup.active]} (4 Patterns)` : 'all Patterns';
+    this.status = n ? `${name} applied to ${where}: ${n} Pattern${n === 1 ? '' : 's'} changed` : `Nothing to change: ${where} already in ${name}`;
+    this.changed(n ? 'patterns' : 'select');
+    return n;
+  }
+
   setOutputLength(v: number, len: number, withRests: boolean): void {
     const p = this.pattern(v);
     if (withRests) ops.setLengthWithRests(p, len, this.editRng, this.comp.options.dontScrambleRests);
@@ -1605,6 +1632,31 @@ export class Session {
     if (patch.hRange !== undefined) r.hRange = Math.max(0, Math.min(1, patch.hRange));
     if (patch.vRange !== undefined) r.vRange = Math.max(0, Math.min(1, patch.vRange));
     this.changed('robot');
+  }
+
+  /**
+   * Allow or forbid Pattern Group g for Robot i's own choices (Allowed Groups). The last
+   * allowed Group cannot be switched off. Nothing moves now: the Robot's next decision keeps
+   * to the new set (see docs/CONDUCTORS.md). One Undo step.
+   */
+  setRobotGroup(i: number, g: number, on: boolean): void {
+    const r = this.comp.extended.robots[i];
+    if (!r || g < 0 || g >= r.groups.length || r.groups[g] === on) return;
+    if (!on && r.groups.every((x, k) => k === g || !x)) {
+      this.status = `Robot ${i + 1}: at least one Pattern Group must stay allowed`;
+      this.changed('conductor');
+      return;
+    }
+    r.groups = r.groups.map((x, k) => (k === g ? on : x));
+    this.changed('conductors');
+  }
+
+  /** Allow every Pattern Group for Robot i again (its old behaviour). One Undo step. */
+  allowAllGroups(i: number): void {
+    const r = this.comp.extended.robots[i];
+    if (!r || r.groups.every((x) => x)) return;
+    r.groups = allGroups();
+    this.changed('conductors');
   }
 
   toggleRobotVariable(i: number, v: RobotVar): void {

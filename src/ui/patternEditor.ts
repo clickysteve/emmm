@@ -4,7 +4,7 @@
  * Tools: Selector, Eraser, Plunger (insert), Scissors (delete) operate in the strip above
  * the grid. View 1–4 (Shift: show a second pattern in grey). MIDI Edit Counter and Range.
  */
-import { CHROMATIC, inScale, isChromatic, isRoot, ROOT_NAMES, SCALES, snapToScale, type ScaleChoice } from '../app/scales';
+import { CHROMATIC, inScale, isChromatic, isRoot, ROOT_NAMES, SCALES, SHORT_SCALE_NAMES, snapToScale, type ScaleChoice } from '../app/scales';
 import { MAX_PATTERN_STEPS, noteName } from '../engine/constants';
 import * as ops from '../engine/patternOps';
 import type { UiContext } from './context';
@@ -239,19 +239,37 @@ export class PatternEditor {
     // the Pattern's Root + Scale (emmm): changing it moves the notes to the new scale
     const cur = () => this.scaleOf();
     this.parts.push(
-      new Selector(b, RX, 190, 30, 14, {
+      new Selector(b, RX, 174, 30, 14, {
         label: 'Root of this Pattern’s scale. Changing it moves the notes to the new key, keeping their scale degrees and register (⌘Z undoes).',
         options: () => ROOT_NAMES.map((n, i) => ({ value: String(i), text: n })),
         value: () => String(cur().root),
         onChange: (v) => s.setPatternScale(this.voice, { root: Number(v), scale: cur().scale }),
       }),
-      new Selector(b, RX + 32, 190, 62, 14, {
+      new Selector(b, RX + 32, 174, 62, 14, {
         label: 'Scale of this Pattern. Changing it moves the notes to the matching degrees of the new scale; Chromatic leaves them as they are. New notes snap into the scale; notes outside it are shaded. (⌘Z undoes.)',
         options: () => SCALES.map((x) => ({ value: x.id, text: x.name })),
         value: () => cur().scale,
         onChange: (v) => s.setPatternScale(this.voice, { root: cur().root, scale: v }),
       }),
     );
+    // give this Pattern's Root + Scale to more Patterns (each moves its own notes, as above)
+    const apply = new Selector(b, RX, 191, 94, 14, {
+      label: 'Apply scale to: give this Pattern’s Root + Scale to the other Patterns of this Group, or to every Pattern. Each Pattern’s notes move to the new scale as when you change its own; nothing else changes. One Undo step (⌘Z).',
+      fontSize: 8,
+      options: () => {
+        const g = 'abcdef'[s.comp.patternGroup.active];
+        return [
+          { value: 'pattern', text: `This Pattern (Group ${g}, Voice ${this.voice + 1})` },
+          { value: 'group', text: `Group ${g}: all 4 Patterns` },
+          { value: 'all', text: 'All Patterns: Groups a–f' },
+        ];
+      },
+      value: () => '',
+      missingText: () => `Apply ${ROOT_NAMES[cur().root]} ${SHORT_SCALE_NAMES[cur().scale] ?? ''} to…`,
+      onChange: (v) => s.applyPatternScale(cur(), v as 'pattern' | 'group' | 'all', this.voice),
+    });
+    apply.el.classList.add('mmenu');
+    this.parts.push(apply);
     const clear = el('div', 'btn', b, [RX, 208, 94, 14], 'Clear Pattern');
     clear.style.fontSize = '9px';
     clear.title = `Clear Pattern (${keyLabel('clearPattern')}): remove every step of this Voice’s Pattern (Time Base, Phase and Size stay). ${keyLabel('undo')} undoes it.`;
