@@ -48,8 +48,8 @@ export interface StepEvent {
   scheme: 'original' | 'cyclic' | 'utterly' | 'none';
   played: boolean;
   patternRestart: boolean;
-  cycleRestart: { rhythm: boolean; legato: boolean; accent: boolean };
-  levels: { rhythm: number; legato: number; accent: number };
+  cycleRestart: { rhythm: boolean; legato: boolean; accent: boolean; octave: boolean };
+  levels: { rhythm: number; legato: number; accent: number; octave: number };
   pitches: number[];
   velocity: number;
   interval: number;
@@ -87,8 +87,10 @@ export interface VoiceRuntime {
   clock: number;
   /** read position in the Output Length (§4) */
   position: number;
-  cycle: { rhythm: number; legato: number; accent: number };
+  cycle: { rhythm: number; legato: number; accent: number; octave: number };
   rng: Rng;
+  /** emmm Octave: its own random stream, so the Classic choices never change because of it */
+  octRng: Rng;
   /** Keyboard Transpose offset in semitones, null when none received (§9) */
   keyTranspose: number | null;
   /** notes held by a step-advance key: released on key-up */
@@ -102,7 +104,9 @@ export interface EngineOptions {
   onChange?: (what: string) => void;
 }
 
-const CYCLES = ['rhythm', 'legato', 'accent'] as const;
+const CYCLES = ['rhythm', 'legato', 'accent', 'octave'] as const;
+/** Octave level 2 = no shift; levels 0–4 are −2…+2 octaves */
+const OCTAVE_NEUTRAL = 2;
 
 export interface Modulation {
   density: (number | null)[];
@@ -184,8 +188,9 @@ export class MEngine {
       origin: 0,
       clock: 0,
       position: 0,
-      cycle: { rhythm: 0, legato: 0, accent: 0 },
+      cycle: { rhythm: 0, legato: 0, accent: 0, octave: 0 },
       rng: new Rng(this.seedFor(v), v + 1),
+      octRng: new Rng(this.seedFor(v), v + 2001),
       keyTranspose: null,
       heldStepNotes: [],
       last: null,
@@ -267,6 +272,7 @@ export class MEngine {
     this.cancelled.clear();
     this.voices.forEach((vr, v) => {
       vr.rng.reseed(this.seedFor(v), v + 1);
+      vr.octRng.reseed(this.seedFor(v), v + 2001);
       vr.heldStepNotes = [];
       vr.last = null;
     });
@@ -338,7 +344,7 @@ export class MEngine {
       vr.origin = at + this.pattern(v).phase;
       vr.clock = 0;
       vr.position = 0;
-      vr.cycle = { rhythm: 0, legato: 0, accent: 0 };
+      vr.cycle = { rhythm: 0, legato: 0, accent: 0, octave: 0 };
     });
   }
 
@@ -560,9 +566,18 @@ export class MEngine {
     const cycle = variable.positions[variable.active][v];
     const len = Math.max(1, cycle.length);
     const idx = vr.cycle[which] % len;
-    const level = this.pickLevel(cycle[idx], vr.rng);
+    const level = this.pickLevel(cycle[idx], which === 'octave' ? vr.octRng : vr.rng);
     vr.cycle[which] = (idx + 1) % len;
     return { level, restart: idx === 0 && len > 1 };
+  }
+
+  /**
+   * emmm Octave (the fourth Cyclic Variable): read once per event, like Legato and Accent, so
+   * a chord gets one shift. Classic Mode: neutral and not advanced (no effect at all).
+   */
+  private octaveRead(v: number): { level: number; restart: boolean } {
+    if (!this.comp.extended.enabled) return { level: OCTAVE_NEUTRAL, restart: false };
+    return this.cycleRead(v, 'octave');
   }
 
   /** Accent level → velocity (§6). */
@@ -646,6 +661,8 @@ export class MEngine {
     const rh = this.cycleRead(v, 'rhythm');
     const lg = this.cycleRead(v, 'legato');
     const ac = this.cycleRead(v, 'accent');
+    const oc = this.octaveRead(v);
+    const shift = (oc.level - OCTAVE_NEUTRAL) * 12;
     const mult = this.comp.rhythmValues[rh.level] ?? 1;
     const interval = Math.max(1, base * mult);
     const choice = this.chooseStep(v);
@@ -671,7 +688,7 @@ export class MEngine {
       const dur = Math.max(0.25, (realInterval * pct) / 100);
       const channels = this.comp.orchestration.positions[this.comp.orchestration.active][v];
       for (const raw of step) {
-        const pitch = this.transposePitch(v, raw);
+        const pitch = this.transposePitch(v, raw) + shift;
         if (pitch < 0 || pitch > 127) continue;
         pitches.push(pitch);
         for (const ch of channels) out.push(...this.noteOn(v, ch, pitch, velocity, t, t + dur));
@@ -685,8 +702,8 @@ export class MEngine {
       scheme: choice.scheme,
       played,
       patternRestart: choice.restart,
-      cycleRestart: { rhythm: rh.restart, legato: lg.restart, accent: ac.restart },
-      levels: { rhythm: rh.level, legato: lg.level, accent: ac.level },
+      cycleRestart: { rhythm: rh.restart, legato: lg.restart, accent: ac.restart, octave: oc.restart },
+      levels: { rhythm: rh.level, legato: lg.level, accent: ac.level, octave: oc.level },
       pitches,
       velocity,
       interval,
@@ -733,6 +750,8 @@ export class MEngine {
     const rh = this.cycleRead(v, 'rhythm');
     const lg = this.cycleRead(v, 'legato');
     const ac = this.cycleRead(v, 'accent');
+    const oc = this.octaveRead(v);
+    const shift = (oc.level - OCTAVE_NEUTRAL) * 12;
     const choice = this.chooseStep(v);
     const p = this.pattern(v);
     const step = choice.index >= 0 ? p.steps[choice.index] : [];
@@ -743,7 +762,7 @@ export class MEngine {
     if (played) {
       const channels = this.comp.orchestration.positions[this.comp.orchestration.active][v];
       for (const raw of step) {
-        const pitch = this.transposePitch(v, raw);
+        const pitch = this.transposePitch(v, raw) + shift;
         if (pitch < 0 || pitch > 127) continue;
         pitches.push(pitch);
         for (const ch of channels) {
@@ -762,8 +781,8 @@ export class MEngine {
       scheme: choice.scheme,
       played,
       patternRestart: choice.restart,
-      cycleRestart: { rhythm: rh.restart, legato: lg.restart, accent: ac.restart },
-      levels: { rhythm: rh.level, legato: lg.level, accent: ac.level },
+      cycleRestart: { rhythm: rh.restart, legato: lg.restart, accent: ac.restart, octave: oc.restart },
+      levels: { rhythm: rh.level, legato: lg.level, accent: ac.level, octave: oc.level },
       pitches,
       velocity: keyVelocity,
       interval: 0,

@@ -17,7 +17,7 @@ export const MAX_WEIGHT = 100;
 export const DEFAULT_WEIGHT = 10;
 
 /** The six-Position Variables a Robot may move (Sound Choice has 16 and is not offered). */
-export const ROBOT_VARS: VariableName[] = ['patternGroup', 'noteDensity', 'velocityRange', 'noteOrder', 'transposition', 'timeDistortion', 'rhythm', 'legato', 'accent', 'orchestration'];
+export const ROBOT_VARS: VariableName[] = ['patternGroup', 'noteDensity', 'velocityRange', 'noteOrder', 'transposition', 'timeDistortion', 'rhythm', 'legato', 'accent', 'octave', 'orchestration'];
 export type RobotVar = (typeof ROBOT_VARS)[number];
 
 export const VAR_SHORT: Record<VariableName, string> = {
@@ -30,6 +30,7 @@ export const VAR_SHORT: Record<VariableName, string> = {
   rhythm: 'Rhy',
   legato: 'Leg',
   accent: 'Acc',
+  octave: 'Oct',
   orchestration: 'Orch',
   soundChoice: 'Snd',
 };
@@ -43,6 +44,7 @@ export const VAR_LONG: Record<VariableName, string> = {
   rhythm: 'Rhythm',
   legato: 'Legato',
   accent: 'Accent',
+  octave: 'Octave',
   orchestration: 'Orchestration',
   soundChoice: 'Sound Choice',
 };

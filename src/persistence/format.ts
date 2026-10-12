@@ -113,7 +113,7 @@ function restoreVariableArrays(comp: Composition, raw: Composition): void {
       p.outputLength = Math.max(0, Math.min(p.outputLength, p.steps.length));
     }),
   );
-  for (const k of ['accent', 'legato', 'rhythm'] as const) {
+  for (const k of ['accent', 'legato', 'rhythm', 'octave'] as const) {
     comp[k].positions.forEach((pos, pi) =>
       pos.forEach((_, v) => {
         const rc = raw[k]?.positions?.[pi]?.[v];
@@ -219,7 +219,7 @@ export function deserialize(text: string): EmmmDocument {
 export function validate(c: Composition): void {
   const clamp = (x: number, lo: number, hi: number) => (Number.isFinite(x) ? Math.max(lo, Math.min(hi, x)) : lo);
   c.patternGroup.active = clamp(c.patternGroup.active, 0, NUM_POSITIONS - 1);
-  for (const k of ['noteDensity', 'velocityRange', 'noteOrder', 'transposition', 'timeDistortion', 'accent', 'legato', 'rhythm', 'orchestration'] as const) {
+  for (const k of ['noteDensity', 'velocityRange', 'noteOrder', 'transposition', 'timeDistortion', 'accent', 'legato', 'rhythm', 'octave', 'orchestration'] as const) {
     c[k].active = clamp(c[k].active, 0, NUM_POSITIONS - 1);
   }
   c.soundChoice.active = clamp(c.soundChoice.active, 0, 15);
@@ -232,7 +232,7 @@ export function validate(c: Composition): void {
     }),
   );
   c.transposition.positions.forEach((p) => p.forEach((x, v) => (p[v] = clamp(Math.round(x), -60, 60))));
-  for (const k of ['accent', 'legato', 'rhythm'] as const)
+  for (const k of ['accent', 'legato', 'rhythm', 'octave'] as const)
     c[k].positions.forEach((p) =>
       p.forEach((cy) => {
         if (cy.length > 16) cy.length = 16;

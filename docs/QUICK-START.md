@@ -707,6 +707,20 @@ slow section to a fast one. All of these can be changed while the music plays.
   Duplicate Group…** / **Duplicate Pattern…** copy straight into a Group you pick. Each is one
   **⌘Z**, and none changes the playing Group.
 
+- **Octave** (emmm): the fourth Cyclic Variable, beside Rhythm, Legato and Accent. Levels 0–4
+  shift each event's notes by −2, −1, 0, +1 or +2 octaves (2 = no shift, the default
+  everywhere), added to Transposition; a chord moves as one. It advances with Legato and
+  Accent, can be conducted and moved by Robots, and does nothing in Classic Mode. The
+  Cyclic window's pictures show each step's meaning — Rhythm and Accent as bar heights,
+  Legato as bar lengths, Octave as a contour about a dotted centre — with ranges dithered and
+  the playing step shaded.
+- **Generate Pattern** (emmm, **Pattern ▸ Generate Pattern…**): Random Melody, Random Walk,
+  Arpeggio (Up / Down / Up-Down), Motif or Euclidean, from a Root + Scale within a note
+  range, with Steps, Density and Variation. **Generate** draws a proposal (a picture only —
+  nothing sounds or changes); generate again as often as you like; **Apply** replaces the
+  Pattern named in the window (the one the editor shows when it opened) in one **⌘Z**;
+  **Cancel** leaves it alone. The result is an ordinary Pattern.
+
 ## Saving your work
 
 - **Save:** **File ▸ Save** or **⌘S** downloads a file named after the document
@@ -840,7 +854,8 @@ M stopped in the early 1990s. emmm's generative tools are its idea of where it m
 next. They are part of the normal instrument; nothing here changes how notes are generated
 from your Patterns and Variables. **Options ▸ Enable Classic Mode** (off by default) gives a
 narrower instrument closer to M: the generative tools below (Mutation, Reroll, A/B, CC
-Cycles, Trajectory, Robots 2–4, Rules and Return) stop and their windows close, but every
+Cycles, Trajectory, Robots 2–4, Rules and Return, the Octave Cyclic Variable and Generate
+Pattern) stop and their windows close, but every
 setting is kept for when you switch it off again. Pattern editing, scales, copy and paste,
 MIDI Learn and settings, files and Undo work in both. Documents remember their mode; documents
 saved before this change with Extended off open in Classic Mode.

@@ -127,7 +127,7 @@ export class VariableChoice {
     const active = (comp[this.variable] as { active: number }).active;
     const pending = s.hold?.pending.positions[this.variable];
     const flashNow = this.ctx.now();
-    const isCyc = this.variable === 'accent' || this.variable === 'legato' || this.variable === 'rhythm';
+    const isCyc = this.variable === 'accent' || this.variable === 'legato' || this.variable === 'rhythm' || this.variable === 'octave';
     for (let i = 0; i < NUM_POSITIONS; i++) {
       const on = i === active;
       const c = on ? 'var(--paper)' : 'var(--ink)';
@@ -135,10 +135,17 @@ export class VariableChoice {
       this.cells[i].classList.toggle('blink', pending === i);
       let flash: boolean[] = [];
       if (this.variable === 'patternGroup' && on) flash = this.ctx.flash.pattern.map((t) => t > flashNow);
-      const key = `${s.rev}|${on}|${flash.join()}`;
+      // emmm (not Classic Mode): the Cyclic pictures show meaning and, on the active Position,
+      // the step each Voice is playing
+      const modern = isCyc && comp.extended.enabled;
+      const cur = modern && on && s.engine.state !== 'stopped' && !comp.options.noCyclicBlinking ? s.engine.voices.map((vr, v) => {
+        const n = (comp[this.variable] as { positions: unknown[][][] }).positions[i][v].length;
+        return n ? (vr.cycle[this.variable as 'accent'] - 1 + n) % n : -1;
+      }) : null;
+      const key = `${s.rev}|${on}|${flash.join()}|${modern}|${cur?.join() ?? ''}`;
       if (this.drawn[i] !== key) {
         this.drawn[i] = key;
-        let inner = miniFor(comp, this.variable, i, this.cw - 2, this.ch - 2, c, flash);
+        let inner = miniFor(comp, this.variable, i, this.cw - 2, this.ch - 2, c, flash, modern, cur);
         const marked = (comp[this.variable] as { marked?: boolean[] }).marked?.[i];
         if (marked) inner += `<text x="${this.cw - 4}" y="7" font-size="8" text-anchor="end" fill="${c}">*</text>`;
         setSvg(this.svgs[i], inner);
@@ -146,7 +153,7 @@ export class VariableChoice {
       // the first step of each restarting cycle blinks (S1 ch.7 "Cyclic Variables Blink")
       const fl = this.flashEls[i];
       for (let v = 0; v < 4; v++) {
-        const show = isCyc && on && !comp.options.noCyclicBlinking && this.ctx.flash.cycle[this.variable as 'accent'][v] > flashNow;
+        const show = isCyc && !comp.extended.enabled && on && !comp.options.noCyclicBlinking && this.ctx.flash.cycle[this.variable as 'accent'][v] > flashNow;
         const d = show ? '' : 'none';
         if (fl[v].style.display !== d) fl[v].style.display = d;
       }

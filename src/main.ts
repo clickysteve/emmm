@@ -32,6 +32,7 @@ import { commands, dispatch, keyLabel } from './ui/keys';
 import { ShortcutsWindow } from './ui/shortcutsWindow';
 import { TrajectoryWindow } from './ui/trajectoryWindow';
 import { RobotsWindow } from './ui/robotsWindow';
+import { GenerateWindow } from './ui/generateWindow';
 import { lastVariable } from './ui/choice';
 import { NoteDensityEditor, NoteOrderEditor, OrchestrationEditor, TimeDistortionEditor, TranspositionEditor, VarEditor, VelocityRangeEditor } from './ui/varEditors';
 
@@ -91,7 +92,7 @@ fit();
 
 const flash: FlashState = {
   pattern: [0, 0, 0, 0],
-  cycle: { rhythm: [0, 0, 0, 0], legato: [0, 0, 0, 0], accent: [0, 0, 0, 0] },
+  cycle: { rhythm: [0, 0, 0, 0], legato: [0, 0, 0, 0], accent: [0, 0, 0, 0], octave: [0, 0, 0, 0] },
   notes: [0, 1, 2, 3].map(() => ({ pitches: [], until: 0, step: -1 })),
 };
 
@@ -155,13 +156,14 @@ const shortcutsWin = new ShortcutsWindow(desktop);
 const trajectoryWin = new TrajectoryWindow(ctx, desktop);
 extendedWin.openTrajectory = () => bringForward(trajectoryWin.win);
 const robotsWin = new RobotsWindow(ctx, desktop);
+const generateWin = new GenerateWindow(ctx, desktop);
 extendedWin.openRobots = () => bringForward(robotsWin.win);
 /**
  * Classic Mode (Options): the user-facing face of the existing Extended switch — Classic Mode
  * on = Extended off. Switching never touches the advanced settings themselves, and while it
  * is on, the windows of the advanced generative features close and cannot be opened.
  */
-const advancedWins = [extendedWin.win, robotsWin.win, trajectoryWin.win, ccWin.win];
+const advancedWins = [extendedWin.win, robotsWin.win, trajectoryWin.win, ccWin.win, generateWin.win];
 function setClassicMode(on: boolean): void {
   session.comp.extended.enabled = !on;
   session.changed('extended');
@@ -171,7 +173,7 @@ session.onChange(() => {
 });
 // a window that appears is drawn at once (not only at the next change)
 windowEvents.shown = () => (session.dirty = true);
-const floating = [...Object.values(editors), cyclic, patternEditor, midiAssign, monitorWin, about, importWin, library, extendedWin, helpWin, ccWin, paletteWin, learnWin, feedbackWin, shortcutsWin, trajectoryWin, robotsWin];
+const floating = [...Object.values(editors), cyclic, patternEditor, midiAssign, monitorWin, about, importWin, library, extendedWin, helpWin, ccWin, paletteWin, learnWin, feedbackWin, shortcutsWin, trajectoryWin, robotsWin, generateWin];
 floating.forEach((f) => f.win.el.classList.add('hidden'));
 if (prefs.app.feedback) feedbackWin.win.show();
 
@@ -212,7 +214,8 @@ function openEditor(name: EditorName, opts: { position?: number; variable?: Vari
     const e = editors[name];
     e.openAt(opts.position ?? session.comp[e.variable].active);
   } else if (name === 'cyclic') {
-    const v = (opts.variable ?? cyclic.which) as 'rhythm' | 'legato' | 'accent';
+    let v = (opts.variable ?? cyclic.which) as 'rhythm' | 'legato' | 'accent' | 'octave';
+    if (v === 'octave' && !session.comp.extended.enabled) v = 'rhythm'; // no Octave in Classic Mode
     cyclic.openAt(v, opts.position ?? session.comp[v].active);
   } else if (name === 'patternEditor') patternEditor.openFor(opts.voice ?? session.selected.findIndex(Boolean));
   else if (name === 'midiSettings') midiAssign.win.show();
@@ -229,6 +232,7 @@ function openEditor(name: EditorName, opts: { position?: number; variable?: Vari
   openEditor,
   patternEditor,
   robotsWin,
+  generateWin,
   /** redraw everything once (used by automated checks) */
   updateAll: () => {
     for (const m of main) m.update();
@@ -278,6 +282,13 @@ async function duplicate(pattern: boolean): Promise<void> {
   if (to === null) return;
   if (pattern) session.duplicatePattern(from, v, Number(to));
   else session.duplicateGroup(from, Number(to));
+}
+
+/** Generate Pattern: into the Pattern the editor shows (else the selected one of the playing
+ * Group), fixed for as long as the window stays open. */
+function openGenerator(): void {
+  const v = patternEditor.win.open ? patternEditor.voice : Math.max(0, session.selected.findIndex(Boolean));
+  generateWin.openFor(editGroup(), v);
 }
 
 async function openDocument(): Promise<void> {
@@ -522,6 +533,7 @@ const MENUS: { title: string; cls?: string; items: MenuItem[] | (() => MenuItem[
       { label: 'Rhythm…', action: () => openEditor('cyclic', { variable: 'rhythm' }) },
       { label: 'Legato…', action: () => openEditor('cyclic', { variable: 'legato' }) },
       { label: 'Accent…', action: () => openEditor('cyclic', { variable: 'accent' }) },
+      { label: 'Octave…', enabled: () => ext().enabled, action: () => openEditor('cyclic', { variable: 'octave' }) },
       { sep: true, label: '' },
       C('prevPosition', 'Previous Position'),
       C('nextPosition', 'Next Position'),
@@ -531,6 +543,7 @@ const MENUS: { title: string; cls?: string; items: MenuItem[] | (() => MenuItem[
     title: 'Pattern',
     items: [
       C('patternEditor', 'Edit…'),
+      { label: 'Generate Pattern…', enabled: () => ext().enabled, action: openGenerator },
       C('clearPattern', 'Clear Pattern'),
       C('prevVoice', 'Select Previous Pattern'),
       C('nextVoice', 'Select Next Pattern'),
@@ -781,7 +794,7 @@ function consumeVisual(now: number): boolean {
     if (ev.kind === 'step') {
       session.nowPlaying[ev.voice] = ev;
       if (ev.patternRestart) flash.pattern[ev.voice] = now + 110;
-      (['rhythm', 'legato', 'accent'] as const).forEach((k) => ev.cycleRestart[k] && (flash.cycle[k][ev.voice] = now + 110));
+      (['rhythm', 'legato', 'accent', 'octave'] as const).forEach((k) => ev.cycleRestart[k] && (flash.cycle[k][ev.voice] = now + 110));
       flash.notes[ev.voice] = { pitches: ev.pitches, until: now + Math.max(60, Math.min(200, ev.interval * 3)), step: ev.stepIndex };
     } else if (ev.kind === 'on') {
       monitorWin.push(`▸ ${ev.channel.toString().padStart(2)} on  ${noteName(ev.pitch).padEnd(4)} ${ev.velocity}  v${ev.voice + 1}`);

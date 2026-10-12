@@ -21,7 +21,7 @@ export interface FlashState {
   /** performance.now() until which the pattern brick of voice v flashes */
   pattern: number[];
   /** cycle restart flash per cyclic variable per voice */
-  cycle: Record<'rhythm' | 'legato' | 'accent', number[]>;
+  cycle: Record<'rhythm' | 'legato' | 'accent' | 'octave', number[]>;
   /** last played pitches per voice and when */
   notes: { pitches: number[]; until: number; step: number }[];
 }
@@ -48,6 +48,7 @@ export const VAR_LABEL: Record<VariableName, string> = {
   accent: 'Accent',
   legato: 'Legato',
   rhythm: 'Rhythm',
+  octave: 'Octave',
   orchestration: 'Chan<br>Orch',
   soundChoice: 'Sound<br>Choice',
 };
@@ -62,4 +63,5 @@ export const EDITOR_FOR: Partial<Record<VariableName, EditorName>> = {
   accent: 'cyclic',
   legato: 'cyclic',
   rhythm: 'cyclic',
+  octave: 'cyclic',
 };

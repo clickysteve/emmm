@@ -1,7 +1,8 @@
 /**
  * The Cyclic Editor (S1 ch.7 and ch.17): four editing grids (one per voice) of 16 steps ×
  * levels 0–4; the Rhythm / Legato / Accent buttons with vertical Position selectors; the global
- * Rhythm and Legato value tables; the Accent ↔ Velocity Range reminder diagram.
+ * Rhythm and Legato value tables; the Accent ↔ Velocity Range reminder diagram. emmm adds
+ * Octave (levels 0–4 = −2…+2 octaves) below them, hidden in Classic Mode.
  */
 import { MAX_CYCLE_STEPS, NUM_POSITIONS, NUM_VOICES } from '../engine/constants';
 import type { Cycle } from '../engine/types';
@@ -9,7 +10,7 @@ import type { UiContext } from './context';
 import { clamp, el, label, localPoint, svgEl, setSvg, trackDrag } from './dom';
 import { MWindow, Numerical } from './widgets';
 
-type CycVar = 'rhythm' | 'legato' | 'accent';
+type CycVar = 'rhythm' | 'legato' | 'accent' | 'octave';
 const RHYTHM_VALUES = [0.25, 0.33, 0.5, 0.66, 0.75, 1, 1.25, 1.33, 1.5, 1.66, 1.75, 2, 2.5, 3, 3.5, 4, 5, 6, 7, 8, 12, 16];
 
 const SX = 9; // step spacing
@@ -24,7 +25,10 @@ export class CyclicEditor {
   editPos = 0;
   private grids: SVGSVGElement[] = [];
   private names: Record<CycVar, HTMLDivElement> = {} as Record<CycVar, HTMLDivElement>;
-  private sel: Record<CycVar, HTMLDivElement[]> = { rhythm: [], legato: [], accent: [] };
+  private sel: Record<CycVar, HTMLDivElement[]> = { rhythm: [], legato: [], accent: [], octave: [] };
+  /** the Octave block's elements (hidden in Classic Mode) */
+  private octaveEls: HTMLElement[] = [];
+  private modern: boolean | null = null;
   private parts: { update(): void }[] = [];
 
   constructor(private ctx: UiContext, parent: HTMLElement) {
@@ -42,9 +46,10 @@ export class CyclicEditor {
       area.addEventListener('pointerdown', (ev) => this.down(ev, v, area));
     }
     // right-hand panel: three variable buttons with vertical position selectors
-    const vars: CycVar[] = ['rhythm', 'legato', 'accent'];
+    const vars: CycVar[] = ['rhythm', 'legato', 'accent', 'octave'];
     vars.forEach((cv, k) => {
       const y0 = 3 + k * 78;
+      const first = b.children.length;
       const nm = el('div', 'btn', b, [170, y0, 52, 14], cv[0].toUpperCase() + cv.slice(1));
       nm.style.fontSize = '10px';
       nm.addEventListener('pointerdown', (ev) => {
@@ -72,7 +77,10 @@ export class CyclicEditor {
         });
         this.sel[cv].push(c);
       }
-      if (cv !== 'accent') {
+      if (cv === 'octave') {
+        for (let lv = 4; lv >= 0; lv--) label(b, 232, y0 + 7 + (4 - lv) * 14, `${lv} = ${['−2', '−1', '0', '+1', '+2'][lv]} oct`, 'small');
+        label(b, 186, y0 + 70, 'added to Transposition', 'tiny');
+      } else if (cv !== 'accent') {
         for (let lv = 4; lv >= 0; lv--) {
           const y = y0 + 4 + (4 - lv) * 14;
           label(b, 232, y + 3, `${lv} =`, 'small');
@@ -102,6 +110,7 @@ export class CyclicEditor {
         );
         label(b, 222, y0 + 58, '0 = silent', 'tiny');
       }
+      if (cv === 'octave') this.octaveEls = [...b.children].slice(first) as HTMLElement[];
     });
     this.parts.push({ update: () => this.drawAll() });
   }
@@ -191,7 +200,7 @@ export class CyclicEditor {
       if (this.ctx.flash.cycle[this.which][v] > flashNow && isActive) inner += `<rect x="${ox - 4}" y="0" width="2" height="${GH + 6}" fill="var(--activity)"/>`;
       setSvg(this.grids[v], inner);
     });
-    (['rhythm', 'legato', 'accent'] as CycVar[]).forEach((cv) => {
+    (['rhythm', 'legato', 'accent', 'octave'] as CycVar[]).forEach((cv) => {
       this.names[cv].classList.toggle('on', cv === this.which);
       this.sel[cv].forEach((c, p) => {
         const edit = cv === this.which && p === this.editPos;
@@ -207,6 +216,16 @@ export class CyclicEditor {
   }
 
   update(): void {
+    // emmm Octave: shown (and the window taller) only outside Classic Mode
+    const modern = this.ctx.s.comp.extended.enabled;
+    if (modern !== this.modern) {
+      this.modern = modern;
+      this.octaveEls.forEach((e) => e.classList.toggle('hidden', !modern));
+      const h = modern ? 336 : 256;
+      this.win.el.style.height = h + 'px';
+      this.win.body.style.height = h - 18 + 'px';
+      if (!modern && this.which === 'octave') this.which = 'rhythm';
+    }
     this.win.setTitle('Cyclic Editor');
     this.parts.forEach((p) => p.update());
   }

@@ -249,7 +249,7 @@ export class CcCycleRunner {
   }
 }
 
-const VAR_NAMES: Record<VariableName, string> = { patternGroup: 'Pattern Group', noteDensity: 'Note Density', velocityRange: 'Velocity Range', noteOrder: 'Note Order', transposition: 'Transposition', timeDistortion: 'Time Distortion', rhythm: 'Rhythm', legato: 'Legato', accent: 'Accent', orchestration: 'Orchestration', soundChoice: 'Sound Choice' };
+const VAR_NAMES: Record<VariableName, string> = { patternGroup: 'Pattern Group', noteDensity: 'Note Density', velocityRange: 'Velocity Range', noteOrder: 'Note Order', transposition: 'Transposition', timeDistortion: 'Time Distortion', rhythm: 'Rhythm', legato: 'Legato', accent: 'Accent', octave: 'Octave', orchestration: 'Orchestration', soundChoice: 'Sound Choice' };
 
 export function targetLabel(t: LearnTarget): string {
   switch (t.kind) {
