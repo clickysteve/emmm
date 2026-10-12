@@ -631,7 +631,7 @@ function smart(prm: RobotParams, mem: RobotMemory, cands: Candidate[], ctx: Deci
  *   arc       leaves Home, 2–4 moves of shorter and shorter sections (build), back Home for 8 (release)
  *   memory    never straight back where it came from, except Home; never onto the Position the
  *             other Robot just took on a shared Variable (an answer, not an echo)
- *   restraint even when due, sometimes lets the music ride another bar
+ *   restraint even when due, sometimes lets the section run two more bars
  */
 function genius(prm: RobotParams, mem: RobotMemory, cands: Candidate[], ctx: DecideContext, rng: Rng): number {
   const c = mem.pos;
@@ -647,7 +647,11 @@ function genius(prm: RobotParams, mem: RobotMemory, cands: Candidate[], ctx: Dec
   let need = mem.section;
   if (m.busy >= 2) need *= 2;
   else if (m.others && m.sinceOther >= 8) need = Math.max(2, need / 2);
-  if (!respond && (m.barsHere + 1e-6 < need || u >= 0.85)) return c; // not yet / restraint
+  if (!respond && m.barsHere + 1e-6 < need) return c; // not yet
+  if (!respond && u >= 0.85) {
+    mem.section = Math.ceil(m.barsHere - 1e-6) + 2; // restraint: let this section run two more bars
+    return c;
+  }
   const theme = nearest(cands, ctx.home ?? mem.startPos) ?? c;
   const pool = cands.filter((x) => x.pos !== c && x.pos !== m.otherPos);
   const others = pool.length ? pool : cands.filter((x) => x.pos !== c);
