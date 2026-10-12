@@ -27,7 +27,7 @@ import { capturePerfState, recallPerfState } from '../extended/perfState';
 import { freshSeed } from '../engine/rng';
 import { assignDeep } from './assign';
 import { History } from './history';
-import { CHROMATIC, cleanChoice, transformSteps, type ScaleChoice } from './scales';
+import { CHROMATIC, cleanChoice, ROOT_NAMES, scaleById, transformSteps, type ScaleChoice } from './scales';
 import { Conductor } from './conductor';
 import { allGroups, cleanParams, createsCycle, DEFAULT_WEIGHT, defaultParams, MAX_WEIGHT, personalityInfo, ROBOT_VARS, VAR_LONG, type RobotDef, type RobotParams, type RobotVar } from '../extended/conductors';
 import { captureHome, cleanReturnSettings, type ReturnSettings } from '../extended/home';
@@ -881,6 +881,33 @@ export class Session {
     p.steps = transformSteps(p.steps, from, to);
     p.scale = to;
     this.changed('patterns');
+  }
+
+  /**
+   * Give the scale `choice` to this Pattern, every Pattern of the active Pattern Group (all four
+   * Voices), or every Pattern of all six Groups (emmm). Each Pattern changes exactly as
+   * setPatternScale changes one — its notes move from its own scale to the new one — and gets
+   * its own copy, so it can be changed alone afterwards. Nothing else of a Pattern changes. One
+   * Undo step. Returns how many Patterns changed.
+   */
+  applyPatternScale(choice: ScaleChoice, scope: 'pattern' | 'group' | 'all', voice: number): number {
+    const to = cleanChoice(choice);
+    const groups = scope === 'all' ? this.comp.patternGroups : [this.comp.patternGroups[this.comp.patternGroup.active]];
+    let n = 0;
+    for (const g of groups)
+      g.patterns.forEach((p, v) => {
+        if (scope === 'pattern' && v !== voice) return;
+        const from = p.scale ? cleanChoice(p.scale) : CHROMATIC;
+        if (from.root === to.root && from.scale === to.scale && p.scale) return;
+        p.steps = transformSteps(p.steps, from, to);
+        p.scale = { ...to };
+        n++;
+      });
+    const name = `${ROOT_NAMES[to.root]} ${scaleById(to.scale).name}`;
+    const where = scope === 'pattern' ? 'this Pattern' : scope === 'group' ? `Group ${'abcdef'[this.comp.patternGroup.active]} (4 Patterns)` : 'all Patterns';
+    this.status = n ? `${name} applied to ${where}: ${n} Pattern${n === 1 ? '' : 's'} changed` : `Nothing to change: ${where} already in ${name}`;
+    this.changed(n ? 'patterns' : 'select');
+    return n;
   }
 
   setOutputLength(v: number, len: number, withRests: boolean): void {

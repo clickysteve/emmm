@@ -607,6 +607,10 @@ body.dragging * {
 .msel.missing .msel-text {
   color: var(--dim);
 }
+/* a pop-up used as a menu (no current value): its title reads as an ordinary label */
+.msel.mmenu.missing .msel-text {
+  color: inherit;
+}
 .msel-list {
   position: absolute;
   z-index: 20001;
