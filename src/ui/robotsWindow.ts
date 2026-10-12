@@ -15,7 +15,7 @@
  */
 import { NUM_POSITIONS, NUM_SNAPSHOTS, STEP_ADVANCE, TIME_BASE_DENOMINATORS } from '../engine/constants';
 import type { VariableName } from '../engine/types';
-import { candidates, NUM_ROBOTS, PARAM_INFO, PERSONALITIES, personalityInfo, rateLabel, rateWords, ROBOT_VARS, robotWeights, VAR_LONG, VAR_SHORT, weightRow, type Personality, type RobotParams, type RobotVar } from '../extended/conductors';
+import { candidates, NUM_ROBOTS, PARAM_INFO, PERSONALITIES, personalityInfo, rateLabel, rateWords, ROBOT_VARS, robotWeights, SYNC_OPTIONS, VAR_LONG, VAR_SHORT, weightRow, type ChangeSync, type Personality, type RobotParams, type RobotVar } from '../extended/conductors';
 import { activeOf, HOME_VARS, returnPath } from '../extended/home';
 import { ACTION_KINDS, CONDITION_KINDS, CYCLE_NAMES, defaultAction, defaultCondition, MAX_RULES, ruleSummary, TIMINGS, type Action, type Condition, type Rule, type RuleTiming } from '../extended/rules';
 import type { UiContext } from './context';
@@ -376,6 +376,8 @@ export class RobotsWindow {
     if (c.isBaton(i)) return { text: 'Baton (M)', tip: 'M’s Robot Conductor: the Baton jumps; the Variables with arrows on follow' };
     if (!Number.isFinite(c.next[i]) && this.ext.robots[i].rateDen === STEP_ADVANCE) return { text: 'on Rules', tip: 'Rate sa: moves only when a Rule advances it' };
     if (!s.playing) return { text: 'ready', tip: 'Starts deciding one step after Start' };
+    const pm = c.pending[i];
+    if (pm) return { text: `→${pm.to + 1} ${barBeat(pm.at)}`, tip: `Change Sync: its move to Position ${pm.to + 1} waits for ${barBeat(pm.at)}` };
     return { text: Number.isFinite(c.next[i]) ? `next ${barBeat(c.next[i])}` : 'on', tip: `Next decision at bar ${barBeat(c.next[i])}` };
   }
 
@@ -440,7 +442,23 @@ export class RobotsWindow {
     } else {
       this.rateBoxes(p, 230, 1, () => ({ num: def().rateNum, den: def().rateDen }), (num, den) => s.setRobot(i, { rateNum: num, rateDen: den }), 'Rate (M’s Time Base): one decision every n / d of a whole note — 1|4 a beat, 1|1 a bar, 2|1 two bars; sa = only when a Rule advances it. Type "2/1" for both.', true);
     }
-    this.text(p, 282, 4, 190, 9, () => (baton ? `one jump every 1/${s.comp.conducting.robot.rate} note` : rateWords(def())));
+    this.text(p, 282, 4, 106, 9, () => (baton ? `1 jump every 1/${s.comp.conducting.robot.rate}` : def().rateDen === STEP_ADVANCE ? 'on Rules only' : rateWords(def())));
+    // Change Sync: when its own moves take effect
+    label(p, 392, 5, 'sync', 'tiny');
+    if (baton) this.text(p, 414, 4, 58, 9, () => '— (M)', 'label tiny');
+    else {
+      const sel = this.select(
+        p,
+        414,
+        1,
+        58,
+        `Robot ${i + 1} Change Sync`,
+        () => SYNC_OPTIONS.map((o) => ({ value: String(o.value), text: o.name })),
+        () => String(def().sync),
+        (v) => s.setRobot(i, { sync: Number(v) as ChangeSync }),
+      );
+      setTip(sel.el, 'Change Sync: when this Robot’s own moves take effect. FREE = as soon as it decides; BEAT / BAR / 2 / 4 / 8 BARS = a move decided in between waits for that boundary (counted from Start); a newer move replaces a waiting one. It decides when, never where. Your hand and Rules are always immediate.');
+    }
     // Variables
     label(p, 2, 23, 'Variables', 'tiny');
     ROBOT_VARS.forEach((v, k) => {
@@ -553,7 +571,8 @@ export class RobotsWindow {
         if (!c.isBaton(i)) {
           lines.push(pi.weighted ? 'Weights shape its choices (WEIGHTS tab): taller bars are likelier; 0 = never.' : 'Weights only decide which Positions are allowed (0 = not allowed); their sizes do not change its path.');
           const cands = candidates(robotWeights(this.ext.weights, def().groups), def().variables).map((x) => x.pos + 1);
-          lines.push(`Allowed Positions now: ${cands.join(' ')}.`);
+          const so = SYNC_OPTIONS.find((o) => o.value === def().sync) ?? SYNC_OPTIONS[0];
+          lines.push(`Allowed Positions now: ${cands.join(' ')}. · Change Sync ${so.name}: its own moves take effect ${so.words}.`);
           if (c.personalityOverride[i]) lines.push(`A Rule changed it to ${personalityInfo(c.personalityOverride[i]!).name} while playing (* in the overview); Stop puts it back.`);
           if ((def().personality === 'follower' || def().personality === 'contrarian') && def().target === null) lines.push('<b>Choose a Robot to watch</b> — until then it holds its Position.');
         } else {
