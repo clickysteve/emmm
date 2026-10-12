@@ -29,7 +29,7 @@ import { assignDeep } from './assign';
 import { History } from './history';
 import { CHROMATIC, cleanChoice, transformSteps, type ScaleChoice } from './scales';
 import { Conductor } from './conductor';
-import { cleanParams, createsCycle, DEFAULT_WEIGHT, defaultParams, MAX_WEIGHT, personalityInfo, ROBOT_VARS, VAR_LONG, type RobotDef, type RobotParams, type RobotVar } from '../extended/conductors';
+import { allGroups, cleanParams, createsCycle, DEFAULT_WEIGHT, defaultParams, MAX_WEIGHT, personalityInfo, ROBOT_VARS, VAR_LONG, type RobotDef, type RobotParams, type RobotVar } from '../extended/conductors';
 import { captureHome, cleanReturnSettings, type ReturnSettings } from '../extended/home';
 import { cleanRule, defaultRule, MAX_RULES, type Rule } from '../extended/rules';
 
@@ -1605,6 +1605,31 @@ export class Session {
     if (patch.hRange !== undefined) r.hRange = Math.max(0, Math.min(1, patch.hRange));
     if (patch.vRange !== undefined) r.vRange = Math.max(0, Math.min(1, patch.vRange));
     this.changed('robot');
+  }
+
+  /**
+   * Allow or forbid Pattern Group g for Robot i's own choices (Allowed Groups). The last
+   * allowed Group cannot be switched off. Nothing moves now: the Robot's next decision keeps
+   * to the new set (see docs/CONDUCTORS.md). One Undo step.
+   */
+  setRobotGroup(i: number, g: number, on: boolean): void {
+    const r = this.comp.extended.robots[i];
+    if (!r || g < 0 || g >= r.groups.length || r.groups[g] === on) return;
+    if (!on && r.groups.every((x, k) => k === g || !x)) {
+      this.status = `Robot ${i + 1}: at least one Pattern Group must stay allowed`;
+      this.changed('conductor');
+      return;
+    }
+    r.groups = r.groups.map((x, k) => (k === g ? on : x));
+    this.changed('conductors');
+  }
+
+  /** Allow every Pattern Group for Robot i again (its old behaviour). One Undo step. */
+  allowAllGroups(i: number): void {
+    const r = this.comp.extended.robots[i];
+    if (!r || r.groups.every((x) => x)) return;
+    r.groups = allGroups();
+    this.changed('conductors');
   }
 
   toggleRobotVariable(i: number, v: RobotVar): void {

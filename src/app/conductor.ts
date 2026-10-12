@@ -23,11 +23,13 @@ import {
   chooseOther,
   decide,
   freshMemory,
+  nearestGroup,
   NUM_ROBOTS,
   PERSONALITIES,
   remember,
   resolvePosition,
   robotStepTicks,
+  robotWeights,
   ROBOT_VARS,
   VAR_SHORT,
   type Personality,
@@ -278,6 +280,9 @@ export class Conductor {
           return vars.length > 0 && vars.every((v) => this.owns(v, t));
         },
         skip: (v, t) => this.owns(v, t),
+        // Robot 1's Allowed Groups: a jump onto a Pattern Group it may not choose lands on the
+        // nearest allowed one instead
+        place: (v, p) => (v === 'patternGroup' ? nearestGroup(this.ext.robots[0].groups, p) : p),
       };
     if (!e.observer) e.observer = (t, cause, produced, step) => this.observe(t, cause, produced, step);
   }
@@ -490,7 +495,9 @@ export class Conductor {
     const vars = def.variables;
     const free = vars.filter((v) => !this.owns(v, t));
     if (vars.length && !free.length) return []; // everything it moves belongs to a Return: it rests
-    const cands = candidates(this.ext.weights, vars);
+    // its Allowed Groups count as weight 0 on Pattern Group, for this Robot only
+    const weights = robotWeights(this.ext.weights, def.groups);
+    const cands = candidates(weights, vars);
     const mem = this.mem[i];
     const target = this.targetView(i);
     const p = this.personality(i);
@@ -505,7 +512,7 @@ export class Conductor {
     for (const v of free) {
       if (claims.has(v)) continue;
       claims.set(v, i);
-      const pos = resolvePosition(this.ext.weights, v, to);
+      const pos = resolvePosition(weights, v, to);
       if (activeOf(this.comp, v) !== pos) {
         out.push(...this.engine.selectPosition(v, pos, t));
         changed.push(VAR_SHORT[v]);
