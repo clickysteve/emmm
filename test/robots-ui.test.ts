@@ -528,3 +528,29 @@ describe('Allowed Groups (ROBOT tab)', () => {
     s.allowAllGroups(1);
   });
 });
+
+describe('Change Sync, Smart and Genius in the window', () => {
+  it('sync and the new personalities are chosen through the controls; selecting a Robot never switches it', () => {
+    s.setRobotEnabled(3, false);
+    draw();
+    pd(win().querySelector<HTMLDivElement>('[aria-label="Edit Robot 4"]')!);
+    draw();
+    expect(ui.robotsWin.sel).toBe(3);
+    expect(options('Robot 4 Change Sync').map((o) => o.text)).toEqual(['FREE', 'BEAT', 'BAR', '2 BARS', '4 BARS', '8 BARS']);
+    choose('Robot 4 Change Sync', '4 BARS');
+    expect(s.comp.extended.robots[3].sync).toBe(16);
+    choose('Robot 4 personality', 'Smart');
+    expect(s.comp.extended.robots[3].personality).toBe('smart');
+    expect(win().textContent).toMatch(/Thinks in phrases/);
+    expect(win().textContent).toMatch(/Change Sync 4 BARS: its own moves take effect at the next 4-bar boundary/);
+    choose('Robot 4 personality', 'Genius');
+    expect(s.comp.extended.robots[3].personality).toBe('genius');
+    expect(within('.label.tiny').map((l) => l.textContent)).toContain('explore %');
+    // still off, and the Allowed Groups row is still there
+    expect(s.conductor.robotOn(3)).toBe(false);
+    expect(win().querySelector('[aria-label="Robot 4 on / off"]')!.textContent).toBe('OFF');
+    expect(win().textContent).toMatch(/Allowed Groups:/);
+    choose('Robot 4 Change Sync', 'FREE');
+    s.setRobot(3, { personality: 'restless' });
+  });
+});

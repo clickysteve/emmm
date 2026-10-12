@@ -19,10 +19,12 @@ import type { EngineEvent, MEngine, StepEvent } from '../engine/engine';
 import { Rng } from '../engine/rng';
 import type { Composition, Snapshot, VariableName } from '../engine/types';
 import {
+  BAR_TICKS,
   candidates,
   chooseOther,
   decide,
   freshMemory,
+  nearestCandidate,
   nearestGroup,
   NUM_ROBOTS,
   PERSONALITIES,
@@ -31,7 +33,9 @@ import {
   robotStepTicks,
   robotWeights,
   ROBOT_VARS,
+  syncTicks,
   VAR_SHORT,
+  type MusicView,
   type Personality,
   type RobotMemory,
   type TargetView,
@@ -84,6 +88,16 @@ export interface RestHold {
   until: number;
 }
 
+/** A Robot's own move waiting for its Change Sync boundary. At most one per Robot: a newer
+ * move-decision replaces it; a decision to stay leaves it waiting. */
+export interface PendingMove {
+  to: number;
+  /** the boundary tick it takes effect at */
+  at: number;
+  /** the Change Sync it was queued under (a change of setting cancels it) */
+  sync: number;
+}
+
 export type LogKind = 'move' | 'rule' | 'return' | 'robot' | 'info';
 export interface LogEntry {
   tick: number;
@@ -114,6 +128,8 @@ export class Conductor {
   /** a Follower / Contrarian with nothing to watch */
   waiting = [false, false, false, false];
   lastMoveTick = [-Infinity, -Infinity, -Infinity, -Infinity];
+  /** Change Sync: each Robot's move waiting for its boundary (runtime only, never saved) */
+  pending: (PendingMove | null)[] = [null, null, null, null];
   /** Variables each Robot changed last time (display) */
   lastChanged: string[] = ['', '', '', ''];
   ret: ReturnRt | null = null;
@@ -360,6 +376,7 @@ export class Conductor {
     }
     this.waiting = [false, false, false, false];
     this.lastMoveTick = [-Infinity, -Infinity, -Infinity, -Infinity];
+    this.pending = [null, null, null, null];
     this.lastChanged = ['', '', '', ''];
     this.ret = null;
     this.ruleRt = new WeakMap();
@@ -397,6 +414,10 @@ export class Conductor {
   /** (Re)compute next decision ticks and (re)start the chain. `fromStart`: first at one step. */
   private schedule(now: number, fromStart: boolean): void {
     for (let i = 0; i < NUM_ROBOTS; i++) {
+      // a waiting move is dropped when its Robot is switched off, becomes Baton (M) or its
+      // Change Sync is changed — it never turns up later
+      const pm = this.pending[i];
+      if (pm && (!this.positionRobot(i) || this.ext.robots[i].sync !== pm.sync)) this.pending[i] = null;
       const step = robotStepTicks(this.ext.robots[i]);
       if (!this.positionRobot(i) || !Number.isFinite(step)) {
         this.next[i] = Infinity;
@@ -437,7 +458,7 @@ export class Conductor {
   private hubAt = -1;
 
   private hubSchedule(): void {
-    let t = Math.min(...this.next);
+    let t = Math.min(...this.next, ...this.pending.map((pm) => pm?.at ?? Infinity));
     for (const r of this.ext.rules) t = Math.min(t, this.ruleRt.get(r)?.next ?? Infinity);
     if (Number.isFinite(t) && t === this.hubAt) return;
     const gen = ++this.hubGen;
@@ -455,7 +476,12 @@ export class Conductor {
     const out: EngineEvent[] = [];
     const claims = new Map<VariableName, number>();
     for (let i = 0; i < NUM_ROBOTS; i++) {
-      if (this.next[i] > t + 1e-6) continue;
+      if (this.next[i] > t + 1e-6) {
+        // not deciding now: a waiting move whose boundary this is takes effect
+        const pm = this.pending[i];
+        if (pm && pm.at <= t + 1e-6) out.push(...this.applyPending(i, t, claims));
+        continue;
+      }
       const step = robotStepTicks(this.ext.robots[i]);
       this.next[i] = Number.isFinite(step) && this.positionRobot(i) ? gridAfter(-1, step, t, false) : Infinity;
       out.push(...this.decideRobot(i, t, claims, 'timer'));
@@ -489,7 +515,10 @@ export class Conductor {
    */
   private decideRobot(i: number, t: number, claims: Map<VariableName, number>, cause: 'timer' | 'advance' | 'choose'): EngineEvent[] {
     if (!this.positionRobot(i)) return [];
-    if (this.suspended(i, t)) return [];
+    if (this.suspended(i, t)) {
+      this.pending[i] = null;
+      return [];
+    }
     if (!this.live) this.mem[i] = freshMemory(this.initialPos(i)); // a Rule, while stopped
     const def = this.ext.robots[i];
     const vars = def.variables;
@@ -502,9 +531,51 @@ export class Conductor {
     const target = this.targetView(i);
     const p = this.personality(i);
     this.waiting[i] = (p === 'follower' || p === 'contrarian') && !target;
-    const ctx = { home: this.robotHome(i), target, seenTargetMoves: this.seenTargetMoves[i] };
+    const ctx = { home: this.robotHome(i), target, seenTargetMoves: this.seenTargetMoves[i], music: p === 'smart' || p === 'genius' ? this.music(i, t) : undefined };
     const to = cause === 'choose' ? chooseOther(mem, cands, this.rng[i]) : decide(p, def.params, mem, cands, ctx, this.rng[i]);
     if (target) this.seenTargetMoves[i] = target.moves;
+    // Change Sync: only the Robot's own timed moves wait; a Rule's advance / choose is at once
+    const sync = syncTicks(def.sync);
+    if (cause === 'timer' && sync > 0) {
+      const pm = this.pending[i];
+      if (to === mem.pos) {
+        // a decision to stay leaves a waiting move waiting — unless this is its boundary
+        if (pm && pm.at <= t + 1e-6) {
+          remember(mem, to);
+          return this.applyPending(i, t, claims);
+        }
+        return this.applyMove(i, to, t, claims); // stays, as in FREE
+      }
+      if (!onGrid(t, sync)) {
+        this.pending[i] = { to, at: gridAfter(-1, sync, t, false), sync: def.sync };
+        return [];
+      }
+    }
+    this.pending[i] = null;
+    return this.applyMove(i, to, t, claims);
+  }
+
+  /** A waiting move takes effect: re-checked against the Robot's state and Allowed Groups now. */
+  private applyPending(i: number, t: number, claims: Map<VariableName, number>): EngineEvent[] {
+    const pm = this.pending[i];
+    this.pending[i] = null;
+    if (!pm || !this.positionRobot(i) || this.suspended(i, t)) return [];
+    const def = this.ext.robots[i];
+    if (def.sync !== pm.sync) return [];
+    // still allowed? (its Allowed Groups or the weights may have changed while it waited)
+    const to = nearestCandidate(candidates(robotWeights(this.ext.weights, def.groups), def.variables), pm.to);
+    if (to === this.mem[i].pos) return [];
+    return this.applyMove(i, to, t, claims);
+  }
+
+  /** Move Robot i to Position `to` now: its free Variables not claimed by a higher-priority Robot. */
+  private applyMove(i: number, to: number, t: number, claims: Map<VariableName, number>): EngineEvent[] {
+    const def = this.ext.robots[i];
+    const vars = def.variables;
+    const free = vars.filter((v) => !this.owns(v, t));
+    if (vars.length && !free.length) return [];
+    const weights = robotWeights(this.ext.weights, def.groups);
+    const mem = this.mem[i];
     const from = mem.pos;
     remember(mem, to);
     const out: EngineEvent[] = [];
@@ -520,6 +591,34 @@ export class Conductor {
     }
     this.robotMoved(i, from, to, t, changed);
     return out;
+  }
+
+  /** What a Smart / Genius Robot hears at tick t: its phrase position, and the other Robots. */
+  private music(i: number, t: number): MusicView {
+    const step = robotStepTicks(this.ext.robots[i]);
+    const mine = new Set(this.variables(i));
+    let others = 0;
+    let busy = 0;
+    let last = -1;
+    let lastBy = -1;
+    for (let j = 0; j < NUM_ROBOTS; j++) {
+      if (j === i || !this.robotOn(j)) continue;
+      others++;
+      const lt = this.lastMoveTick[j];
+      if (!Number.isFinite(lt) || lt > t) continue;
+      if (t - lt < 2 * BAR_TICKS) busy++;
+      if (lt > last) (last = lt), (lastBy = j);
+    }
+    return {
+      barsHere: (t - Math.max(0, this.lastMoveTick[i])) / BAR_TICKS,
+      onBar: onGrid(t, BAR_TICKS),
+      everyBar: step <= BAR_TICKS && onGrid(BAR_TICKS, step),
+      others,
+      busy,
+      sinceOther: last >= 0 ? (t - last) / BAR_TICKS : Infinity,
+      otherTick: last,
+      otherPos: lastBy >= 0 && this.variables(lastBy).some((v) => mine.has(v)) ? this.mem[lastBy].pos : null,
+    };
   }
 
   private robotMoved(i: number, from: number, to: number, t: number, changed: string[]): void {
@@ -955,6 +1054,11 @@ export class Conductor {
  * The next point of a grid of `step` ticks from tick 0 after `now` (from Start: the first
  * step). A decision already due exactly at `now` on this grid (not yet made) is kept.
  */
+/** Is tick t on a grid of `step` ticks from Start? */
+function onGrid(t: number, step: number): boolean {
+  return Math.abs(t / step - Math.round(t / step)) < 1e-6;
+}
+
 function gridAfter(current: number, step: number, now: number, fromStart: boolean): number {
   if (fromStart) return step;
   if (Math.abs(current - now) < 1e-9 && Math.abs(now / step - Math.round(now / step)) < 1e-6) return current;

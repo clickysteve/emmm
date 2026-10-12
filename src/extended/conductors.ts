@@ -8,7 +8,7 @@
  * for every arrow in M's Conducting Grid. Robot 1 is M's own Robot Conductor: its default
  * personality 'baton' is M's Automatic Conducting in the engine, untouched.
  */
-import { NUM_POSITIONS, STEP_ADVANCE, TICKS_PER_WHOLE, TIME_BASE_DENOMINATORS } from '../engine/constants';
+import { NUM_POSITIONS, STEP_ADVANCE, TICKS_PER_QUARTER, TICKS_PER_WHOLE, TIME_BASE_DENOMINATORS } from '../engine/constants';
 import type { Rng } from '../engine/rng';
 import type { VariableName } from '../engine/types';
 
@@ -47,7 +47,28 @@ export const VAR_LONG: Record<VariableName, string> = {
   soundChoice: 'Sound Choice',
 };
 
-export type Personality = 'baton' | 'drunk' | 'tourist' | 'homebody' | 'restless' | 'orbit' | 'pendulum' | 'chaotic' | 'curious' | 'follower' | 'contrarian';
+export type Personality = 'baton' | 'drunk' | 'tourist' | 'homebody' | 'restless' | 'orbit' | 'pendulum' | 'chaotic' | 'curious' | 'follower' | 'contrarian' | 'smart' | 'genius';
+
+/**
+ * Change Sync: when a Robot's own moves take effect, in beats from Start (4/4, as everywhere in
+ * M). 0 = FREE: at the decision, exactly as before. Otherwise a move decided between boundaries
+ * waits for the next one (the latest decision wins). It decides WHEN, never WHERE.
+ */
+export type ChangeSync = 0 | 1 | 4 | 8 | 16 | 32;
+export const SYNC_OPTIONS: { value: ChangeSync; name: string; words: string }[] = [
+  { value: 0, name: 'FREE', words: 'as soon as it decides' },
+  { value: 1, name: 'BEAT', words: 'on the next beat' },
+  { value: 4, name: 'BAR', words: 'on the next bar line' },
+  { value: 8, name: '2 BARS', words: 'at the next 2-bar boundary' },
+  { value: 16, name: '4 BARS', words: 'at the next 4-bar boundary' },
+  { value: 32, name: '8 BARS', words: 'at the next 8-bar boundary' },
+];
+const SYNC_VALUES = SYNC_OPTIONS.map((o) => o.value as number);
+/** Ticks between a Change Sync's boundaries (0 = FREE). */
+export function syncTicks(sync: ChangeSync): number {
+  return sync * TICKS_PER_QUARTER;
+}
+export const BAR_TICKS = TICKS_PER_WHOLE;
 
 export interface RobotParams {
   /** Drunk / Orbit / Pendulum: Positions per move */
@@ -87,6 +108,8 @@ export interface RobotDef {
   home: number | null;
   /** Follower / Contrarian: the Robot it watches (0–3), or null */
   target: number | null;
+  /** Change Sync (0 = FREE). Ignored by Baton (M), which is M's own engine. */
+  sync: ChangeSync;
   params: RobotParams;
   /** Allowed Groups: the Pattern Groups (a–f) it may choose by itself; at least one. Restricts
    * only its own automatic choices of Pattern Group, never a hand, Rule or Snapshot. */
@@ -115,6 +138,8 @@ export const PERSONALITIES: PersonalityInfo[] = [
   { id: 'curious', name: 'Curious', help: 'Mostly returns to familiar Positions; sometimes explores the least-visited ones.', params: ['explore'], weighted: true },
   { id: 'follower', name: 'Follower', help: 'Follows another Robot: goes where it is (copy) or repeats its moves (echo). Holds while that Robot is off or has not moved.', params: ['mode', 'fidelity'], weighted: false },
   { id: 'contrarian', name: 'Contrarian', help: 'Moves away from another Robot: the mirror Position, or anywhere at least “distance” away.', params: ['mode', 'distance'], weighted: true },
+  { id: 'smart', name: 'Smart', help: 'Thinks in phrases: plays a section 2, 4 or 8 bars and moves on a bar line, returning to its Home (its theme) between familiar and — “explore” % — new Positions; now and then a surprise.', params: ['explore'], weighted: true },
+  { id: 'genius', name: 'Genius', help: 'Phrases like Smart and listens to the other Robots: holds back while they change, answers a bar or so later with a different Position, builds arcs away from Home and releases back. Alone, it still phrases.', params: ['explore'], weighted: true },
 ];
 export const PERSONALITY_IDS = new Set(PERSONALITIES.map((p) => p.id));
 export function personalityInfo(p: Personality): PersonalityInfo {
@@ -148,7 +173,7 @@ export function defaultRobot(i: number): RobotDef {
     { personality: 'orbit', variables: ['transposition'], rateNum: 16, rateDen: 1 },
     { personality: 'restless', variables: ['rhythm'], rateNum: 1, rateDen: 1 },
   ];
-  return { enabled: false, home: null, target: null, params: defaultParams(), groups: allGroups(), ...structuredClone(presets[i] ?? presets[1]) };
+  return { enabled: false, home: null, target: null, sync: 0, params: defaultParams(), groups: allGroups(), ...structuredClone(presets[i] ?? presets[1]) };
 }
 
 export function defaultRobots(): RobotDef[] {
@@ -216,6 +241,7 @@ export function cleanRobot(v: unknown, i: number): RobotDef {
     rateDen: RATE_DENS.includes(o.rateDen as number) ? (o.rateDen as number) : d.rateDen,
     home: typeof o.home === 'number' && Number.isInteger(o.home) && o.home >= 0 && o.home < NUM_POSITIONS ? o.home : null,
     target,
+    sync: SYNC_VALUES.includes(o.sync as number) ? (o.sync as ChangeSync) : 0,
     params: cleanParams(o.params),
     groups: cleanGroups(o.groups),
   };
@@ -352,6 +378,17 @@ export interface RobotMemory {
   moves: number;
   /** where it was at Start (Homebody without a Home) */
   startPos: number;
+  /** Smart / Genius: where it was before `pos` (-1 = nowhere yet) */
+  prev: number;
+  /** Smart / Genius: bars this section should last */
+  section: number;
+  /** Genius: moves since it left its Home (0 = at Home) and how many before it goes back */
+  arc: number;
+  arcLen: number;
+  /** Genius: the tick of the other Robot's move it last listened to */
+  heard: number;
+  /** Smart / Genius: what its last move-decision planned, taken up if that move happens */
+  plan: { to: number; section: number; arc: number; arcLen: number } | null;
 }
 
 export function freshMemory(pos: number): RobotMemory {
@@ -359,7 +396,7 @@ export function freshMemory(pos: number): RobotMemory {
   const lastVisit = Array.from({ length: NUM_POSITIONS }, () => -1);
   visits[pos] = 1;
   lastVisit[pos] = 0;
-  return { pos, decisions: 0, dwell: 0, visits, lastVisit, dir: 1, lastDelta: 0, moves: 0, startPos: pos };
+  return { pos, decisions: 0, dwell: 0, visits, lastVisit, dir: 1, lastDelta: 0, moves: 0, startPos: pos, prev: -1, section: 4, arc: 0, arcLen: 3, heard: -1, plan: null };
 }
 
 /** The Robot a Follower / Contrarian watches, as it decides. */
@@ -377,7 +414,31 @@ export interface DecideContext {
   target: TargetView | null;
   /** the target's move count when this Robot last decided */
   seenTargetMoves: number;
+  /** Smart / Genius: where the decision falls in the music (absent = free, on a bar line) */
+  music?: MusicView;
 }
+
+/** The music around a Smart / Genius decision: read-only, from the Conductor. */
+export interface MusicView {
+  /** bars since this Robot last moved (or since Start) */
+  barsHere: number;
+  /** the decision falls on a bar line */
+  onBar: boolean;
+  /** it decides at least once a bar, on a grid that meets every bar line (so it can wait for one) */
+  everyBar: boolean;
+  /** Genius: how many other Robots are on */
+  others: number;
+  /** other Robots that moved in the last two bars */
+  busy: number;
+  /** bars since another Robot last moved (Infinity = none has) */
+  sinceOther: number;
+  /** the tick of that move (-1 = none) */
+  otherTick: number;
+  /** where that Robot went, if it moves one of this Robot's Variables (else null) */
+  otherPos: number | null;
+}
+
+const FREE_MUSIC: MusicView = { barsHere: Infinity, onBar: true, everyBar: false, others: 0, busy: 0, sinceOther: Infinity, otherTick: -1, otherPos: null };
 
 function nearest(cands: Candidate[], p: number, exclude = -1): number | null {
   let best: number | null = null;
@@ -512,7 +573,116 @@ export function decide(p: Personality, prm: RobotParams, mem: RobotMemory, cands
       if (away.length) return weightedPick(away, rng) ?? c;
       return weightedPick(farthest(cands, t.pos), rng) ?? c;
     }
+    case 'smart':
+      return smart(prm, mem, cands, ctx, rng);
+    case 'genius':
+      return genius(prm, mem, cands, ctx, rng);
   }
+}
+
+/** Is this Smart / Genius Robot's section over, at a place it may move (a bar line if it can wait)? */
+function phraseDue(m: MusicView, bars: number): boolean {
+  return m.barsHere + 1e-6 >= bars && (m.onBar || !m.everyBar);
+}
+
+/** Familiar material: weighted by how often it was visited, the Position it just left avoided. */
+function revisit(mem: RobotMemory, from: Candidate[], rng: Rng): number | null {
+  const pool = from.length > 1 ? from.filter((x) => x.pos !== mem.prev) : from;
+  return weightedPick(pool.map((x) => ({ pos: x.pos, w: x.w * (1 + mem.visits[x.pos]) })), rng);
+}
+
+/** New material: the least-visited Positions. */
+function leastVisited(mem: RobotMemory, from: Candidate[], rng: Rng): number | null {
+  if (!from.length) return null;
+  const least = Math.min(...from.map((x) => mem.visits[x.pos]));
+  return weightedPick(from.filter((x) => mem.visits[x.pos] === least), rng);
+}
+
+/**
+ * SMART: phrase-aware. Stays for its section (2, 4 or 8 bars), then moves on a bar line. From
+ * elsewhere it often goes back to its theme (its Home, else where it started); otherwise it
+ * revisits familiar material or, "explore" % of the time, the least-visited. The theme gets
+ * the long sections; a short 2-bar section, or breaking off a long one early, is its surprise.
+ */
+function smart(prm: RobotParams, mem: RobotMemory, cands: Candidate[], ctx: DecideContext, rng: Rng): number {
+  const c = mem.pos;
+  const m = ctx.music ?? FREE_MUSIC;
+  const u = rng.next();
+  const surprise = mem.section >= 8 && m.barsHere >= 4 && m.onBar && u < 0.08;
+  if (!surprise && !phraseDue(m, mem.section)) return c;
+  const theme = nearest(cands, ctx.home ?? mem.startPos) ?? c;
+  const others = cands.filter((x) => x.pos !== c);
+  let to: number | null = null;
+  if (c !== theme && rng.next() < 0.5) to = theme;
+  else if (rng.next() * 100 < prm.explore) to = leastVisited(mem, others, rng);
+  else to = revisit(mem, others, rng);
+  to ??= c;
+  const v = rng.next();
+  const section = to === theme ? (v < 0.5 ? 8 : 4) : v < 0.7 ? 4 : v < 0.9 ? 2 : 8;
+  mem.plan = { to, section, arc: 0, arcLen: mem.arcLen };
+  return to;
+}
+
+/**
+ * GENIUS: Smart's phrasing, plus the other Robots (read-only — it never touches them).
+ *   listen    another Robot moved this bar → it holds (unless its own section is long overdue)
+ *   respond   another Robot moved 1–4 bars ago → it may answer now, half way through its section
+ *   contrast  the others are busy → its sections double; all static for 8 bars → they halve
+ *   arc       leaves Home, 2–4 moves of shorter and shorter sections (build), back Home for 8 (release)
+ *   memory    never straight back where it came from, except Home; never onto the Position the
+ *             other Robot just took on a shared Variable (an answer, not an echo)
+ *   restraint even when due, sometimes lets the section run two more bars
+ */
+function genius(prm: RobotParams, mem: RobotMemory, cands: Candidate[], ctx: DecideContext, rng: Rng): number {
+  const c = mem.pos;
+  const m = ctx.music ?? FREE_MUSIC;
+  const u = rng.next();
+  if (m.others && m.sinceOther < 1 && m.barsHere < mem.section * 2) return c; // listen
+  if (m.everyBar && !m.onBar) return c;
+  let respond = false;
+  if (m.others && m.otherTick >= 0 && m.otherTick !== mem.heard && m.sinceOther <= 4 && m.barsHere >= mem.section / 2) {
+    mem.heard = m.otherTick;
+    respond = u < 0.6;
+  }
+  let need = mem.section;
+  if (m.busy >= 2) need *= 2;
+  else if (m.others && m.sinceOther >= 8) need = Math.max(2, need / 2);
+  if (!respond && m.barsHere + 1e-6 < need) return c; // not yet
+  if (!respond && u >= 0.85) {
+    mem.section = Math.ceil(m.barsHere - 1e-6) + 2; // restraint: let this section run two more bars
+    return c;
+  }
+  const theme = nearest(cands, ctx.home ?? mem.startPos) ?? c;
+  const pool = cands.filter((x) => x.pos !== c && x.pos !== m.otherPos);
+  const others = pool.length ? pool : cands.filter((x) => x.pos !== c);
+  let to: number | null;
+  let arc = mem.arc + 1;
+  let arcLen = mem.arcLen;
+  let section: number;
+  if (c === theme || !cands.some((x) => x.pos === theme)) {
+    // leave Home: familiar material, or something new
+    const away = others.filter((x) => x.pos !== theme);
+    to = rng.next() * 100 < prm.explore ? leastVisited(mem, away.length ? away : others, rng) : revisit(mem, away.length ? away : others, rng);
+    arc = 1;
+    arcLen = 2 + Math.floor(rng.next() * 3);
+    section = 4;
+  } else if (mem.arc >= mem.arcLen && m.otherPos !== theme) {
+    to = theme; // release
+    arc = 0;
+    section = 8;
+  } else {
+    const away = others.filter((x) => x.pos !== theme && x.pos !== mem.prev);
+    to = revisit(mem, away.length ? away : others, rng);
+    section = arc >= 3 ? 2 : 4; // build: sections shorten
+  }
+  to ??= c;
+  mem.plan = { to, section, arc, arcLen };
+  return to;
+}
+
+/** The candidate nearest `p` (itself if it is one); `p` when there are none. */
+export function nearestCandidate(cands: Candidate[], p: number): number {
+  return nearest(cands, p) ?? p;
 }
 
 /** A forced new Position (Rule "choose"): a weighted different eligible Position. */
@@ -529,6 +699,13 @@ export function remember(mem: RobotMemory, next: number): void {
   if (moved) {
     mem.moves++;
     mem.dwell = 0;
+    mem.prev = mem.pos;
+    // Smart / Genius: the section planned for this move (another kind of move starts afresh)
+    const plan = mem.plan?.to === next ? mem.plan : null;
+    mem.section = plan?.section ?? 4;
+    mem.arc = plan?.arc ?? 0;
+    mem.arcLen = plan?.arcLen ?? mem.arcLen;
+    mem.plan = null;
   } else mem.dwell++;
   mem.pos = next;
   mem.visits[next]++;
