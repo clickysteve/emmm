@@ -102,6 +102,7 @@ export type VariableName =
   | 'accent'
   | 'legato'
   | 'rhythm'
+  | 'octave'
   | 'orchestration'
   | 'soundChoice';
 export type ConductTarget = VariableName | 'tempo' | 'snapshot';
@@ -247,6 +248,8 @@ export interface Composition {
   timeDistortion: Variable<TimeMap[]>;
   accent: Variable<Cycle[]>;
   legato: Variable<Cycle[]>;
+  /** emmm (not M): the fourth Cyclic Variable — levels 0–4 = −2…+2 octaves, 2 neutral */
+  octave: Variable<Cycle[]>;
   rhythm: Variable<Cycle[]>;
   /** each position: 4 voices × list of enabled M Output Channels (1..16) */
   orchestration: Variable<number[][]>;

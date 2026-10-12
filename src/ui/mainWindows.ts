@@ -630,21 +630,38 @@ export class VariablesWindow implements Updatable {
 
 const CYC: VariableName[] = ['rhythm', 'legato', 'accent'];
 
+/**
+ * Cyclic Variables: Rhythm | Legato | Accent, plus emmm's Octave outside Classic Mode — the
+ * same window width shared by three or four columns (rebuilt when the mode changes).
+ */
 export class CyclicWindow implements Updatable {
   win: MWindow;
   private choices: VariableChoice[] = [];
   private arrows: ConductArrow[] = [];
-  constructor(ctx: UiContext, parent: HTMLElement) {
+  private builtFor: boolean | null = null;
+  constructor(private ctx: UiContext, parent: HTMLElement) {
     this.win = new MWindow(parent, { id: 'cyclic', title: 'Cyclic Variables', x: 310, y: 140, w: 302, h: 222, area: 'cyclic' });
+    this.build();
+  }
+  private build(): void {
+    const ctx = this.ctx;
     const b = this.win.body;
-    CYC.forEach((v, i) => {
-      const x = 3 + i * 99;
+    const modern = ctx.s.comp.extended.enabled;
+    this.builtFor = modern;
+    b.innerHTML = '';
+    this.choices = [];
+    this.arrows = [];
+    const vars: VariableName[] = modern ? [...CYC, 'octave'] : CYC;
+    const step = modern ? 74 : 99;
+    vars.forEach((v, i) => {
+      const x = 3 + i * step;
       label(b, x + 2, 4, VAR_LABEL[v]);
-      this.arrows.push(arrowFor(ctx, b, x + 72, v === 'legato' ? 0 : 1, v, v === 'legato' ? 17 : 13));
-      this.choices.push(new VariableChoice(ctx, b, v, x, 19, 96, 31, true));
+      this.arrows.push(arrowFor(ctx, b, x + step - 27, v === 'legato' ? 0 : 1, v, v === 'legato' ? 17 : 13));
+      this.choices.push(new VariableChoice(ctx, b, v, x, 19, step - 3, 31, true));
     });
   }
   update(): void {
+    if (this.builtFor !== this.ctx.s.comp.extended.enabled) this.build();
     this.choices.forEach((c) => c.update());
     this.arrows.forEach((a) => a.update());
   }

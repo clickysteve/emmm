@@ -537,7 +537,9 @@ Vel Range (velocities) · Note Order (Original / Cyclic Random / Utterly Random)
 Time Distort (swing / rubato maps).<br>
 <b>Cyclic Variables</b> — Rhythm (time to the next note, × the Time Base), Legato (note length as %
 of that time), Accent (level 1–4 within Vel Range; 0 = rest). Cycles are 1–16 steps; a step can be
-a range of levels, picked at random each time.<br>
+a range of levels, picked at random each time. <b>Octave</b> (emmm) shifts each event's notes by
+−2…+2 octaves (level 2 = none), on top of Transposition. The pictures show what each step does
+(dithered = a range); the shaded step is the one playing.<br>
 <b>Midi</b> — Orchestration sends each voice to any of 16 output channels; Sound Choice sends
 program changes.<br><br>
 <b>Mouse</b> — click a Position to choose it · double-click to edit it · drag onto another to swap
@@ -565,7 +567,10 @@ edit (the playing one is underlined); it stays put while the music changes Group
 <b>Copy &amp; paste</b> — in the Pattern Editor ⌘C / ⌘V copy and paste the whole Pattern (or the
 selected steps): pick another Group with Grp to paste there. Edit ▸ Copy Group / Paste Group copy all
 four Patterns; Edit ▸ Duplicate Group… / Duplicate Pattern… copy straight into the Group you pick.
-All are one Undo, and never change which Group plays. <b>Scale Lock</b> (Transposition window, emmm): Transposition
+All are one Undo, and never change which Group plays.<br>
+<b>Generate Pattern</b> — Pattern ▸ Generate Pattern…: Random Melody, Random Walk, Arpeggio, Motif or
+Euclidean notes from a Root + Scale within a range. Generate shows a picture (no sound); Apply puts
+it into the Pattern the editor shows (one Undo); Cancel leaves it alone. <b>Scale Lock</b> (Transposition window, emmm): Transposition
 counts degrees of each Pattern's scale instead of semitones.<br>
 <b>Typing numbers</b> — click any number, type the value, Return (Escape cancels); ↑ ↓ step it.
 Time Base takes "3/8". Range bars take "40-100". emmm ▸ Keyboard Shortcuts… (⌥H) lists every key.<br>
@@ -588,8 +593,8 @@ Robot may wander to (you can still choose any).
 Options ▸ Performance Feedback shows what M decides for each note; Options ▸ MIDI Learn… maps
 controllers and keys.<br>
 <b>Classic Mode</b> — Options ▸ Enable Classic Mode (off by default) is a narrower instrument closer to
-M: Robots 2–4, Rules, Return, Mutation, Reroll, A/B, Trajectory and CC Cycles stop and their windows
-close; their settings are kept for when you switch it off. Editing, scales, copy/paste, MIDI, files
+M: Robots 2–4, Rules, Return, Mutation, Reroll, A/B, Trajectory, CC Cycles, Octave and Generate
+Pattern stop and their windows close (the Cyclic window shows M's three Variables); their settings are kept for when you switch it off. Editing, scales, copy/paste, MIDI, files
 and Undo work in both.<br>
 <b>Comfort</b> — rest the mouse on a control for a tip (Options ▸ Show Tips) · ⤢ in the menu bar =
 full screen.<br><br>

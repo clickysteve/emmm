@@ -49,6 +49,7 @@ const VARIABLE_TARGETS: VariableName[] = [
   'accent',
   'legato',
   'rhythm',
+  'octave',
   'orchestration',
   'soundChoice',
 ];
@@ -68,6 +69,7 @@ export function conductAt(comp: Composition, x: number, y: number, fresh = false
   c.baton = { x: Math.max(0, Math.min(1, x)), y: Math.max(0, Math.min(1, y)) };
   const res: BatonResult = { positions: [], tempo: null, snapshot: null };
   for (const v of VARIABLE_TARGETS) {
+    if (v === 'octave' && !comp.extended.enabled) continue; // emmm Octave: not in Classic Mode
     const a = c.arrows[v];
     if (!a.enabled) continue;
     if (v === 'velocityRange' && c.continuousMode.velocityRange) continue;

@@ -107,6 +107,52 @@ export function miniCycle(cycles: Cycle[], w: number, h: number, c: string): str
   return s;
 }
 
+/**
+ * emmm (outside Classic Mode): a Cyclic Variable drawn by what it means, one row per Voice —
+ * Rhythm: bars as tall as the time to the next note; Legato: bars as long as the note;
+ * Accent: bars as tall as the loudness (0 = silent, nothing drawn); Octave: a contour about a
+ * dotted centre line (no shift). A step with a range is drawn dithered from its low to its
+ * high value, a fixed step solid. A dotted base line shows the cycle length (the steps spread
+ * over the cell, on one scale for the four Voices); `cur` frames the step each Voice is
+ * playing (active Position only, −1 = none).
+ */
+export function miniCycleMeaning(kind: 'rhythm' | 'legato' | 'accent' | 'octave', cycles: Cycle[], comp: Composition, w: number, h: number, c: string, cur: number[] | null): string {
+  const { y, rh } = rows(h);
+  const d = defs(c);
+  let s = d.defs;
+  const sw = (w - 4) / Math.max(4, ...cycles.map((cy) => cy.length));
+  const bw = Math.max(1, Math.min(6, Math.floor(sw) - 1));
+  const H = Math.max(3, Math.floor(rh) - 1);
+  const maxR = Math.max(...comp.rhythmValues);
+  const frac = (lv: number) => (kind === 'rhythm' ? (comp.rhythmValues[lv] ?? 1) / maxR : kind === 'legato' ? Math.min(1, (comp.legatoValues[lv] ?? 50) / 100) : lv / 4);
+  cycles.forEach((cy, v) => {
+    const top = Math.round(y(v));
+    const bottom = top + H;
+    const mid = top + Math.floor(H / 2);
+    if (cur && cur[v] >= 0 && cur[v] < cy.length) s += `<rect x="${Math.round(2 + cur[v] * sw) - 1.5}" y="${top - 0.5}" width="${bw + 3}" height="${H + 2}" fill="none" stroke="${c}" stroke-width="1"/>`;
+    s += rect(2, kind === 'octave' ? mid : bottom, Math.round(cy.length * sw) - 1, 1, d.dots);
+    cy.forEach((st, i) => {
+      const x = Math.round(2 + i * sw);
+      const lo = Math.min(st.lo, st.hi);
+      const hi = Math.max(st.lo, st.hi);
+      if (kind === 'legato') {
+        const a = Math.max(1, Math.round((sw - 1) * frac(lo)));
+        const b = Math.max(a, Math.round((sw - 1) * frac(hi)));
+        s += rect(x, mid - 1, a, 2, c) + (b > a ? rect(x + a, mid - 1, b - a, 2, d.grey) : '');
+      } else if (kind === 'octave') {
+        const at = (lv: number) => Math.round(mid - ((lv - 2) * H) / 4);
+        if (hi > lo) s += rect(x, at(hi), bw, at(lo) - at(hi) + 1, d.grey);
+        else s += rect(x, at(lo) - (lo === 2 ? 0 : 1), bw, lo === 2 ? 1 : 2, c);
+      } else {
+        const a = Math.round(H * frac(lo));
+        const b = Math.max(a, Math.round(H * frac(hi)));
+        s += rect(x, bottom - a, bw, a, c) + (b > a ? rect(x, bottom - b, bw, b - a, d.grey) : '');
+      }
+    });
+  });
+  return s;
+}
+
 export function miniOrchestration(chs: number[][], w: number, h: number, c: string): string {
   const { y, rh } = rows(h);
   const cw = (w - 4) / 16;
@@ -137,8 +183,11 @@ export function miniPatternGroup(comp: Composition, g: number, w: number, h: num
   return s;
 }
 
-export function miniFor(comp: Composition, v: VariableName, pos: number, w: number, h: number, c: string, flash: boolean[] = []): string {
+/** `modern`: emmm's informative Cyclic pictures (off in Classic Mode); `cur`: see miniCycleMeaning. */
+export function miniFor(comp: Composition, v: VariableName, pos: number, w: number, h: number, c: string, flash: boolean[] = [], modern = false, cur: number[] | null = null): string {
   switch (v) {
+    case 'octave':
+      return miniCycleMeaning(v, comp[v].positions[pos], comp, w, h, c, cur);
     case 'noteDensity':
       return miniNoteDensity(comp.noteDensity.positions[pos], w, h, c);
     case 'velocityRange':
@@ -157,7 +206,7 @@ export function miniFor(comp: Composition, v: VariableName, pos: number, w: numb
     case 'accent':
     case 'legato':
     case 'rhythm':
-      return miniCycle(comp[v].positions[pos], w, h, c);
+      return modern ? miniCycleMeaning(v, comp[v].positions[pos], comp, w, h, c, cur) : miniCycle(comp[v].positions[pos], w, h, c);
     case 'orchestration':
       return miniOrchestration(comp.orchestration.positions[pos], w, h, c);
     case 'patternGroup':

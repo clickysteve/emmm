@@ -44,7 +44,7 @@ const CONDUCTOR_SYNC = new Set(['extended', 'robot', 'conductors']);
 /** Changes by a hand (or a definition edit) that Rules should see at once (Conductor.poke). */
 /** MIDI Learn targets that drive the advanced generative features (off in Classic Mode). */
 const ADVANCED_LEARN = new Set(['mutate', 'mutationAmount', 'reroll', 'abRecall', 'abCapture', 'abToggle', 'trajToggle']);
-const CONDUCTOR_POKE = new Set(['patternGroup', 'noteDensity', 'velocityRange', 'noteOrder', 'transposition', 'timeDistortion', 'accent', 'legato', 'rhythm', 'orchestration', 'soundChoice', 'snapshot', 'ab-recall', 'mutation', 'baton', 'conductors', 'arrows', 'undo']);
+const CONDUCTOR_POKE = new Set(['patternGroup', 'noteDensity', 'velocityRange', 'noteOrder', 'transposition', 'timeDistortion', 'accent', 'legato', 'rhythm', 'octave', 'orchestration', 'soundChoice', 'snapshot', 'ab-recall', 'mutation', 'baton', 'conductors', 'arrows', 'undo']);
 
 export interface VisualEvent {
   ms: number;
@@ -203,6 +203,7 @@ export class Session {
       accent: v(c.accent),
       legato: v(c.legato),
       rhythm: v(c.rhythm),
+      octave: v(c.octave),
       orchestration: v(c.orchestration),
       soundChoice: v(c.soundChoice),
       tempo: { ...c.tempo, value: 0 },
@@ -218,7 +219,7 @@ export class Session {
   private restoreDoc(state: string): void {
     const c = this.comp;
     const next = JSON.parse(state) as Composition;
-    for (const k of ['noteDensity', 'velocityRange', 'noteOrder', 'transposition', 'timeDistortion', 'accent', 'legato', 'rhythm', 'orchestration', 'soundChoice'] as const)
+    for (const k of ['noteDensity', 'velocityRange', 'noteOrder', 'transposition', 'timeDistortion', 'accent', 'legato', 'rhythm', 'octave', 'orchestration', 'soundChoice'] as const)
       (next[k] as { active: number }).active = c[k].active;
     next.patternGroup = { active: c.patternGroup.active };
     next.tempo.value = c.tempo.value;
@@ -1056,6 +1057,22 @@ export class Session {
       p.tbDen = dens[v];
       this.engine.setTimeBaseDen(v, den, tick);
     });
+  }
+
+  /**
+   * emmm Generate Pattern: replace the notes of Voice v's Pattern in Group g with `steps` (an
+   * ordinary step list) and give it the scale they were made from. Timing, Phase, record
+   * modes and every other Pattern stay. One Undo step.
+   */
+  applyGenerated(g: number, v: number, steps: Step[], scale: ScaleChoice): void {
+    const p = this.comp.patternGroups[g].patterns[v];
+    p.steps = steps.map((st) => [...st]);
+    p.outputLength = p.steps.length;
+    p.size = Math.max(p.size, p.steps.length);
+    p.scale = cleanChoice(scale);
+    ops.rescramble(p, this.editRng, this.comp.options.dontScrambleRests);
+    this.status = `Generated ${p.steps.length} steps into Pattern ${'abcdef'[g]}${v + 1} (Undo restores it)`;
+    this.changed('patterns');
   }
 
   // ------------------------------------------------------------------ whole Groups (emmm)

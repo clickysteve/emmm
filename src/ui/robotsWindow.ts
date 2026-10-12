@@ -462,8 +462,8 @@ export class RobotsWindow {
     // Variables
     label(p, 2, 23, 'Variables', 'tiny');
     ROBOT_VARS.forEach((v, k) => {
-      const x = 46 + (k % 5) * 62;
-      const y = 19 + Math.floor(k / 5) * 15;
+      const x = 46 + (k % 6) * 62;
+      const y = 19 + Math.floor(k / 6) * 15;
       this.toggle(
         p,
         x,
@@ -617,8 +617,8 @@ export class RobotsWindow {
     const v = this.selVar;
     label(p, 2, 4, 'Variable', 'tiny');
     ROBOT_VARS.forEach((rv, k) => {
-      const x = 46 + k * 42;
-      const d = el('div', 'num', p, [x, 0, 40, 14], VAR_SHORT[rv]);
+      const x = 46 + k * 38;
+      const d = el('div', 'num', p, [x, 0, 36, 14], VAR_SHORT[rv]);
       d.style.fontSize = '9px';
       d.setAttribute('role', 'tab');
       this.activatable(d, () => {
@@ -627,11 +627,11 @@ export class RobotsWindow {
       });
       d.title = `${VAR_LONG[rv]}: edit its weights`;
       d.classList.toggle('inv', rv === v);
-      const strip = svgEl(40, 4, '');
-      const sb = el('div', '', p, [x, 16, 40, 4]);
+      const strip = svgEl(36, 4, '');
+      const sb = el('div', '', p, [x, 16, 36, 4]);
       sb.style.position = 'absolute';
       sb.appendChild(strip);
-      this.tabParts.push({ update: () => setSvg(strip, stripSvg(weightRow(this.ext.weights, rv), 40, 4, false)) });
+      this.tabParts.push({ update: () => setSvg(strip, stripSvg(weightRow(this.ext.weights, rv), 36, 4, false)) });
     });
     // six columns of bars: drag to set
     const X0 = 46;

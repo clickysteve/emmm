@@ -659,6 +659,20 @@ try {
   const sC = JSON.parse(await scalesNow()).flat();
   check('C. Group c Voice 3 changed alone to E Dorian; the other 23 stay D Dorian', sC[2 * 4 + 2] === '4dorian' && sC.filter((x) => x === '2dorian').length === 23, sC.join(' '));
   await shot('10-apply-scale');
+  // Octave column and Generate Pattern (emmm)
+  check('Cyclic window: four columns with Octave', await evaluate(`document.querySelectorAll('[data-win="cyclic"] .pos[data-var="octave"]').length === 6`));
+  await evaluate(`(() => { emmm.comp.octave.positions[0] = [[{lo:2,hi:2},{lo:3,hi:3},{lo:1,hi:3},{lo:0,hi:0}],[{lo:2,hi:2}],[{lo:4,hi:4},{lo:2,hi:2}],[{lo:1,hi:1},{lo:2,hi:4}]]; emmm.comp.rhythm.positions[0][1] = [{lo:1,hi:3},{lo:2,hi:2}]; emmm.changed('octave'); })()`);
+  await evaluate(`document.querySelectorAll('[data-win="edit-pattern"]:not(.hidden) .close').forEach((c) => c.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })))`);
+  await key(' ');
+  await sleep(700);
+  await shot('11-cyclic-octave-playing');
+  await key(' ');
+  await click(`[...document.querySelectorAll('#menubar .menu')].find((m) => m.firstChild?.textContent === 'Pattern')`);
+  await click(`[...document.querySelectorAll('.dropdown .item')].find((i) => i.firstElementChild.textContent === 'Generate Pattern…')`);
+  await click(`document.querySelector('#gen-generate')`);
+  check('Generate Pattern: a preview, nothing applied yet', await evaluate(`!!emmmUi.generateWin.pending && document.querySelector('[data-win="generate"] .box svg').innerHTML.includes('<rect')`));
+  await shot('12-generate');
+  await click(`document.querySelector('#gen-cancel')`);
   await click(`${PE}.querySelector('.close')`);
   // F: save, reload (autosave), open the saved file
   const confF = await evaluate(`JSON.stringify({ g: emmm.comp.patternGroups, r: emmm.comp.extended.robots })`);

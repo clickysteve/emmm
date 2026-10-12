@@ -52,7 +52,7 @@ export interface ConductorHost {
 }
 
 /** M's conducting arrows in M's order (to read the Baton robot's Position). */
-const ARROW_VARS: VariableName[] = ['patternGroup', 'noteDensity', 'velocityRange', 'noteOrder', 'transposition', 'timeDistortion', 'accent', 'legato', 'rhythm', 'orchestration'];
+const ARROW_VARS: VariableName[] = ['patternGroup', 'noteDensity', 'velocityRange', 'noteOrder', 'transposition', 'timeDistortion', 'accent', 'legato', 'rhythm', 'octave', 'orchestration'];
 const CYCLES: CycleKind[] = ['pattern', 'rhythm', 'legato', 'accent'];
 const LOG_MAX = 40;
 
@@ -198,7 +198,7 @@ export class Conductor {
   variables(i: number): VariableName[] {
     if (this.isBaton(i)) {
       const c = this.comp.conducting;
-      return ARROW_VARS.filter((v) => c.arrows[v].enabled && !(v === 'velocityRange' && c.continuousMode.velocityRange) && !(v === 'legato' && c.continuousMode.legato));
+      return ARROW_VARS.filter((v) => c.arrows[v].enabled && (v !== 'octave' || this.ext.enabled) && !(v === 'velocityRange' && c.continuousMode.velocityRange) && !(v === 'legato' && c.continuousMode.legato));
     }
     return [...this.ext.robots[i].variables];
   }

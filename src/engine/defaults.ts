@@ -58,6 +58,7 @@ export const CONDUCT_TARGETS: ConductTarget[] = [
   'accent',
   'legato',
   'rhythm',
+  'octave',
   'orchestration',
   'soundChoice',
   'tempo',
@@ -130,6 +131,8 @@ export function defaultComposition(seed = 38291): Composition {
       same(cyc(4, 0, 2, 3)),
       same(cyc(4, 1, 2, 1, 3, 1, 2, 1, 4, 1, 2, 0, 3, 1, [1, 4], [0, 4])),
     ]),
+    // emmm Octave: every Position neutral (level 2 = no shift) until the user edits it
+    octave: variable([same(cyc(2)), same(cyc(2)), same(cyc(2)), same(cyc(2)), same(cyc(2)), same(cyc(2))]),
     legato: variable([
       same(cyc(2)),
       same(cyc(4)),
