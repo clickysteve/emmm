@@ -6,7 +6,7 @@ import './ui/style.css';
 import { Session } from './app/session';
 import { defaultComposition, demoComposition } from './engine/defaults';
 import { freshSeed } from './engine/rng';
-import type { VariableName } from './engine/types';
+import type { Composition, VariableName } from './engine/types';
 import { writeSmf } from './midi/smf';
 import { deserialize } from './persistence/format';
 import { autosave, clearStartup, downloadBytes, downloadDocument, loadAutosave, loadStartup, pickFile, saveStartup } from './persistence/storage';
@@ -24,7 +24,7 @@ import { PaletteWindow } from './ui/paletteWindow';
 import { Prefs } from './app/prefs';
 import { cleanLearnMappings } from './extended/extended';
 import { onLegacyLearn } from './persistence/format';
-import { alertDialog, closeDialog, confirmDialog, promptDialog } from './ui/dialogs';
+import { alertDialog, choiceDialog, closeDialog, confirmDialog, promptDialog } from './ui/dialogs';
 import { FeedbackWindow } from './ui/feedbackWindow';
 import { closeSelectors } from './ui/selector';
 import { installTooltips } from './ui/tooltip';
@@ -52,13 +52,19 @@ onLegacyLearn((list) => {
 });
 
 // ------------------------------------------------------------------ document at startup
+/** A new document is the full emmm instrument (Classic Mode off); a saved startup state and
+ * every saved document keep their own mode. */
+function fullInstrument(c: Composition): Composition {
+  c.extended.enabled = true;
+  return c;
+}
 function newDocument() {
-  const c = loadStartup() ?? defaultComposition();
+  const c = loadStartup() ?? fullInstrument(defaultComposition());
   c.seed = freshSeed();
   return c;
 }
 const params = new URLSearchParams(location.search);
-let initial = params.has('demo') ? demoComposition() : params.has('new') ? newDocument() : (loadAutosave()?.composition ?? demoComposition());
+let initial = params.has('demo') ? fullInstrument(demoComposition()) : params.has('new') ? newDocument() : (loadAutosave()?.composition ?? fullInstrument(demoComposition()));
 if (params.has('seed')) initial.seed = Number(params.get('seed')) || initial.seed;
 
 const session = new Session(initial);
@@ -150,6 +156,19 @@ const trajectoryWin = new TrajectoryWindow(ctx, desktop);
 extendedWin.openTrajectory = () => bringForward(trajectoryWin.win);
 const robotsWin = new RobotsWindow(ctx, desktop);
 extendedWin.openRobots = () => bringForward(robotsWin.win);
+/**
+ * Classic Mode (Options): the user-facing face of the existing Extended switch — Classic Mode
+ * on = Extended off. Switching never touches the advanced settings themselves, and while it
+ * is on, the windows of the advanced generative features close and cannot be opened.
+ */
+const advancedWins = [extendedWin.win, robotsWin.win, trajectoryWin.win, ccWin.win];
+function setClassicMode(on: boolean): void {
+  session.comp.extended.enabled = !on;
+  session.changed('extended');
+}
+session.onChange(() => {
+  if (!session.comp.extended.enabled) for (const w of advancedWins) if (w.open) w.close();
+});
 // a window that appears is drawn at once (not only at the next change)
 windowEvents.shown = () => (session.dirty = true);
 const floating = [...Object.values(editors), cyclic, patternEditor, midiAssign, monitorWin, about, importWin, library, extendedWin, helpWin, ccWin, paletteWin, learnWin, feedbackWin, shortcutsWin, trajectoryWin, robotsWin];
@@ -227,14 +246,39 @@ interface MenuItem {
   sep?: boolean;
 }
 
-const regionTarget = (): { voice: number; region?: [number, number] } | undefined => {
-  if (patternEditor.win.open && patternEditor.region && patternEditor.region[1] > patternEditor.region[0]) return { voice: patternEditor.voice, region: patternEditor.region };
-  if (patternEditor.win.open && !session.selected.some(Boolean)) return { voice: patternEditor.voice };
+const regionTarget = (): { voice: number; region?: [number, number]; group?: number } | undefined => {
+  const group = patternEditor.group;
+  if (patternEditor.win.open && patternEditor.region && patternEditor.region[1] > patternEditor.region[0]) return { voice: patternEditor.voice, region: patternEditor.region, group };
+  // the editor showing another Group than the Patterns window: its Pattern is the target
+  if (patternEditor.win.open && (!session.selected.some(Boolean) || group !== session.comp.patternGroup.active)) return { voice: patternEditor.voice, group };
   return undefined;
 };
 const anySelected = () => session.selected.some(Boolean) || patternEditor.win.open;
 const patOp = (op: string) => () => session.patternOp(op, regionTarget());
 const editOp = (op: Parameters<Session['editOp']>[0]) => () => session.editOp(op, regionTarget());
+
+// ------------------------------------------------------------------ whole Groups (emmm)
+/** The Group the user is working on: the Pattern Editor's when it is open, else the playing one. */
+const editGroup = () => (patternEditor.win.open ? patternEditor.group : session.comp.patternGroup.active);
+const G = (g: number) => 'abcdef'[g];
+async function pasteGroup(): Promise<void> {
+  const c = session.groupClipboard;
+  const to = editGroup();
+  if (!c) return;
+  if (session.hasNotes(to) && !(await confirmDialog(screen, `Replace the four Patterns of Group <b>${G(to)}</b> with those copied from Group <b>${G(c.from)}</b>? (Undo restores them.)`, 'Replace'))) return;
+  session.pasteGroup(to);
+}
+/** Duplicate the Group (or the edited Voice's Pattern) into another Group, chosen in one dialog. */
+async function duplicate(pattern: boolean): Promise<void> {
+  const from = editGroup();
+  const v = patternEditor.win.open ? patternEditor.voice : Math.max(0, session.selected.findIndex(Boolean));
+  const what = pattern ? `Pattern <b>${G(from)}${v + 1}</b> (Voice ${v + 1})` : `Group <b>${G(from)}</b> (all four Patterns)`;
+  const choices = [0, 1, 2, 3, 4, 5].filter((g) => g !== from).map((g) => ({ label: G(g) + (session.hasNotes(g, pattern ? v : undefined) ? ' •' : ''), value: String(g) }));
+  const to = await choiceDialog(screen, `Duplicate ${what} into Group:<br><span class="small">• has notes, which are replaced (Undo restores them).</span>`, choices);
+  if (to === null) return;
+  if (pattern) session.duplicatePattern(from, v, Number(to));
+  else session.duplicateGroup(from, Number(to));
+}
 
 async function openDocument(): Promise<void> {
   const f = await pickFile('.json,.emmm,application/json');
@@ -286,8 +330,8 @@ function windowsMenu(): MenuItem[] {
     C('cyclicEditor', 'Cyclic Editor'),
     { label: 'Pattern Editor', key: keyLabel('patternEditor'), action: () => (openEditor('patternEditor', { voice: patternEditor.voice }), patternEditor.win.flashTitle()) },
     { label: 'Monitor', action: () => (openEditor('monitor'), monitorWin.win.flashTitle()) },
-    C('trajectoryWindow', 'Trajectory  (Extended)'),
-    C('robotsWindow', 'Robots  (Extended)'),
+    C('trajectoryWindow', 'Trajectory'),
+    C('robotsWindow', 'Robots'),
   ];
   const fixed = new Set<MWindow>([cyclic.win, patternEditor.win, monitorWin.win, trajectoryWin.win, robotsWin.win]);
   const open: MenuItem[] = floating.filter((f) => f.win.open && !fixed.has(f.win)).map((f) => ({ label: f.win.titleEl.textContent || f.win.o.title, action: () => bringForward(f.win) }));
@@ -319,7 +363,7 @@ function toggleFeedback(): void {
   else feedbackWin.win.el.classList.add('hidden');
 }
 function clearPattern(): void {
-  session.editOp('clear', patternEditor.win.open && !session.selected.some(Boolean) ? { voice: patternEditor.voice } : undefined);
+  session.editOp('clear', regionTarget() && { voice: patternEditor.voice, group: patternEditor.group });
 }
 function openPatternEditor(): void {
   openEditor('patternEditor', { voice: patternEditor.win.open ? patternEditor.voice : Math.max(0, session.selected.findIndex(Boolean)) });
@@ -394,9 +438,9 @@ cmd('captureB', () => session.abCapture('b'), () => ext().enabled);
 cmd('feedback', toggleFeedback);
 cmd('fullScreen', () => toggleFullScreen(), () => !!document.documentElement.requestFullscreen);
 cmd('shortcuts', () => bringForward(shortcutsWin.win));
-cmd('trajectoryWindow', () => bringForward(trajectoryWin.win));
+cmd('trajectoryWindow', () => bringForward(trajectoryWin.win), () => ext().enabled);
 // ⌥W opens the Robots window; on the window already in front it moves the keyboard into it
-cmd('robotsWindow', () => (robotsWin.win.open && windowFocus.front === robotsWin.win ? robotsWin.focusIn() : bringForward(robotsWin.win)));
+cmd('robotsWindow', () => (robotsWin.win.open && windowFocus.front === robotsWin.win ? robotsWin.focusIn() : bringForward(robotsWin.win)), () => ext().enabled);
 cmd('returnHome', () => session.returnHome(), () => ext().enabled && !!ext().home.positions);
 
 /** A menu item for a keyboard command: same action, same enabling, its key shown. */
@@ -423,7 +467,7 @@ const MENUS: { title: string; cls?: string; items: MenuItem[] | (() => MenuItem[
     items: [
       { label: 'New', action: () => void confirmDialog(screen, 'Start a new document? Unsaved changes are kept only in the autosave.', 'New').then((ok) => ok && session.load(newDocument())) },
       C('open', 'Open…'),
-      { label: 'Open Demo', action: () => session.load(demoComposition()) },
+      { label: 'Open Demo', action: () => session.load(fullInstrument(demoComposition())) },
       { label: 'Open Midi File…', action: async () => {
           const f = await pickFile('.mid,.midi,audio/midi');
           if (f) await importWin.openFile(f);
@@ -449,6 +493,11 @@ const MENUS: { title: string; cls?: string; items: MenuItem[] | (() => MenuItem[
       C('copy', 'Copy'),
       C('paste', 'Paste'),
       { label: 'Clear', enabled: anySelected, action: editOp('clear') },
+      { sep: true, label: '' },
+      { label: 'Copy Group', action: () => session.copyGroup(editGroup()) },
+      { label: 'Paste Group', enabled: () => !!session.groupClipboard, action: () => void pasteGroup() },
+      { label: 'Duplicate Group…', action: () => void duplicate(false) },
+      { label: 'Duplicate Pattern…', action: () => void duplicate(true) },
       { sep: true, label: '' },
       { label: 'Paste Notes', enabled: () => anySelected() && !!session.clipboard, action: editOp('pasteNotes') },
       C('changeToRests', 'Change to Rests'),
@@ -531,12 +580,24 @@ const MENUS: { title: string; cls?: string; items: MenuItem[] | (() => MenuItem[
       },
       C('fullScreen', 'Full Screen', { checked: () => !!document.fullscreenElement }),
       { sep: true, label: '' },
-      { label: 'Extended…  (not Classic M)', checked: () => session.comp.extended.enabled, action: () => extendedWin.win.show() },
-      C('feedback', 'Performance Feedback  (Extended)', { checked: () => prefs.app.feedback }),
-      { label: 'MIDI Learn…  (Extended)', action: () => learnWin.win.show() },
-      C('trajectoryWindow', 'Trajectory…  (Extended)'),
-      C('robotsWindow', 'Robots, Rules & Home…  (Extended)'),
-      C('returnHome', 'Return Home  (Extended)'),
+      { label: 'Enable Classic Mode', checked: () => !ext().enabled, action: () => setClassicMode(ext().enabled) },
+      {
+        label: 'Follow Playing Pattern',
+        checked: () => prefs.editor.followPlaying,
+        action: () => {
+          prefs.editor.followPlaying = !prefs.editor.followPlaying;
+          prefs.saveEditor();
+          session.changed('editor');
+        },
+      },
+      { sep: true, label: '' },
+      { label: 'Mutation & Variation…', enabled: () => ext().enabled, action: () => extendedWin.win.show() },
+      C('robotsWindow', 'Robots, Rules & Home…'),
+      C('trajectoryWindow', 'Trajectory…'),
+      { label: 'CC Cycles…', enabled: () => ext().enabled, action: () => ccWin.win.show() },
+      C('returnHome', 'Return Home'),
+      C('feedback', 'Performance Feedback', { checked: () => prefs.app.feedback }),
+      { label: 'MIDI Learn…', action: () => learnWin.win.show() },
       { label: 'Monitor All Output (internal)', checked: () => session.monitorAll, action: () => ((session.monitorAll = !session.monitorAll), session.monitor.unlock(), session.changed('midi')) },
     ],
   },
@@ -665,7 +726,7 @@ window.addEventListener('keydown', (e) => {
     case '<': {
       // Pattern Editor audition: ` plays the step at the MIDI Edit Counter, , the step under the cursor
       if (!patternEditor.win.open) return;
-      const p = session.pattern(patternEditor.voice);
+      const p = patternEditor.pat(patternEditor.voice);
       const idx = e.key === '`' || e.key === '~' ? session.recorders[patternEditor.voice].counter : patternEditor.hover?.step ?? -1;
       if (p.steps[idx]?.length) session.auditionStep(patternEditor.voice, p.steps[idx], patternEditor.velocity);
       break;
@@ -758,7 +819,7 @@ function frame(): void {
   const o = session.comp.midi.outputs[0];
   const outName = !o.port ? 'no output' : o.port === 'monitor' ? 'monitor' : session.midi.portName(o.port);
   const film = session.movieRecording ? 'MOVIE●  ' : session.movieArmed ? 'MOVIE  ' : '';
-  const st = `${session.comp.extended.enabled ? 'EXT  ' : ''}${session.hold ? 'HOLD  ' : ''}${film}${session.playing ? '▶' : session.engine.state === 'paused' ? (session.extHalted ? 'EXT STOP ❚❚' : '❚❚') : '■'}|→ ${outName}${session.monitorAll && o.port !== 'monitor' ? ' + monitor' : ''}`;
+  const st = `${session.comp.extended.enabled ? '' : 'CLASSIC  '}${session.hold ? 'HOLD  ' : ''}${film}${session.playing ? '▶' : session.engine.state === 'paused' ? (session.extHalted ? 'EXT STOP ❚❚' : '❚❚') : '■'}|→ ${outName}${session.monitorAll && o.port !== 'monitor' ? ' + monitor' : ''}`;
   if (st !== lastStatus) {
     const [a, b] = st.split('|');
     statusEl.textContent = a;

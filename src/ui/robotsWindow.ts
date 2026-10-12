@@ -216,9 +216,9 @@ export class RobotsWindow {
       update: () => {
         const ck = this.s.clockStatus();
         const clock = ck === 'internal' ? 'INTERNAL CLOCK' : `EXTERNAL CLOCK · ${ck.toUpperCase()}`;
-        const t = this.ext.enabled ? clock : 'EXTENDED IS OFF — Options ▸ Extended…';
+        const t = this.ext.enabled ? clock : 'CLASSIC MODE — Robots are off';
         if (status.textContent !== t) status.textContent = t;
-        setTip(status, this.ext.enabled ? 'The Robots, Rules and Return follow emmm’s musical clock — internal, or MIDI clock in (MIDI Settings)' : 'Robots, Rules and Return run only when Extended is switched on');
+        setTip(status, this.ext.enabled ? 'The Robots, Rules and Return follow emmm’s musical clock — internal, or MIDI clock in (MIDI Settings)' : 'Robots, Rules and Return do not run in Classic Mode (Options ▸ Enable Classic Mode)');
       },
     });
     for (let i = 0; i < NUM_ROBOTS; i++) this.buildRow(i, 12 + i * 15);
@@ -364,7 +364,7 @@ export class RobotsWindow {
   private robotStatus(i: number): { text: string; tip: string; strong?: boolean; recent?: boolean } {
     const c = this.c;
     const s = this.s;
-    if (!this.ext.enabled) return { text: '—', tip: 'Extended is off' };
+    if (!this.ext.enabled) return { text: '—', tip: 'Classic Mode is on' };
     if (!c.robotOn(i)) return { text: 'off', tip: `Robot ${i + 1} is off` };
     const now = s.scheduler.nowTick();
     if (c.suspended(i, now)) return { text: 'PAUSED', strong: true, tip: `Paused by a Rule until ${barBeat(c.suspendedUntil[i])}` };
@@ -418,7 +418,7 @@ export class RobotsWindow {
     const def = () => this.ext.robots[i];
     const baton = c.isBaton(i);
     label(p, 2, 4, `<b>Robot ${i + 1}</b>`);
-    this.toggle(p, 46, 1, 30, () => (c.robotOn(i) ? 'On' : 'Off'), () => c.robotOn(i), () => s.setRobotEnabled(i, !c.robotOn(i)), () => (this.ext.enabled ? `Switch Robot ${i + 1} on or off${i === 0 ? ' (the same switch as the Conducting window’s robot button)' : ''}` : 'Switch Extended on first (Options ▸ Extended…)'), () => this.ext.enabled);
+    this.toggle(p, 46, 1, 30, () => (c.robotOn(i) ? 'On' : 'Off'), () => c.robotOn(i), () => s.setRobotEnabled(i, !c.robotOn(i)), () => (this.ext.enabled ? `Switch Robot ${i + 1} on or off${i === 0 ? ' (the same switch as the Conducting window’s robot button)' : ''}` : 'Classic Mode is on (Options): Robots do not run'), () => this.ext.enabled);
     this.select(
       p,
       82,
@@ -606,7 +606,7 @@ export class RobotsWindow {
       const which = allowed.length === NUM_POSITIONS ? 'any Pattern Group' : allowed.length === 1 ? `only Group ${allowed} (it stays there)` : `only Groups ${allowed.split('').join(' ')}`;
       return moves ? `Allowed Groups: chooses ${which}` : `Allowed Groups: ${which} — used when it moves Pattern Group`;
     });
-    this.text(p, 2, 198, 470, 30, () => (this.ext.enabled ? 'Click a Robot’s number or row to edit it — ON / OFF beside the number is the only switch. Rate “sa” = it moves only when a Rule tells it to.' : 'Extended is off: these settings are kept but nothing runs. Switch it on in Options ▸ Extended….'), 'label tiny');
+    this.text(p, 2, 198, 470, 30, () => (this.ext.enabled ? 'Click a Robot’s number or row to edit it — ON / OFF beside the number is the only switch. Rate “sa” = it moves only when a Rule tells it to.' : 'Classic Mode is on: these settings are kept but nothing runs. Switch it off in Options.'), 'label tiny');
   }
 
   // ------------------------------------------------------------------ WEIGHTS
@@ -864,7 +864,7 @@ export class RobotsWindow {
     const ext = this.ext;
     const c = this.c;
     if (!r.on) out.push('This Rule is off.');
-    if (!ext.enabled) out.push('Extended is off: Rules do not run.');
+    if (!ext.enabled) out.push('Classic Mode is on: Rules do not run.');
     const robotOf = (x: Condition | Action) => ('robot' in x ? x.robot : -1);
     const wr = robotOf(r.when);
     if (wr >= 0 && !c.robotOn(wr) && r.when.kind !== 'interval') out.push(`Robot ${wr + 1} is off, so it will not move: this condition cannot happen until it is on.`);
@@ -1112,7 +1112,7 @@ export class RobotsWindow {
       d.textContent = `${e.stopped ? '■' : barBeat(e.tick)} ${e.text}`;
       d.title = d.textContent;
     });
-    if (!shown.length) el('div', 'label tiny', this.logEl, [3, 3, 126, 8], s.comp.extended.enabled ? 'Nothing yet' : 'Extended is off');
+    if (!shown.length) el('div', 'label tiny', this.logEl, [3, 3, 126, 8], s.comp.extended.enabled ? 'Nothing yet' : 'Classic Mode');
   }
 
   update(): void {

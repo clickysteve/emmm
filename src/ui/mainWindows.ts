@@ -733,6 +733,7 @@ export class SnapshotWindow implements Updatable {
   private quant: Numerical;
   private ctl: Record<string, HTMLDivElement> = {};
   private info: HTMLDivElement;
+  private mode: HTMLDivElement;
   constructor(private ctx: UiContext, parent: HTMLElement) {
     const s = ctx.s;
     this.win = new MWindow(parent, { id: 'snapshot', title: 'Snap', x: 618, y: 22, w: 96, h: 442, area: 'snapshots' });
@@ -800,7 +801,8 @@ export class SnapshotWindow implements Updatable {
     tool(62, 267, 30, 20, iconSvg('restore', 16, 14), 'Restore From Snapshot: put back what the last Snapshot changed (quantized, like a Snapshot)', () => s.restoreFromSnapshot());
     tool(62, 286, 30, 46, iconSvg('globe', 18, 18), 'Blink Everything: select every control a Snapshot can hold — all Variable Positions, the conducting arrows, each Voice’s Patterns-window settings, Sync and the Sequence enable — then click a letter to store (click an item first to leave it out)', () => s.blinkEverything());
     label(b, 4, 342, 'emmm', '');
-    label(b, 4, 354, 'classic', 'tiny');
+    // the mode, under the name: shown only in Classic Mode (Options ▸ Enable Classic Mode)
+    this.mode = label(b, 4, 354, '', 'tiny');
     // what is happening, in words (emmm): holding, editing, waiting for the quantization, or
     // what the current Snapshot holds
     this.info = el('div', 'label tiny', b, [2, 366, 90, 56]);
@@ -843,6 +845,8 @@ export class SnapshotWindow implements Updatable {
     const s = this.ctx.s;
     this.holdBtn.classList.toggle('blink', !!s.hold);
     this.arrow.update();
+    const mode = s.comp.extended.enabled ? '' : 'classic mode';
+    if (this.mode.textContent !== mode) this.mode.textContent = mode;
     if (this.quant.el.dataset.v !== String(s.comp.quantization)) {
       this.quant.el.innerHTML = s.comp.quantization ? noteValueIcon(s.comp.quantization, 12, 12) : iconSvg('wave', 12, 12);
       this.quant.el.dataset.v = String(s.comp.quantization);

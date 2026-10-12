@@ -85,6 +85,11 @@ export function confirmDialog(screen: HTMLElement, html: string, ok = 'OK'): Pro
   ], false).then((v) => v === true);
 }
 
+/** A row of choices plus Cancel. Resolves the chosen value, or null for Cancel. */
+export function choiceDialog(screen: HTMLElement, html: string, choices: { label: string; value: string }[]): Promise<string | null> {
+  return open<string | null>(screen, html, [{ label: 'Cancel', value: null }, ...choices], null).then((v) => (v === null ? null : String(v)));
+}
+
 /** Text entry. Resolves the text, or null for Cancel. */
 export function promptDialog(screen: HTMLElement, html: string, value: string, ok = 'OK'): Promise<string | null> {
   return open<null | 'ok'>(screen, html, [

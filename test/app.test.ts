@@ -167,13 +167,13 @@ describe('other menus are wired', () => {
     expect(s.comp.options.dontScrambleRests).toBe(!was);
     choose('Options', 'Palette…');
     expect(isOpen('palette')).toBe(true);
-    choose('Options', 'Performance Feedback  (Extended)');
+    choose('Options', 'Performance Feedback');
     expect(isOpen('feedback')).toBe(true);
-    choose('Options', 'Performance Feedback  (Extended)');
+    choose('Options', 'Performance Feedback');
     expect(isOpen('feedback')).toBe(false);
-    choose('Options', 'MIDI Learn…  (Extended)');
+    choose('Options', 'MIDI Learn…');
     expect(isOpen('learn')).toBe(true);
-    choose('Options', 'Extended…  (not Classic M)');
+    choose('Options', 'Mutation & Variation…');
     expect(isOpen('extended')).toBe(true);
     const tipsBefore = openMenu('Options').find((i) => label(i) === 'Show Tips')!.classList.contains('checked');
     closeMenus();
@@ -192,7 +192,7 @@ describe('other menus are wired', () => {
   });
   it('the app has no native <select> anywhere', () => {
     ui.openEditor('midiAssignment');
-    choose('Options', 'Extended…  (not Classic M)');
+    choose('Options', 'Mutation & Variation…');
     ui.updateAll();
     expect(document.querySelectorAll('select')).toHaveLength(0);
     expect(document.querySelectorAll('.msel').length).toBeGreaterThan(34);

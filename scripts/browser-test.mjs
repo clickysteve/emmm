@@ -221,12 +221,8 @@ try {
   check('app loads with the fake MIDI device', await evaluate(`emmm.midi.status === 'ready' && emmm.midi.outputs().some((o) => o.name === 'Fake Synth')`));
   await evaluate(`(() => { const s = emmm; s.comp.midi.outputs.forEach((o, i) => { o.port = 'fake-out'; o.channel = i + 1; }); s.comp.voices.forEach((v) => (v.playEnable = true)); s.comp.patternGroups[0].patterns.forEach((p, i) => { p.steps = [[60 + i * 3], [62 + i * 3], [64 + i * 3], [67 + i * 3]]; p.scrambled = [0, 1, 2, 3]; p.outputLength = 4; p.tbDen = 8; }); s.changed('midi'); })()`);
 
-  // Extended on: Options ▸ Extended… ▸ Extended on
-  await click(`[...document.querySelectorAll('#menubar .menu')].find((m) => m.firstChild?.textContent === 'Options')`);
-  await click(`[...document.querySelectorAll('.dropdown .item')].find((i) => i.firstElementChild.textContent.startsWith('Extended…'))`);
-  await click(`[...document.querySelector('[data-win="extended"]').querySelectorAll('.num')].find((e) => /Extended on/.test(e.textContent))`);
-  check('Extended switched on through its window', await evaluate(`emmm.comp.extended.enabled === true`));
-  await click(`document.querySelector('[data-win="extended"] .close')`);
+  // a new document is the full instrument: Classic Mode off (Extended on internally)
+  check('a new document is the full instrument (Classic Mode off)', await evaluate(`emmm.comp.extended.enabled === true`));
 
   // 1 open the Robots window: ⌥W
   await key('w', { code: 'KeyW', mods: 1 });
@@ -435,8 +431,8 @@ try {
   // 20–21 Classic
   await evaluate(`(() => { emmm.setRobotEnabled(1, true); emmm.setRobotEnabled(2, true); })()`);
   await click(`[...document.querySelectorAll('#menubar .menu')].find((m) => m.firstChild?.textContent === 'Options')`);
-  await click(`[...document.querySelectorAll('.dropdown .item')].find((i) => i.firstElementChild.textContent.startsWith('Extended…'))`);
-  await click(`[...document.querySelector('[data-win="extended"]').querySelectorAll('.num')].find((e) => /Extended on/.test(e.textContent))`);
+  await click(`[...document.querySelectorAll('.dropdown .item')].find((i) => i.firstElementChild.textContent === 'Enable Classic Mode')`);
+  check('20. Options ▸ Enable Classic Mode: the Robots window closes, ⌥W is greyed', await evaluate(`${W}.classList.contains('hidden')`));
   check('20. switched to Classic (Extended off)', await evaluate(`emmm.comp.extended.enabled === false && emmm.engine.observer === null && emmm.engine.robotGate === null`));
   const logN = await evaluate(`emmm.conductor.log.length`);
   const posBefore = await evaluate(`JSON.stringify([emmm.comp.noteDensity.active, emmm.comp.velocityRange.active, emmm.comp.transposition.active])`);
@@ -444,8 +440,36 @@ try {
   await sleep(1500);
   check('21. Classic: the Robots do nothing, the music plays', (await evaluate(`emmm.conductor.log.length`)) === logN && (await evaluate(`JSON.stringify([emmm.comp.noteDensity.active, emmm.comp.velocityRange.active, emmm.comp.transposition.active])`)) === posBefore && (await evaluate(`emmm.engine.state === 'playing'`)));
   await key(' ');
-  await click(`[...document.querySelector('[data-win="extended"]').querySelectorAll('.num')].find((e) => /Extended on/.test(e.textContent))`);
-  await click(`document.querySelector('[data-win="extended"] .close')`);
+  await click(`[...document.querySelectorAll('#menubar .menu')].find((m) => m.firstChild?.textContent === 'Options')`);
+  await click(`[...document.querySelectorAll('.dropdown .item')].find((i) => i.firstElementChild.textContent === 'Enable Classic Mode')`);
+  check('Classic Mode off again: Robots 2 and 3 kept their switches', await evaluate(`emmm.comp.extended.enabled === true && emmm.comp.extended.robots[1].enabled && emmm.comp.extended.robots[2].enabled`));
+  await key('w', { code: 'KeyW', mods: 1 });
+  await waitFor(`!${W}.classList.contains('hidden')`, 2000, 'Robots window');
+
+  // Pattern Editor: Group a–f, Follow off, Apply Scale, Copy / Paste Group; About
+  {
+    const PE = `document.querySelector('[data-win="edit-pattern"]')`;
+    const menu = async (t, item) => {
+      await click(`[...document.querySelectorAll('#menubar .menu')].find((m) => m.firstChild?.textContent === '${t}')`);
+      await click(`[...document.querySelectorAll('.dropdown .item')].find((i) => i.firstElementChild.textContent === '${item}')`);
+    };
+    await evaluate(`emmmUi.openEditor('patternEditor', { voice: 0 })`);
+    await click(`[...${PE}.querySelectorAll('.num')].find((d) => d.textContent === 'b' && d.title.startsWith('Edit Pattern Group'))`);
+    await evaluate(`emmm.clickPosition('patternGroup', 2)`);
+    await sleep(100);
+    check('editor: Follow off keeps Group b while c plays', await evaluate(`emmmUi.patternEditor.group === 1 && /playing: c/.test(${PE}.querySelector('.title, .titlebar').textContent)`));
+    await click(`[...${PE}.querySelectorAll('.num')].find((d) => d.textContent === 'a' && d.title.startsWith('Edit Pattern Group'))`);
+    await menu('Edit', 'Copy Group');
+    await click(`[...${PE}.querySelectorAll('.num')].find((d) => d.textContent === 'd' && d.title.startsWith('Edit Pattern Group'))`);
+    await menu('Edit', 'Paste Group');
+    await sleep(100);
+    check('Paste Group into an empty Group d: no question, the four Patterns copied, c still playing', await evaluate(`!document.querySelector('.mdialog') && JSON.stringify(emmm.comp.patternGroups[3]) === JSON.stringify(emmm.comp.patternGroups[0]) && emmm.comp.patternGroup.active === 2`));
+    await evaluate(`emmm.clickPosition('patternGroup', 0)`);
+    await menu('emmm', 'About emmm…');
+    check('About: spiritual successor and MORE LIKE THIS link', await evaluate(`(() => { const a = document.querySelector('#about-more'); const t = document.querySelector('[data-win="about"]').textContent; return /spiritual successor/.test(t) && !/recreation/.test(t) && a.href === 'https://slopfactory.allmyfriendsaresynths.com/' && a.getBoundingClientRect().width > 0; })()`));
+    await click(`document.querySelector('[data-win="about"] .close')`);
+    await click(`${PE}.querySelector('.close')`);
+  }
 
   // 22 Pause / Continue / Stop (Return = Play / Pause, Space = Stop / Play)
   await key('Enter');
@@ -608,25 +632,30 @@ try {
   const peSel = (start) => `[...${PE}.querySelectorAll('.msel')].find((e) => (e.getAttribute('aria-label') || '').startsWith(${JSON.stringify(start)}))`;
   const scalesNow = () => evaluate(`JSON.stringify(emmm.comp.patternGroups.map((g) => g.patterns.map((p) => (p.scale ? p.scale.root + p.scale.scale : '-'))))`);
   const groupsBefore = await evaluate(`JSON.stringify(emmm.comp.patternGroups)`);
-  await chooseItem(peSel('Root of this Pattern'), 'D');
-  await chooseItem(peSel('Scale of this Pattern'), 'Natural Minor / Aeolian');
-  await click(peSel('Apply scale to'));
-  const items = await evaluate(`[...document.querySelectorAll('.msel-item')].map((i) => i.textContent)`);
-  check('B. the Apply menu offers This Pattern / the current Group / All Patterns', JSON.stringify(items) === JSON.stringify(['Apply D Minor to…', 'This Pattern (Group b, Voice 1)', 'Group b: all 4 Patterns', 'All Patterns: Groups a–f']), items.join(' | '));
-  await click(`[...document.querySelectorAll('.msel-item')].find((i) => i.textContent === 'Group b: all 4 Patterns')`, { wait: 150 });
+  const radio = (t) => `[...${PE}.querySelectorAll('[role=radio]')].find((r) => r.textContent.includes(${JSON.stringify(t)}))`;
+  await chooseItem(peSel('Scale root'), 'D');
+  await chooseItem(peSel('Scale to apply'), 'Natural Minor / Aeolian');
+  await click(radio('This Group'));
+  const labels = await evaluate(`[...${PE}.querySelectorAll('[role=radio]')].map((r) => r.textContent)`);
+  check('B. Apply to: This Pattern / This Group / All Groups, naming the Group', JSON.stringify(labels) === JSON.stringify(['○ This Pattern (b1)', '◉ This Group (b)', '○ All Groups (a–f)']), labels.join(' | '));
+  check('B. choosing the scale and the scope changes nothing yet', (await evaluate(`JSON.stringify(emmm.comp.patternGroups)`)) === groupsBefore);
+  await click(`${PE}.querySelector('#pe-apply-scale')`, { wait: 150 });
   const sB = JSON.parse(await scalesNow());
   check('B. every Pattern of Group b gets D minor', JSON.stringify(sB[1]) === '["2minor","2minor","2minor","2minor"]', JSON.stringify(sB[1]));
   const othersB = await evaluate(`(() => { const b = JSON.parse(${JSON.stringify(groupsBefore)}); return emmm.comp.patternGroups.every((g, i) => i === 1 || JSON.stringify(g) === JSON.stringify(b[i])); })()`);
   check('B. Groups a, c, d, e, f are exactly as they were', othersB);
   check('B. Group b keeps its timing, lengths and rests (only notes and scale change)', await evaluate(`(() => { const b = JSON.parse(${JSON.stringify(groupsBefore)})[1]; return emmm.comp.patternGroups[1].patterns.every((p, v) => p.tbDen === b.patterns[v].tbDen && p.outputLength === b.patterns[v].outputLength && p.steps.length === b.patterns[v].steps.length && p.steps[2].length === 0); })()`));
   // C: a scale for everything, then one Pattern on its own
-  await chooseItem(peSel('Scale of this Pattern'), 'Dorian');
-  await chooseItem(peSel('Apply scale to'), 'All Patterns: Groups a–f');
-  check('C. All Patterns: all 24 get D Dorian', JSON.stringify(JSON.parse(await scalesNow()).flat()) === JSON.stringify(Array(24).fill('2dorian')));
+  await chooseItem(peSel('Scale to apply'), 'Dorian');
+  await click(radio('All Groups'));
+  await click(`${PE}.querySelector('#pe-apply-scale')`, { wait: 150 });
+  check('C. All Groups: all 24 get D Dorian', JSON.stringify(JSON.parse(await scalesNow()).flat()) === JSON.stringify(Array(24).fill('2dorian')));
   await click(`${PE}.querySelector('.close')`);
   await click(`document.querySelector('.pos[data-var="patternGroup"][data-pos="2"]')`, { wait: 300 });
   await evaluate(`emmmUi.openEditor('patternEditor', { voice: 2 })`);
-  await chooseItem(peSel('Root of this Pattern'), 'E');
+  await chooseItem(peSel('Scale root'), 'E');
+  await click(radio('This Pattern'));
+  await click(`${PE}.querySelector('#pe-apply-scale')`, { wait: 150 });
   const sC = JSON.parse(await scalesNow()).flat();
   check('C. Group c Voice 3 changed alone to E Dorian; the other 23 stay D Dorian', sC[2 * 4 + 2] === '4dorian' && sC.filter((x) => x === '2dorian').length === 23, sC.join(' '));
   await shot('10-apply-scale');

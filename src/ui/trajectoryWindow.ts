@@ -62,7 +62,7 @@ export class TrajectoryWindow {
     const note = el('div', 'label tiny', b, [6, 3, 456, 9], 'EXTENDED — NOT PART OF CLASSIC M. A ROW OF VALUES MOVED THROUGH AT A MUSICAL RATE.');
     note.style.color = 'var(--ink)';
     const off = el('div', 'label tiny', b, [300, 3, 160, 9]);
-    this.parts.push({ update: () => (off.textContent = s.comp.extended.enabled ? '' : 'EXTENDED IS OFF') });
+    this.parts.push({ update: () => (off.textContent = s.comp.extended.enabled ? '' : 'CLASSIC MODE: OFF') });
     for (let slot = 0; slot < TRAJECTORY_SLOTS; slot++) this.buildSlot(slot, TOP + slot * SLOT_H);
   }
 

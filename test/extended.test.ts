@@ -16,11 +16,15 @@ afterEach(() => {
 });
 
 describe('EXTENDED is inert unless enabled', () => {
-  it('controllers do nothing in Classic mode', () => {
+  it('MIDI Learn works in Classic Mode, except for the generative targets', () => {
     const s = mk();
     s.learn.push({ target: { kind: 'variable', variable: 'patternGroup' }, source: { type: 'cc', channel: 1, number: 20 } });
+    s.learn.push({ target: { kind: 'reroll' }, source: { type: 'cc', channel: 1, number: 21 } });
+    const seed = s.comp.seed;
     s.midiIn('x', [0xb0, 20, 127], 0);
-    expect(s.comp.patternGroup.active).toBe(0);
+    expect(s.comp.patternGroup.active).toBe(5);
+    s.midiIn('x', [0xb0, 21, 127], 0);
+    expect(s.comp.seed).toBe(seed);
   });
   it('MIDI clock input is not Extended: it follows Start with Extended off, and is ignored only when switched off', () => {
     const s = mk();

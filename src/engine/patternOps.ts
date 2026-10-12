@@ -25,7 +25,7 @@ export function newPattern(steps: Step[] = [], rng?: Rng): Pattern {
 }
 
 export function clonePattern(p: Pattern): Pattern {
-  return { ...p, steps: p.steps.map((s) => [...s]), scrambled: [...p.scrambled] };
+  return { ...p, steps: p.steps.map((s) => [...s]), scrambled: [...p.scrambled], ...(p.scale ? { scale: { ...p.scale } } : {}) };
 }
 
 export function isRest(s: Step): boolean {

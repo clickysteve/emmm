@@ -688,12 +688,24 @@ slow section to a fast one. All of these can be changed while the music plays.
   One **⌘Z** undoes the whole change. The scale is saved with the document; older documents
   open as Chromatic, unchanged. It is an editing tool: M plays the Pattern's notes exactly as
   they are — nothing is corrected while the music plays.
-- **Apply scale to…** (box 7, emmm): gives this Pattern's Root and Scale to **This Pattern**,
-  to every Pattern of the **current Group** (all four Voices), or to **All Patterns** (all six
-  Groups). Each Pattern changes exactly as if you had chosen the scale in it yourself — its own
+- **Choosing and applying a scale** (boxes 6 and 7, emmm): choose a Root and Scale in box 6,
+  choose **Apply to** — **This Pattern**, **This Group** (all four Voices of the Group you are
+  editing) or **All Groups** (a–f) — then press **Apply Scale**. Nothing changes until you press
+  it. Each Pattern changes exactly as if you had chosen the scale in it yourself — its own
   notes move from its own scale to the new one; its rhythm, length, Time Base, Phase and
   everything else stay. Afterwards each Pattern has its own scale again: apply D Minor to all,
   change one to E Minor, and the rest stay in D Minor. One **⌘Z** undoes the whole apply.
+
+- **Which Group you edit** (emmm): the **Grp a–f** buttons under the grid choose the Pattern
+  Group shown in the editor; the playing Group is underlined. The editor stays on your Group
+  while the music, conducting or Robots change Group — unless **Follow playing** (also
+  **Options ▸ Follow Playing Pattern**) is ticked. It never changes what plays.
+- **Copying Patterns and Groups** (emmm): with the Pattern Editor open and no steps selected,
+  **⌘C** copies the whole Pattern (notes, timing, scale); choose another Group with **Grp** and
+  **⌘V** pastes it into the same Voice there. **Edit ▸ Copy Group** / **Paste Group** copy all
+  four Patterns of a Group into another (asking before replacing notes), and **Edit ▸
+  Duplicate Group…** / **Duplicate Pattern…** copy straight into a Group you pick. Each is one
+  **⌘Z**, and none changes the playing Group.
 
 ## Saving your work
 
@@ -822,12 +834,16 @@ zooms the browser).
 
 ---
 
-## Extended: emmm's additions (not part of M)
+## Generative tools and Classic Mode
 
-M stopped in the early 1990s. **Extended** is emmm's idea of where it might have gone next —
-modern additions, not reconstructions of the original. Open **Options ▸ Extended…** and click
-**Extended on**; nothing here changes how Classic M generates notes, and with Extended off it
-all does nothing.
+M stopped in the early 1990s. emmm's generative tools are its idea of where it might have gone
+next. They are part of the normal instrument; nothing here changes how notes are generated
+from your Patterns and Variables. **Options ▸ Enable Classic Mode** (off by default) gives a
+narrower instrument closer to M: the generative tools below (Mutation, Reroll, A/B, CC
+Cycles, Trajectory, Robots 2–4, Rules and Return) stop and their windows close, but every
+setting is kept for when you switch it off again. Pattern editing, scales, copy and paste,
+MIDI Learn and settings, files and Undo work in both. Documents remember their mode; documents
+saved before this change with Extended off open in Classic Mode.
 
 - **Seed and Reroll.** All of emmm's randomness comes from the **Seed** (also in the
   Conducting window): same document + same seed = the same performance from Start. **Reroll**
@@ -855,14 +871,14 @@ all does nothing.
   **×** (remove). One knob drives one control: learning it for something else moves it, and
   the window says so. Escape cancels. Mappings are kept by this browser, for your equipment.
 - (MIDI clock input used to be here. It is MIDI infrastructure, not an experiment, so it now
-  lives in **File ▸ MIDI Settings…** and works with Extended on or off.)
+  lives in **File ▸ MIDI Settings…** and works in both modes.)
 - **Performance Feedback** (**Options ▸ Performance Feedback**) opens a small inspector: for
   each Voice, the step just played, the source note and what came out, whether Note Density
   let it through (PASS / SKIP), the transposition, the Rhythm / Legato / Accent levels picked,
   the velocity and the channels — plus the active Positions, Locks and A/B state.
 - **CC Cycles** drive MIDI controllers with M-style cyclic patterns, one per Voice.
-- **Trajectory** (Extended button **Traject…**, **⌥J**, or **Windows ▸ Trajectory**) — see below.
-- **Robots, Rules & Home** (Extended button **Robots…**, **⌥W**, or **Options ▸ Robots, Rules &
+- **Trajectory** (button **Traject…**, **⌥J**, or **Windows ▸ Trajectory**) — see below.
+- **Robots, Rules & Home** (button **Robots…**, **⌥W**, or **Options ▸ Robots, Rules &
   Home…**) — four Robot Conductors, Position weights, Rules and a Home to return to; see below.
 
 ### Trajectory
@@ -983,7 +999,7 @@ brought back to. The design notes, with every algorithm, are in [CONDUCTORS.md](
   Play / Pause). Press **⌥W** again on the open window to move the keyboard into it, then
   **← →** to move, **Enter / Space** to act, **Escape** to give the keys back.
 - Everything is saved with the document (not the Robots' positions or the log), every edit is
-  one **⌘Z**, and with Extended off none of it runs: Classic M plays exactly as before.
+  one **⌘Z**, and in Classic Mode none of it runs: emmm plays exactly as M did.
 
 ---
 
