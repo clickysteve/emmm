@@ -556,7 +556,8 @@ n/d of a whole note (1|8 = eighths); Rhythm multiplies each step; Time Distortio
 Phase delays the start. Also in the Pattern Editor (Length, T Base, Phase).<br>
 <b>Pattern Editor</b> — Length = steps the Voice plays (Alt: cut / extend the Pattern) · Clear
 Pattern · Root + Scale of the Pattern (changing it moves the notes by scale degree; new notes snap
-into it; M plays the notes as written). <b>Scale Lock</b> (Transposition window, emmm): Transposition
+into it; M plays the notes as written) · Apply … to… gives it to this Pattern, the current Group or
+all Patterns. <b>Scale Lock</b> (Transposition window, emmm): Transposition
 counts degrees of each Pattern's scale instead of semitones.<br>
 <b>Typing numbers</b> — click any number, type the value, Return (Escape cancels); ↑ ↓ step it.
 Time Base takes "3/8". Range bars take "40-100". emmm ▸ Keyboard Shortcuts… (⌥H) lists every key.<br>
@@ -573,7 +574,9 @@ same music from Start.<br><br>
 (subtle → chaos), A/B states, MIDI Learn, CC Cycles, and <b>Trajectory</b> (⌥J):
 rows of values moved through at a musical rate, driving a MIDI controller, Density, Transposition,
 Tempo, the Baton or a Position. <b>Robots</b> (⌥W): four Robot Conductors (Robot 1 is M's) with
-personalities, Position weights, Rules (WHEN … THEN …) and Home / Return (⇧⌥H).
+personalities, Position weights, Rules (WHEN … THEN …) and Home / Return (⇧⌥H). Click a Robot's
+number to edit it (it stays on or off); ON / OFF switches it. Groups a–f: the Pattern Groups that
+Robot may wander to (you can still choose any).
 Options ▸ Performance Feedback shows what M decides for each note.<br>
 <b>Comfort</b> — rest the mouse on a control for a tip (Options ▸ Show Tips) · ⤢ in the menu bar =
 full screen.<br><br>

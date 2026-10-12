@@ -214,7 +214,7 @@ Variable on Position 1. (Your MIDI routing from the previous step is kept.)
 Double-click Voice 1's **Select** box (the box with ♪ ●● · in the first row of the Patterns
 window). The **Pattern Editor** opens.
 
-![Pattern Editor with C3 E3 G3 B♭3 entered; 1 tools, 2 View (which Voice), 3 Length, 4 Time Base, 5 Phase, 6 the Pattern's root and scale, 7 Clear Pattern](images/qs-pattern-editor.png)
+![Pattern Editor with C3 E3 G3 B♭3 entered; 1 tools, 2 View (which Voice), 3 Length, 4 Time Base, 5 Phase, 6 the Pattern's root and scale, 7 Apply scale to…, 8 Clear Pattern](images/qs-pattern-editor.png)
 
 Pitch runs vertically (a keyboard on the left, with C2, C3, C4… marked in tiny letters);
 **steps** run left to right. As you move the mouse over the grid, the right-hand panel shows
@@ -232,7 +232,8 @@ same values) as its row in the Patterns window:
 - **4 T Base** and **5 Phase** — how fast the Voice steps through the Pattern, and how late it
   starts (see *Making a Voice faster or slower* below). The line under them says it in words,
   e.g. "step = 1/4 note · 120/min × Rhythm".
-- **6 Root and Scale** of the Pattern and **7 Clear Pattern** — see *Pattern editing helpers* below.
+- **6 Root and Scale** of the Pattern, **7 Apply scale to…** and **8 Clear Pattern** — see
+  *Pattern editing helpers* below.
 
 Now close the Pattern Editor with the triangle at its top-left corner (it covers part of
 the Patterns window).
@@ -687,6 +688,12 @@ slow section to a fast one. All of these can be changed while the music plays.
   One **⌘Z** undoes the whole change. The scale is saved with the document; older documents
   open as Chromatic, unchanged. It is an editing tool: M plays the Pattern's notes exactly as
   they are — nothing is corrected while the music plays.
+- **Apply scale to…** (box 7, emmm): gives this Pattern's Root and Scale to **This Pattern**,
+  to every Pattern of the **current Group** (all four Voices), or to **All Patterns** (all six
+  Groups). Each Pattern changes exactly as if you had chosen the scale in it yourself — its own
+  notes move from its own scale to the new one; its rhythm, length, Time Base, Phase and
+  everything else stay. Afterwards each Pattern has its own scale again: apply D Minor to all,
+  change one to E Minor, and the rest stay in D Minor. One **⌘Z** undoes the whole apply.
 
 ## Saving your work
 
@@ -900,12 +907,16 @@ brought back to. The design notes, with every algorithm, are in [CONDUCTORS.md](
 
 ![The Robots window: the four Robots, the activity log and the ROBOT tab](images/qs-robots.png)
 
-- **Switch a Robot on:** click its number in the overview (inverted = on). **Robot 1 is M's own
-  Robot Conductor** — the same switch as the Conducting window's robot button, playing M's
-  algorithm (*Baton (M)*) unless you give it another personality. Robots 2–4 start off.
+- **Edit a Robot / switch it on:** click a Robot's **number** (or anywhere on its row) to edit
+  it in the ROBOT tab — this only *selects* it (outlined); it never switches it on or off. The
+  **ON / OFF** box beside the number is the switch (inverted = on). So you can set up an OFF
+  Robot completely — personality, Variables, rate, Groups — while the others play, and switch
+  it on when you want it. **Robot 1 is M's own Robot Conductor** — its ON / OFF is the same
+  switch as the Conducting window's robot button, playing M's algorithm (*Baton (M)*) unless
+  you give it another personality. Robots 2–4 start off.
 - **Give it Variables:** in the **ROBOT** tab, click the Variable toggles (Note Density,
   Velocity, Legato …). A Robot holds one Position (1–6) and puts all its Variables there — the
-  overview shows it inverted. Click a row of the overview to edit another Robot.
+  overview shows it inverted.
 - **Speed:** the **rate** is a Time Base like a Pattern's: one decision every `n | d` of a whole
   note — `1|4` a beat, `1|1` a bar, `2|1` two bars, `16|1` sixteen bars. Type `2/1` to set both.
   **sa** = it moves only when a Rule tells it to.
@@ -917,6 +928,14 @@ brought back to. The design notes, with every algorithm, are in [CONDUCTORS.md](
   way. Only the chosen personality's settings are shown, with a description of what it does;
   **Defaults** resets them. A Follower cannot watch a Robot that watches it back (the choice is
   greyed out).
+- **Allowed Groups:** the **Groups a–f** switches in the ROBOT tab say which Pattern Groups this
+  Robot may choose when it moves Pattern Group (all six by default). Switch off c–f and it
+  wanders between a and b only; leave one on and it stays in that Group (its other Variables
+  keep moving). Each Robot has its own set. The last Group can't be switched off; **All**
+  allows every Group again. Switching off the Group the music is in doesn't jump anywhere: the
+  Robot's next decision goes to an allowed Group. It limits the Robots only — you can still
+  click any Group, and Snapshots and Rules that set a Group still do. The overview shows a
+  restricted Robot as `PGrp:ab`.
 - **Who wins:** Robots may share a Variable. If two change it at the same moment, the lower
   number wins; otherwise the latest change stands. Your own clicks always work.
 - **WEIGHTS:** choose a Variable, then drag its six bars (or type the numbers): a taller bar is

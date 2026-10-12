@@ -27,7 +27,8 @@ generic, inert-by-default engine hooks were added (`robotGate`, `observer`); wit
 
 ```
 extended.robots[4]      RobotDef: enabled, personality, variables[], rateNum|rateDen,
-                        home (Position or none), params, target (Follower/Contrarian)
+                        home (Position or none), params, target (Follower/Contrarian),
+                        groups[6] (Allowed Groups a–f, default all)
 extended.weights        per Variable: six weights 0–100 (default 10 each)
 extended.rules[≤16]     Rule: on, when (Condition), every N, then (Action), at (timing)
 extended.home           captured Positions (all eleven Variables) + Baton; which are included
@@ -82,6 +83,36 @@ fire) but leaves claimed Variables alone. M's Baton robot runs after actions at 
 Robot 1 it also wins. Changes at *different* ticks: the latest wins (as with a hand on a
 Variable a Trajectory drives). A Variable being **Returned** (or resting at Home after a
 Return) belongs to the Return — see §4, *Ownership*.
+
+### Allowed Groups
+
+Each Robot has its own **Allowed Groups**: the Pattern Groups (a–f, M's six) it may choose by
+itself. Default: all six — so every older document and every Robot left alone behaves exactly
+as before (a test compares the music with a fingerprint recorded before this existed).
+
+* **How.** For that Robot only, a Pattern Group outside its set counts as weight 0
+  (`robotWeights`); if its set leaves no weight above 0, its allowed Groups count equally (the
+  Allowed Groups win over the weights). Its candidates and each Variable's resolution then work
+  as above, so Pattern Group always resolves to an allowed Group. Its other Variables are not
+  limited except as one Position for all of them already implies (exactly as a weight of 0 on
+  Pattern Group would). A Robot that does not move Pattern Group is not affected at all.
+* **Every automatic pathway**: timer decisions of every personality, Rule *advance* and
+  *choose*, Follower / Contrarian (a Follower keeps to its *own* Groups), and Robot 1 as
+  Baton (M) — its jump onto a forbidden Group lands on the nearest allowed one, also when the
+  Baton lands on a Snapshot cell (the stored Snapshot is untouched). This goes through
+  `robotGate.place`, which exists only while Extended is on; Classic M's robot is untouched.
+* **Not restricted**: your hand (clicking a Group, recalling a Snapshot, MIDI Learn …), a Rule's
+  *set Position* or *recall Snapshot*, Trajectories, Slideshows and Return Home. The setting
+  limits where a Robot *wanders*, never what you or your Rules choose. Priority is unchanged:
+  when two Robots change Pattern Group at the same tick, the lower number wins.
+* **One Group**: the Robot stays in it (and goes there at its next decision); its other
+  Variables keep moving. A Group is a set of four Patterns (one per Voice), so there is no
+  "Pattern inside a Group" for a Robot to choose — the four Voices play on as always.
+* **A Group switched off while the music is in it** (by any means): nothing jumps when you
+  switch it off. The Robot's next decision chooses from its allowed Groups — even a decision to
+  "stay" resolves to the nearest allowed Group — and so does every one after.
+* **Never empty.** The last allowed Group cannot be switched off (refused with a message);
+  a document with none, or with nonsense, loads with all six allowed.
 
 ## 3. Personalities
 
@@ -231,12 +262,14 @@ scans for changes and runs the queue at the transport's current tick:
 Extended window. One floating window (476 × 340) in emmm's controls and the Extended palette
 area. Every control calls a Session method; the window keeps no musical state.
 
-* **Overview** (always visible): four rows — number (inverted = on; click to switch),
-  personality (`*` = changed by a Rule), the six Positions (current inverted, Home underlined,
+* **Overview** (always visible): four rows — number (click it, or anywhere on the row, to
+  *select* the Robot for editing: outlined, the row dotted; this never switches it), **ON / OFF**
+  (inverted = on; the only switch in the row — an OFF Robot can be selected and fully
+  configured, then switched on when you want it), personality (`*` = changed by a Rule), the six Positions (current inverted, Home underlined,
   dotted with `·` = not allowed by the weights), rate (`n|d`, `sa`, or `1|n` for M's robot),
-  Variables, and state in words: `off`, `ready`, `next 3:1`, `▸ Dens Vel` (just moved, in the
+  Variables (`PGrp:ab` when its Allowed Groups are not all six), and state in words: `off`, `ready`, `next 3:1`, `▸ Dens Vel` (just moved, in the
   activity colour and bold), `waits R2`, `PAUSED`, `RETURN`, `resting`, `on Rules`. Click a
-  row to edit that Robot. The header shows the clock source (internal / external and its state).
+  row or number to edit that Robot. The header shows the clock source (internal / external and its state).
 * **Activity log**: the last six real runtime events (Robot moves with the Variables they
   changed, "followed / moved away from Robot n", rules firing or waiting, Return started /
   steps / Variable reached Home / complete / rest over, Robots switched or paused), each with
@@ -250,7 +283,9 @@ area. Every control calls a Session method; the window keeps no musical state.
   personality's parameters only), Home Position (– or 1–6), where it is, its priority, and the
   description of the algorithm from §3 with whether weights shape it and which Positions are
   allowed now. For Baton (M): M's rate and jump ranges (the same settings as the Conducting
-  window).
+  window). **Groups a–f**: the Robot's Allowed Groups (inverted = allowed; **All** allows every
+  Group again), with the set in words ("chooses only Groups a b"; "used when it moves Pattern
+  Group" if Pattern Group is not one of its Variables).
 * **WEIGHTS**: a Variable strip (each with a miniature of its weights), six bars (drag up /
   down, or ↑ ↓ with the bar focused; 0 = hatched "excluded"), the number box under each, each
   Position's chance in %, ▸now and ⌂ marks, a "each pick" strip proportional to the chances,
@@ -273,7 +308,8 @@ transport keys and Tab stays M's Pause while you play with the mouse. **⌥W** o
 front window moves the focus into it (its tab); **← →** move between its controls (also off a
 closed pop-up), **↑ ↓** between toggles, **Enter / Space** act, **Escape** gives the keys back.
 Number boxes work as everywhere in emmm (click, type, Enter; ↑ ↓ step). **⇧⌥H** is Return
-Home from anywhere.
+Home from anywhere. Selection and switching stay separate here too: Enter / Space on a Robot's
+number selects it, on its ON / OFF switches it.
 
 **Screen size.** emmm draws a fixed 720 × 470 screen scaled to the browser window, so the
 Robots window keeps its proportions at any window size; it is a floating window that covers
@@ -287,6 +323,9 @@ M's robot rate; Robots 2–4 off; equal weights; no rules; no Home). Everything 
 load: unknown personalities → Drunk (Baton only for Robot 1), Follower cycles broken, weights
 clamped 0–100 with at least one non-zero per Variable, rules with unknown kinds dropped,
 references clamped to existing Voices / Robots / Positions / Snapshots, rest clamped 0–32.
+Allowed Groups (`groups`, six booleans per Robot) needed no new version: a document without
+them — every document before them — loads with all six allowed; a missing entry counts as
+allowed, only `false` forbids, and none allowed (or nonsense) loads as all six.
 Saved: definitions, weights, rules, Home, Return settings. Not saved: everything runtime.
 Robot randomness comes from the document seed (streams 6000 + n), re-seeded at Start and by
 Reroll. Editing any of it is one Undo step; Robot moves, rule firings and Returns never enter
@@ -299,8 +338,15 @@ the history.
   personality, Follower / Contrarian and cycles, every condition and action, rule safety,
   quantization, hung notes, Home / Return paths, ownership with simultaneous Robot,
   Trajectory and Return, manual changes in Play / Pause / Stop, persistence and Undo.
+* `test/robot-groups.test.ts` — Allowed Groups: every personality over 160 decisions, a b /
+  a c / one Group, a Group switched off while in use, two Robots with different sets at once,
+  Rule advance / choose, Follower, Baton (M) and its Snapshot cell, Classic untouched, the hand
+  and Rules unrestricted, persistence, old and broken data, Undo; and all Groups allowed =
+  the exact music recorded before the feature (fingerprint).
 * `test/robots-ui.test.ts` — the window in a simulated browser (happy-dom), driven by pointer
-  and key events.
+  and key events; including: selecting a Robot (number, row, keyboard) never switches it, an
+  OFF Robot can be fully configured, selecting while playing leaves the music identical, and
+  the Groups row.
 * `scripts/browser-test.mjs` (`npm run test:browser`) — headless Chrome / Chromium over the
   DevTools protocol (no dependencies) with a **fake Web MIDI** output and input, real mouse and
   key events on the real interface: the 24 workflow scenarios (open, enable, personality,
@@ -308,7 +354,10 @@ the history.
   fired by a click while stopped, Home, Return with a Trajectory held off, rest, save, reload,
   open, Classic, Pause / Continue / Stop, external clock Start / Stop / Continue, no stuck notes
   or stray transport messages) plus keyboard, focus, dialogs, disabled controls, invalid values,
-  Undo / Redo, a 900 × 600 window and console errors. Screenshots are written to a temporary
+  Undo / Redo, a 900 × 600 window and console errors; and scenarios **A–G**: configure an OFF
+  Robot without switching it; Robot 1 on Groups a b over 40+ decisions; two Robots with
+  different Groups at once; a manual Group change; a scale applied to a Group and to all
+  Patterns, then one changed alone; save / reload / open; an older project. Screenshots are written to a temporary
   folder (or `SHOTS=dir`). This is not a test of real MIDI hardware.
 
 ## 9. Trade-offs and limits
