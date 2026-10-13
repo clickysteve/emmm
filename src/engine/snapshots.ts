@@ -16,6 +16,7 @@ export const SNAPSHOT_VARIABLES: VariableName[] = [
   'accent',
   'legato',
   'rhythm',
+  'octave',
   'orchestration',
   'soundChoice',
 ];
@@ -50,10 +51,10 @@ export function currentVoiceItem(comp: Composition, v: number, k: keyof Snapshot
 }
 
 /** "Blink Everything": every storable control at its current value. Sync is included, as in
- * M (users then often un-blink it). */
+ * M (users then often un-blink it). emmm's Octave only outside Classic Mode. */
 export function captureAll(comp: Composition): Snapshot {
   const s = emptySnapshot();
-  for (const v of SNAPSHOT_VARIABLES) s.positions[v] = (comp[v] as { active: number }).active;
+  for (const v of SNAPSHOT_VARIABLES) if (v !== 'octave' || comp.extended.enabled) s.positions[v] = (comp[v] as { active: number }).active;
   for (const t of CONDUCT_TARGETS) s.arrows[t] = { ...comp.conducting.arrows[t] };
   for (let v = 0; v < NUM_VOICES; v++) for (const k of VOICE_ITEMS) (s.voices[v] as Record<string, unknown>)[k] = currentVoiceItem(comp, v, k);
   s.sync = true;
@@ -90,6 +91,7 @@ const NAMES: Record<string, string> = {
   accent: 'Accent',
   legato: 'Legato',
   rhythm: 'Rhythm',
+  octave: 'Octave',
   orchestration: 'Orchestration',
   soundChoice: 'Sound Choice',
   tempo: 'Tempo',

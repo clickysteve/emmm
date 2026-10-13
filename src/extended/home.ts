@@ -3,7 +3,7 @@
  *
  * Home is a captured set of Variable Positions (and the Baton). Return guides the included
  * Variables back along *musical paths*: a Variable whose Positions have a size (Density,
- * Velocity, Note Order, Transposition, Rhythm, Legato, Accent) passes through the eligible
+ * Velocity, Note Order, Transposition, Rhythm, Legato, Accent, Octave) passes through the eligible
  * Positions whose value lies between where it is and Home, in order of value; categorical
  * Variables (Pattern Group, Time Distortion, Orchestration, Sound Choice) go Home in one step.
  * Pure functions; the Session schedules the steps (app/conductor.ts).
@@ -13,7 +13,7 @@ import type { Composition, Cycle, VariableName } from '../engine/types';
 import { eligible, type Weights } from './conductors';
 
 /** Every Variable, in M's order (Home captures all of them). */
-export const HOME_VARS: VariableName[] = ['patternGroup', 'noteDensity', 'velocityRange', 'noteOrder', 'transposition', 'timeDistortion', 'rhythm', 'legato', 'accent', 'orchestration', 'soundChoice'];
+export const HOME_VARS: VariableName[] = ['patternGroup', 'noteDensity', 'velocityRange', 'noteOrder', 'transposition', 'timeDistortion', 'rhythm', 'legato', 'accent', 'octave', 'orchestration', 'soundChoice'];
 
 export interface HomeState {
   /** captured active Positions; null = no Home */
@@ -88,7 +88,7 @@ export function returnTicks(r: ReturnSettings): number {
   return (Math.max(1, r.num) * TICKS_PER_WHOLE) / (r.den || 1);
 }
 
-/** Capture the current Positions (all eleven Variables) and the Baton as Home. */
+/** Capture the current Positions (every Home Variable) and the Baton as Home. */
 export function captureHome(comp: Composition, prev: HomeState): HomeState {
   const positions: Partial<Record<VariableName, number>> = {};
   for (const v of HOME_VARS) positions[v] = activeOf(comp, v);
@@ -118,6 +118,8 @@ export function positionValue(comp: Composition, v: VariableName, p: number): nu
       return mean((comp.legato.positions[p] ?? []).map((c) => cycleMean(c, comp.legatoValues)));
     case 'accent':
       return mean((comp.accent.positions[p] ?? []).map((c) => cycleMean(c)));
+    case 'octave':
+      return mean((comp.octave.positions[p] ?? []).map((c) => cycleMean(c)));
     default:
       return null;
   }

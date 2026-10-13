@@ -416,6 +416,7 @@ export class MEngine {
     for (const k of order) {
       const p = s.positions[k];
       if (p === undefined) continue;
+      if (k === 'octave' && !this.comp.extended.enabled) continue; // emmm Octave: kept as it is in Classic Mode
       out.push(...this.selectPosition(k, p, tick, { noSync: true }));
     }
     for (const [k, a] of Object.entries(s.arrows)) {

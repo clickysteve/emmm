@@ -4,7 +4,8 @@
  * A state captures how the music is being *played*: every Variable (its six Positions and
  * which one is active), the cyclic value tables, tempo, the Voices' Patterns-window
  * settings, each Pattern's Output Length / Time Base / Phase / Cyclic Random order, and the
- * conducting arrows. It does not capture the Patterns' notes, MIDI routing, Snapshots,
+ * conducting arrows. A state without Octave (older) leaves Octave alone, as does Classic
+ * Mode (Octave's state is kept for when it is off). It does not capture the Patterns' notes, MIDI routing, Snapshots,
  * Slideshows, options, the palette or anything about the screen.
  *
  * The format is a plain object keyed by composition field, so a later "morph" between A
@@ -14,7 +15,7 @@ import { assignDeep } from '../app/assign';
 import type { Composition } from '../engine/types';
 import type { PerfStateData } from './extended';
 
-const VARIABLE_KEYS = ['noteDensity', 'velocityRange', 'noteOrder', 'transposition', 'timeDistortion', 'accent', 'legato', 'rhythm', 'orchestration', 'soundChoice'] as const;
+const VARIABLE_KEYS = ['noteDensity', 'velocityRange', 'noteOrder', 'transposition', 'timeDistortion', 'accent', 'legato', 'rhythm', 'octave', 'orchestration', 'soundChoice'] as const;
 
 export function capturePerfState(c: Composition): PerfStateData {
   const out: PerfStateData = {
@@ -37,7 +38,7 @@ export function capturePerfState(c: Composition): PerfStateData {
  * caller (`patternGroup`), which performs them the M way (with a Sync).
  */
 export function recallPerfState(c: Composition, s: PerfStateData, setTimeBaseDen: (group: number, voice: number, den: number) => void): { patternGroup: number } {
-  for (const k of VARIABLE_KEYS) if (s[k]) assignDeep(c[k], s[k]);
+  for (const k of VARIABLE_KEYS) if (s[k] && (k !== 'octave' || c.extended.enabled)) assignDeep(c[k], s[k]);
   if (Array.isArray(s.rhythmValues)) assignDeep(c.rhythmValues, s.rhythmValues);
   if (Array.isArray(s.legatoValues)) assignDeep(c.legatoValues, s.legatoValues);
   if (s.tempo) assignDeep(c.tempo, s.tempo);
