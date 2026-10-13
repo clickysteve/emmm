@@ -233,7 +233,7 @@ describe('menus show the keys', () => {
   it('labels beside the commands, from the shared table', () => {
     expect(items('Edit')).toMatchObject({ Undo: keyLabel('undo'), Redo: keyLabel('redo'), Copy: keyLabel('copy'), Paste: keyLabel('paste') });
     expect(items('Pattern')).toMatchObject({ 'Edit…': keyLabel('patternEditor'), 'Clear Pattern': keyLabel('clearPattern') });
-    expect(items('Windows')).toMatchObject({ Variables: keyLabel('variablesWindow'), 'Cyclic Editor': keyLabel('cyclicEditor') });
+    expect(items('Windows')).toMatchObject({ Variables: keyLabel('variablesWindow'), 'Cyclic Variables': keyLabel('cyclicWindow') });
     expect(items('Options')).toMatchObject({ 'Use Metronome': keyLabel('metronome'), 'Full Screen': keyLabel('fullScreen') });
     expect(items('emmm')).toMatchObject({ 'Keyboard Shortcuts…': keyLabel('shortcuts') });
   });

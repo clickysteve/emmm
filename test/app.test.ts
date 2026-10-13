@@ -46,7 +46,7 @@ describe('Windows menu', () => {
     const items = openMenu('Windows').map(label);
     closeMenus();
     expect(items.slice(0, 7)).toEqual(['Close Edit Windows', s.comp.name, 'Patterns a', 'Variables', 'Cyclic Variables', 'Midi', 'Snap']);
-    expect(items).toContain('Cyclic Editor');
+    expect(items).toEqual(expect.arrayContaining(['Rhythm Editor', 'Legato Editor', 'Accent Editor', 'Octave Editor']));
     expect(items).toContain('Pattern Editor');
     expect(items).toContain('Monitor');
   });
@@ -68,7 +68,8 @@ describe('Windows menu', () => {
   it('editor entries open their editors in front; Monitor opens the Monitor', () => {
     choose('Windows', 'Close Edit Windows');
     for (const [entry, id] of [
-      ['Cyclic Editor', 'edit-cyclic'],
+      ['Rhythm Editor', 'edit-rhythm'],
+      ['Octave Editor', 'edit-octave'],
       ['Pattern Editor', 'edit-pattern'],
       ['Monitor', 'monitor'],
     ]) {
@@ -144,7 +145,10 @@ describe('other menus are wired', () => {
       ['Transposition…', 'edit-transposition'],
       ['Time Distortion…', 'edit-timeDistortion'],
       ['Orchestration…', 'edit-orchestration'],
-      ['Rhythm…', 'edit-cyclic'],
+      ['Rhythm…', 'edit-rhythm'],
+      ['Legato…', 'edit-legato'],
+      ['Accent…', 'edit-accent'],
+      ['Octave…', 'edit-octave'],
     ]) {
       choose('Variables', item);
       expect(isOpen(id), item).toBe(true);

@@ -81,7 +81,7 @@ export const KEYS: KeyDef[] = [
   { id: 'patternsWindow', label: 'Patterns window', group: 'Windows', keys: [alt('KeyP')] },
   { id: 'variablesWindow', label: 'Variables window', group: 'Windows', keys: [alt('KeyV')] },
   { id: 'cyclicWindow', label: 'Cyclic Variables window', group: 'Windows', keys: [alt('KeyC')] },
-  { id: 'cyclicEditor', label: 'Cyclic Editor', group: 'Windows', keys: [alt('KeyY')] },
+  { id: 'cyclicEditor', label: 'Cyclic Variable editor (last used)', group: 'Windows', keys: [alt('KeyY')] },
   // Performing
   { id: 'allNotesOff', label: 'All Notes Off', group: 'Performing', keys: [mod('Period')] },
   { id: 'metronome', label: 'Use Metronome', group: 'Performing', keys: [alt('KeyT'), mod('KeyM')] },

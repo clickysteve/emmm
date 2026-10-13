@@ -12,7 +12,7 @@ import { deserialize } from './persistence/format';
 import { autosave, clearStartup, downloadBytes, downloadDocument, loadAutosave, loadStartup, pickFile, saveStartup } from './persistence/storage';
 import { noteName } from './engine/constants';
 import type { EditorName, FlashState, UiContext } from './ui/context';
-import { CyclicEditor } from './ui/cyclicEditor';
+import { CYC_VARS, CyclicVarEditor, type CycVar } from './ui/cyclicEditor';
 import { el, setTip, view } from './ui/dom';
 import { windowEvents, windowFocus, type MWindow } from './ui/widgets';
 import { ConductingWindow, CyclicWindow, MidiWindow, PatternsWindow, SnapshotWindow, VariablesWindow, type Updatable } from './ui/mainWindows';
@@ -133,7 +133,15 @@ const editors: Record<string, VarEditor> = {
   timeDistortion: new TimeDistortionEditor(ctx, desktop),
   orchestration: new OrchestrationEditor(ctx, desktop),
 };
-const cyclic = new CyclicEditor(ctx, desktop);
+/** one edit window per Cyclic Variable (any of them may be open at once) */
+const cyclicEds: Record<CycVar, CyclicVarEditor> = {
+  rhythm: new CyclicVarEditor(ctx, desktop, 'rhythm', 120, 40),
+  legato: new CyclicVarEditor(ctx, desktop, 'legato', 140, 60),
+  accent: new CyclicVarEditor(ctx, desktop, 'accent', 160, 80),
+  octave: new CyclicVarEditor(ctx, desktop, 'octave', 420, 40),
+};
+/** the Cyclic Variable last edited (⌥Y reopens its window) */
+let lastCyclic: CycVar = 'rhythm';
 const patternEditor = new PatternEditor(ctx, desktop);
 const midiAssign = new MidiAssignmentWindow(ctx, desktop);
 const monitorWin = new MonitorWindow(ctx, desktop);
@@ -163,7 +171,7 @@ extendedWin.openRobots = () => bringForward(robotsWin.win);
  * on = Extended off. Switching never touches the advanced settings themselves, and while it
  * is on, the windows of the advanced generative features close and cannot be opened.
  */
-const advancedWins = [extendedWin.win, robotsWin.win, trajectoryWin.win, ccWin.win, generateWin.win];
+const advancedWins = [extendedWin.win, robotsWin.win, trajectoryWin.win, ccWin.win, generateWin.win, cyclicEds.octave.win];
 function setClassicMode(on: boolean): void {
   session.comp.extended.enabled = !on;
   session.changed('extended');
@@ -173,7 +181,7 @@ session.onChange(() => {
 });
 // a window that appears is drawn at once (not only at the next change)
 windowEvents.shown = () => (session.dirty = true);
-const floating = [...Object.values(editors), cyclic, patternEditor, midiAssign, monitorWin, about, importWin, library, extendedWin, helpWin, ccWin, paletteWin, learnWin, feedbackWin, shortcutsWin, trajectoryWin, robotsWin, generateWin];
+const floating = [...Object.values(editors), ...Object.values(cyclicEds), patternEditor, midiAssign, monitorWin, about, importWin, library, extendedWin, helpWin, ccWin, paletteWin, learnWin, feedbackWin, shortcutsWin, trajectoryWin, robotsWin, generateWin];
 floating.forEach((f) => f.win.el.classList.add('hidden'));
 if (prefs.app.feedback) feedbackWin.win.show();
 
@@ -203,8 +211,11 @@ function zoomRects(from: Element | undefined, to: HTMLElement): void {
 }
 
 function openEditor(name: EditorName, opts: { position?: number; variable?: VariableName; voice?: number; from?: Element } = {}): void {
+  // Cyclic: the Variable's own window (no Octave in Classic Mode); none named: the last edited
+  const cv = name === 'cyclic' ? ((opts.variable as CycVar | undefined) ?? (lastCyclic === 'octave' && !session.comp.extended.enabled ? 'rhythm' : lastCyclic)) : null;
+  if (cv && (!CYC_VARS.includes(cv) || (cv === 'octave' && !session.comp.extended.enabled))) return;
   const target =
-    name in editors ? editors[name].win : name === 'cyclic' ? cyclic.win : name === 'patternEditor' ? patternEditor.win : null;
+    name in editors ? editors[name].win : cv ? cyclicEds[cv].win : name === 'patternEditor' ? patternEditor.win : null;
   if (target && !target.open) {
     target.el.classList.remove('hidden');
     zoomRects(opts.from, target.el);
@@ -213,10 +224,11 @@ function openEditor(name: EditorName, opts: { position?: number; variable?: Vari
   if (name in editors) {
     const e = editors[name];
     e.openAt(opts.position ?? session.comp[e.variable].active);
-  } else if (name === 'cyclic') {
-    let v = (opts.variable ?? cyclic.which) as 'rhythm' | 'legato' | 'accent' | 'octave';
-    if (v === 'octave' && !session.comp.extended.enabled) v = 'rhythm'; // no Octave in Classic Mode
-    cyclic.openAt(v, opts.position ?? session.comp[v].active);
+  } else if (cv) {
+    lastCyclic = cv;
+    const e = cyclicEds[cv];
+    // already open: comes forward, still on the Position it is editing, unless one is asked for
+    e.openAt(opts.position ?? (e.win.open ? e.editPos : session.comp[cv].active));
   } else if (name === 'patternEditor') patternEditor.openFor(opts.voice ?? session.selected.findIndex(Boolean));
   else if (name === 'midiSettings') midiAssign.win.show();
   else if (name === 'monitor') monitorWin.win.show();
@@ -338,13 +350,17 @@ function windowsMenu(): MenuItem[] {
   const keyOf = ['conductingWindow', 'patternsWindow', 'variablesWindow', 'cyclicWindow', '', ''];
   const named: MenuItem[] = order.map((m, i) => ({ label: live(m), key: keyOf[i] ? keyLabel(keyOf[i]) : undefined, action: () => bringForward(m.win) }));
   const editors: MenuItem[] = [
-    C('cyclicEditor', 'Cyclic Editor'),
+    ...CYC_VARS.map((v): MenuItem => ({
+      label: cyclicEds[v].win.o.title,
+      enabled: () => v !== 'octave' || ext().enabled,
+      action: () => (openEditor('cyclic', { variable: v }), cyclicEds[v].win.flashTitle()),
+    })),
     { label: 'Pattern Editor', key: keyLabel('patternEditor'), action: () => (openEditor('patternEditor', { voice: patternEditor.voice }), patternEditor.win.flashTitle()) },
     { label: 'Monitor', action: () => (openEditor('monitor'), monitorWin.win.flashTitle()) },
     C('trajectoryWindow', 'Trajectory'),
     C('robotsWindow', 'Robots'),
   ];
-  const fixed = new Set<MWindow>([cyclic.win, patternEditor.win, monitorWin.win, trajectoryWin.win, robotsWin.win]);
+  const fixed = new Set<MWindow>([...Object.values(cyclicEds).map((e) => e.win), patternEditor.win, monitorWin.win, trajectoryWin.win, robotsWin.win]);
   const open: MenuItem[] = floating.filter((f) => f.win.open && !fixed.has(f.win)).map((f) => ({ label: f.win.titleEl.textContent || f.win.o.title, action: () => bringForward(f.win) }));
   return [
     { label: 'Close Edit Windows', key: keyLabel('closeEditWindows'), enabled: () => floating.some((f) => f.win.open), action: closeEditWindows },
@@ -436,7 +452,7 @@ cmd('conductingWindow', () => bringForward(main[1].win));
 cmd('patternsWindow', () => bringForward(main[0].win));
 cmd('variablesWindow', () => bringForward(main[2].win));
 cmd('cyclicWindow', () => bringForward(main[3].win));
-cmd('cyclicEditor', () => (openEditor('cyclic'), cyclic.win.flashTitle()));
+cmd('cyclicEditor', () => (openEditor('cyclic'), cyclicEds[lastCyclic].win.flashTitle()));
 cmd('allNotesOff', () => session.allNotesOff());
 cmd('metronome', toggleOpt('useMetronome'));
 cmd('lockMarked', toggleOpt('lockMarkedVariables'));
