@@ -697,12 +697,17 @@ try {
   const octUi = JSON.parse(await evaluate(`JSON.stringify(emmm.comp.octave.positions[${octPos}].map((c) => c.map((x) => (x.lo === x.hi ? x.lo - 2 : 'range'))))`));
   check('Octave Editor: four independent four-step cycles programmed through the grids', JSON.stringify(octUi) === JSON.stringify(want), JSON.stringify(octUi));
   check('Octave Editor: editing changed nothing that plays', (await evaluate(`emmm.comp.octave.active`)) === octActive);
-  // Note Rate (emmm): real clicks on the upper half of Voice 2's RATE box (1 → 2 → 3 → 4) and Voice 4's (1 → 2)
+  // Note Rate (emmm): a real click only selects a RATE box; then typed keys set it (Voice 2: 4, Voice 4: 2)
   const rateBox = (v) => `${OE}.querySelector('.num.octrate[data-voice="${v}"]')`;
-  for (let i = 0; i < 3; i++) await click(rateBox(1), { dy: -3 });
-  await click(rateBox(3), { dy: -3 });
+  await click(rateBox(1), { dy: -3 });
+  const rateClicked = await evaluate(`JSON.stringify(emmm.comp.octave.rates[${octPos}])`);
+  await key('4');
+  await key('Enter');
+  await click(rateBox(3), { dy: 3 });
+  await key('2');
+  await key('Enter');
   const octRates = await evaluate(`JSON.stringify(emmm.comp.octave.rates[${octPos}])`);
-  check('Octave Editor: the RATE boxes set each Voice’s Note Rate for the edited Position', octRates === '[1,4,1,2]' && (await evaluate(`${rateBox(1)}.textContent`)) === '4', octRates);
+  check('Octave Editor: a click selects a RATE box without changing it; typing sets each Voice’s Note Rate for the edited Position', rateClicked === '[1,1,1,1]' && octRates === '[1,4,1,2]' && (await evaluate(`${rateBox(1)}.textContent`)) === '4', `${rateClicked} → ${octRates}`);
   await click(`[...document.querySelectorAll('#menubar .menu')].find((m) => m.firstChild?.textContent === 'Variables')`);
   await click(`[...document.querySelectorAll('.dropdown .item')].find((i) => i.firstElementChild.textContent === 'Rhythm…')`, { wait: 150 });
   await shot('13-rhythm-and-octave-editors');

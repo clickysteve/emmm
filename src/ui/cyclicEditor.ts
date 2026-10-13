@@ -115,6 +115,8 @@ export class CyclicVarEditor {
           s.changed('octave');
         },
         values: OCTAVE_RATES,
+        // a click only selects the box: type the rate (Enter), or ↑ ↓ through the values
+        intercept: () => true,
         cls: 'octrate',
         title: `Voice ${v + 1} Note Rate: each Octave step lasts this many notes (1 = advance every note)`,
       });
