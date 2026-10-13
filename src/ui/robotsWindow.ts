@@ -476,7 +476,10 @@ export class RobotsWindow {
         () => !baton,
       );
     });
-    this.text(p, 360, 22, 112, 26, () => (baton ? 'Set by the conducting arrows' : `${def().variables.length || 'No'} Variable${def().variables.length === 1 ? '' : 's'}: one Position for all`), 'label tiny');
+    // in the free slot after the second row of buttons (six to a row since Octave)
+    const note = this.text(p, 360, 37, 112, 9, () => (baton ? 'Set by the arrows' : def().variables.length ? 'one Position for all' : 'no Variables'), 'label tiny');
+    note.dataset.role = 'vars-note';
+    setTip(note, baton ? 'Baton (M): the Variables are set by the conducting arrows' : 'Each move sends all of this Robot’s Variables to the same Position');
     // parameters
     label(p, 2, 56, 'set', 'tiny');
     let x = 46;

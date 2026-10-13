@@ -246,6 +246,13 @@ try {
   await click(byText('[role=switch]', 'Note Density'));
   await click(byText('[role=switch]', 'Legato'));
   check('4. Variables assigned (Note Density + Velocity)', await evaluate(`JSON.stringify(emmm.comp.extended.robots[1].variables) === '["noteDensity","velocityRange"]'`));
+  // every Variable button can really be clicked (the note beside them used to cover Time Dist)
+  await click(byText('[role=switch]', 'Time Dist'));
+  await click(byText('[role=switch]', 'Octave'));
+  const tdVars = await evaluate(`JSON.stringify(emmm.comp.extended.robots[1].variables)`);
+  await click(byText('[role=switch]', 'Time Dist'));
+  await click(byText('[role=switch]', 'Octave'));
+  check('4. Time Dist and Octave buttons are clickable (nothing covers them)', tdVars.includes('timeDistortion') && tdVars.includes('octave') && (await evaluate(`JSON.stringify(emmm.comp.extended.robots[1].variables) === '["noteDensity","velocityRange"]'`)), tdVars);
   // 5 rate: click the numerator box, type 1/8
   await click(`${tipped('[role=spinbutton]', '/Rate \\(M’s Time Base\\)/')}[0]`);
   await typeText('1/8');

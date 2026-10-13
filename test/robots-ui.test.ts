@@ -157,6 +157,17 @@ describe('ROBOT tab', () => {
     // the description is the implemented algorithm's
     expect(win().textContent).toMatch(/Steps through the eligible Positions in order, wrapping round/);
   });
+  it('the eleven Variable buttons and the note beside them do not overlap', () => {
+    tab('ROBOT');
+    const box = (e: HTMLElement) => ({ x: parseFloat(e.style.left), y: parseFloat(e.style.top), w: parseFloat(e.style.width), h: parseFloat(e.style.height) });
+    const apart = (a: ReturnType<typeof box>, b: ReturnType<typeof box>) => a.x + a.w <= b.x || b.x + b.w <= a.x || a.y + a.h <= b.y || b.y + b.h <= a.y;
+    const buttons = within('[role=switch]').filter((e) => ['Pattern Group', 'Note Density', 'Velocity', 'Note Order', 'Transposition', 'Time Dist', 'Rhythm', 'Legato', 'Accent', 'Octave', 'Orchestr.'].includes(e.textContent!));
+    expect(buttons).toHaveLength(11);
+    const note = win().querySelector<HTMLDivElement>('[data-role="vars-note"]')!;
+    expect(note.textContent).toBe('one Position for all');
+    for (const b of buttons) expect(apart(box(b), box(note))).toBe(true);
+    buttons.forEach((a, i) => buttons.slice(i + 1).forEach((b) => expect(apart(box(a), box(b))).toBe(true)));
+  });
   it('Baton (M) is offered only to Robot 1; a Follower cannot watch a Robot that watches it', () => {
     expect(options('Robot 2 personality').find((o) => o.text.startsWith('Baton'))).toEqual({ text: 'Baton (M) — Robot 1 only', disabled: true });
     s.setRobot(2, { personality: 'follower', target: 1 });
