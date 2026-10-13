@@ -698,6 +698,21 @@ export class Session {
     this.executeSnapshot(i, !!mods.shift);
   }
 
+  /**
+   * Capture All (a double-click on an empty slot): store everything a Snapshot can hold, as it
+   * is now, as Blink Everything and a letter would — but passively: a Hold/Do selection in
+   * progress is left as it is, nothing is recalled and the music (playback, Robots, Rules,
+   * cycles) carries on untouched. An occupied slot is never overwritten.
+   */
+  captureAllInto(i: number): boolean {
+    if (this.comp.snapshots[i]) return false;
+    this.comp.snapshots[i] = captureAll(this.comp);
+    this.currentSnapshot = i;
+    // not 'snapshot': that change is a hand Rules see at once (Conductor.poke); this one is not
+    this.changed('snapshot-store');
+    return true;
+  }
+
   executeSnapshot(i: number, forceSync = false): void {
     const s = this.comp.snapshots[i];
     if (!s) return;
