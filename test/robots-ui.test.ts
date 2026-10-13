@@ -544,10 +544,12 @@ describe('Allowed Groups (ROBOT tab)', () => {
     expect(s.conductor.robotOn(1)).toBe(true);
     s.start();
     const seen = new Set<number>();
-    for (let t = 48; t <= 384 * 12; t += 48) {
-      render(t);
+    // only the music is checked here, so the window is drawn once at the end, not every step
+    for (let t = 24; t <= 384 * 12; t += 24) {
+      s.emitNow(s.engine.render(t));
       seen.add(act('patternGroup'));
     }
+    draw();
     s.stop();
     expect(seen).toEqual(new Set([0, 1]));
     s.allowAllGroups(1);
