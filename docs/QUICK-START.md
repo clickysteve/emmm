@@ -593,7 +593,9 @@ Workflow:
    back: emmm performs your structure while you conduct on top. **0** stops a Slideshow.
 
 Also useful: the **globe** (Blink Everything) collects *every* storable control at once — a
-"snapshot of everything" — and the **pencil** (Edit Snapshot) re-opens the current Snapshot's
+"snapshot of everything" (quicker still: **double-click an empty letter** to store everything
+there at once, while the music and the Robots carry on; your blinking selection is left alone) —
+and the **pencil** (Edit Snapshot) re-opens the current Snapshot's
 contents as blinking items so you can add or remove some before storing again.
 
 **What a Snapshot does and does not hold.** It holds: which Position each included Variable

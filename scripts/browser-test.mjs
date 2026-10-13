@@ -792,6 +792,51 @@ try {
     check('G. older project plays: Robot 1 wanders over Groups beyond a and b again', new Set(pgG).size > 2, [...new Set(pgG)].map((g) => 'abcdef'[g]).join(' '));
   }
 
+  // H: Capture All — a real double-click on an empty Snapshot letter while the Robots play
+  {
+    await evaluate(`document.querySelectorAll('.mdialog').forEach((d) => d.remove()); emmm.comp.extended.enabled = true; emmm.setRobotEnabled(0, true); emmm.changed('extended'); emmmUi.updateAll()`);
+    const robotsWin = await evaluate(`!${W}.classList.contains('hidden')`);
+    if (robotsWin) await key('w', { code: 'KeyW', mods: 1 }); // it covers the Snap window on a small screen
+    const VARS = `['patternGroup','noteDensity','velocityRange','noteOrder','transposition','timeDistortion','accent','legato','rhythm','octave','orchestration','soundChoice']`;
+    const slotsH = `[...document.querySelectorAll('[data-win="snapshot"] .num')].filter((d) => /^Snapshot [A-Z]:/.test(d.dataset.tip || ''))`;
+    const iH = await evaluate(`emmm.comp.snapshots.findIndex((x, i) => !x && i >= 4)`);
+    const slotH = `${slotsH}[${iH}]`;
+    check('H. an empty letter offers Capture All in its tooltip', await evaluate(`${slotH}.dataset.tip.includes('Double-click empty slot to capture all')`));
+    // record the state at the moment of the double-click (the Robots keep changing it)
+    await evaluate(`(() => { const o = emmm.captureAllInto.bind(emmm); emmm.captureAllInto = (i) => { window.__capAt = ${VARS}.map((v) => emmm.comp[v].active); window.__capTick = emmm.engine.tick; return o(i); }; })()`);
+    await key(' ');
+    await sleep(1500);
+    check('H. playing, Robot 1 on', await evaluate(`emmm.engine.state === 'playing' && emmm.comp.conducting.robot.enabled`));
+    const p = await centre(slotH);
+    await send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: p.x, y: p.y });
+    for (const n of [1, 2]) {
+      await send('Input.dispatchMouseEvent', { type: 'mousePressed', x: p.x, y: p.y, button: 'left', clickCount: n, buttons: 1 });
+      await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: p.x, y: p.y, button: 'left', clickCount: n });
+    }
+    await sleep(120);
+    const capH = await evaluate(`JSON.stringify(emmm.comp.snapshots[${iH}])`);
+    check('H. double-click stored a complete Snapshot (every Variable, arrow and Voice item; Sync)', await evaluate(`(() => { const s = emmm.comp.snapshots[${iH}]; return !!s && Object.keys(s.positions).length === 12 && Object.keys(s.arrows).length === Object.keys(emmm.comp.conducting.arrows).length && s.voices.every((v) => Object.keys(v).length === 8) && s.sync === true; })()`), capH?.slice(0, 120));
+    check('H. its values are the state at the moment of the double-click', await evaluate(`JSON.stringify(${VARS}.map((v) => emmm.comp.snapshots[${iH}].positions[v])) === JSON.stringify(window.__capAt)`));
+    check('H. shown as saved and current (letter in the sun, dark mark), nothing left blinking', await evaluate(`${slotH}.querySelector('svg text').textContent === 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[${iH}] && ${slotH}.querySelector('circle').getAttribute('fill') === 'var(--ink)' && emmm.hold === null && !document.querySelector('[data-win="snapshot"] .blink')`));
+    const logH = await evaluate(`emmm.conductor.log.at(-1)?.tick ?? -1`);
+    await sleep(1500);
+    check('H. playback and the Robots carried on (no recall, no stop)', await evaluate(`emmm.engine.state === 'playing' && emmm.engine.tick > window.__capTick && (emmm.conductor.log.at(-1)?.tick ?? -1) > ${logH}`));
+    // an occupied letter: the double-click recalls (as two clicks always did) but never overwrites
+    await evaluate(`delete emmm.captureAllInto`);
+    await key(' ');
+    await evaluate(`emmm.clickPosition('accent', (emmm.comp.snapshots[${iH}].positions.accent + 1) % 6)`);
+    const p2 = await centre(slotH);
+    for (const n of [1, 2]) {
+      await send('Input.dispatchMouseEvent', { type: 'mousePressed', x: p2.x, y: p2.y, button: 'left', clickCount: n, buttons: 1 });
+      await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: p2.x, y: p2.y, button: 'left', clickCount: n });
+    }
+    await sleep(200);
+    check('H. double-clicking the occupied letter leaves its contents as they were', (await evaluate(`JSON.stringify(emmm.comp.snapshots[${iH}])`)) === capH);
+    check('H. … and recalls it normally', await evaluate(`JSON.stringify(${VARS}.map((v) => emmm.comp[v].active)) === JSON.stringify(window.__capAt)`));
+    await shot('capture-all');
+    if (robotsWin) await key('w', { code: 'KeyW', mods: 1 });
+  }
+
   check('no console errors', consoleErrors.length === 0, consoleErrors.slice(0, 3).join(' | '));
 } catch (e) {
   check('the run completed', false, String(e?.stack ?? e));

@@ -553,7 +553,8 @@ transpose, Echo Map) · speaker = Play-Enable · ✓ = Echo-Thru-Orchestration �
 Select (double-click: Pattern Editor; Alt-click an icon: record modes) · Output Length (Alt: add
 rests) · Time Base (n | d; sa = step advance) · Phase (ticks; 96 = a quarter note).<br><br>
 <b>Snapshots</b> — Hold/Do (camera, Backspace): click controls, then Hold/Do again to do them all at
-once, or click a Snapshot box to store them. Letters A–Z recall. Globe = Blink Everything ·
+once, or click a Snapshot box to store them. Letters A–Z recall. Double-click an empty letter to
+capture all at once. Globe = Blink Everything ·
 pencil = Edit Snapshot · frames = Restore. <b>Slideshows</b> 1–9: Alt-click to record, click to play,
 0 stops, \\ loops.<br><br>
 <b>Speed of a Voice</b> — Tempo sets the beat; each Pattern's Time Base n | d makes one step last
