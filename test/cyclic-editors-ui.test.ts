@@ -172,6 +172,8 @@ describe('dedicated Cyclic Variable editors', () => {
     const before = structuredClone(s.comp.octave.rates);
     pd(box(1));
     pu(box(1));
+    expect(s.comp.octave.rates[2]).toEqual(before[2]); // a click only selects the box
+    expect(document.activeElement).toBe(box(1));
     key(box(1), '8');
     key(box(1), 'Enter');
     key(box(3), 'Home');
