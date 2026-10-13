@@ -46,6 +46,12 @@ export interface CycleStep {
 /** One voice's cycle: 1..16 steps. */
 export type Cycle = CycleStep[];
 
+/** emmm Octave: a Cyclic Variable whose cycles also carry a Note Rate, Position × Voice
+ * (`rates[p][v]`, 1 = advance every note, as the other Cyclic Variables do). */
+export interface OctaveVariable extends Variable<Cycle[]> {
+  rates: number[][];
+}
+
 export interface VelocityRange {
   lo: number;
   hi: number;
@@ -249,7 +255,7 @@ export interface Composition {
   accent: Variable<Cycle[]>;
   legato: Variable<Cycle[]>;
   /** emmm (not M): the fourth Cyclic Variable — levels 0–4 = −2…+2 octaves, 2 neutral */
-  octave: Variable<Cycle[]>;
+  octave: OctaveVariable;
   rhythm: Variable<Cycle[]>;
   /** each position: 4 voices × list of enabled M Output Channels (1..16) */
   orchestration: Variable<number[][]>;

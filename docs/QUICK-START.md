@@ -460,6 +460,11 @@ Variables menu. Several can be open at once. Reading one:
 - The line at the bottom names the Position, Voice, step and value under the pointer.
 - On the right: the Variable's values. **Octave** levels are labelled −2 … +2 octaves, with
   the 0 line drawn solid.
+- **Octave** only: a **RATE** box beside each Voice's grid — 1, 2, 3, 4, 8 or 16 notes per
+  step (1 = advance every note, the default). At 2, the cycle 0 → +1 → 0 → −1 plays
+  0, 0, +1, +1, 0, 0, −1, −1. Each Voice of each Position has its own rate; a ranged step
+  still picks a new octave for every note. Changing a rate while playing starts that
+  Voice's count again on the step it is on.
 
 What the levels mean:
 

@@ -91,6 +91,10 @@ export interface VoiceRuntime {
   rng: Rng;
   /** emmm Octave: its own random stream, so the Classic choices never change because of it */
   octRng: Rng;
+  /** emmm Octave Note Rate: events already played on the current Octave step, and the rate
+   * they were counted against (a different rate restarts the count) */
+  octHeld: number;
+  octRate: number;
   /** Keyboard Transpose offset in semitones, null when none received (§9) */
   keyTranspose: number | null;
   /** notes held by a step-advance key: released on key-up */
@@ -191,6 +195,8 @@ export class MEngine {
       cycle: { rhythm: 0, legato: 0, accent: 0, octave: 0 },
       rng: new Rng(this.seedFor(v), v + 1),
       octRng: new Rng(this.seedFor(v), v + 2001),
+      octHeld: 0,
+      octRate: 1,
       keyTranspose: null,
       heldStepNotes: [],
       last: null,
@@ -345,6 +351,7 @@ export class MEngine {
       vr.clock = 0;
       vr.position = 0;
       vr.cycle = { rhythm: 0, legato: 0, accent: 0, octave: 0 };
+      vr.octHeld = 0;
     });
   }
 
@@ -578,7 +585,22 @@ export class MEngine {
    */
   private octaveRead(v: number): { level: number; restart: boolean } {
     if (!this.comp.extended.enabled) return { level: OCTAVE_NEUTRAL, restart: false };
-    return this.cycleRead(v, 'octave');
+    // Note Rate N: each step lasts N events. A ranged step is still drawn on every event, as
+    // at rate 1; only the advance waits. A changed rate (edit, Position change, recall)
+    // restarts this Voice's count on the step it is on.
+    const vr = this.voices[v];
+    const oct = this.comp.octave;
+    const rate = Math.max(1, oct.rates[oct.active]?.[v] ?? 1);
+    if (rate !== vr.octRate) (vr.octRate = rate), (vr.octHeld = 0);
+    if (rate === 1) return this.cycleRead(v, 'octave');
+    const cycle = oct.positions[oct.active][v];
+    const len = Math.max(1, cycle.length);
+    const idx = vr.cycle.octave % len;
+    const level = this.pickLevel(cycle[idx], vr.octRng);
+    const restart = idx === 0 && len > 1 && vr.octHeld === 0;
+    if (++vr.octHeld >= rate) (vr.octHeld = 0), (vr.cycle.octave = (idx + 1) % len);
+    else vr.cycle.octave = idx;
+    return { level, restart };
   }
 
   /** Accent level → velocity (§6). */

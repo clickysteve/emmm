@@ -159,6 +159,38 @@ describe('dedicated Cyclic Variable editors', () => {
     expect(JSON.stringify(s.comp.octave.positions[3][1])).toBe(after);
   });
 
+  it('Octave Note Rate: a RATE box beside each Voice’s grid sets that Voice’s rate for the edited Position only; Undo restores it', () => {
+    ui.openEditor('cyclic', { variable: 'octave', position: 2 });
+    const box = (v: number) => ed('octave').querySelector<HTMLDivElement>(`.num.octrate[data-voice="${v}"]`)!;
+    const key = (e: Element, k: string) => e.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }));
+    expect([0, 1, 2, 3].map((v) => box(v).textContent)).toEqual(s.comp.octave.rates[2].map(String));
+    // beside the grid: right of it, left of the octave legend
+    const grid = ed('octave').querySelector<HTMLDivElement>('.cgrid[data-voice="1"]')!;
+    const left = (e: HTMLElement) => parseFloat(e.style.left);
+    expect(left(box(1))).toBeGreaterThanOrEqual(left(grid) + parseFloat(grid.style.width));
+    s.history.commit();
+    const before = structuredClone(s.comp.octave.rates);
+    pd(box(1));
+    pu(box(1));
+    key(box(1), '8');
+    key(box(1), 'Enter');
+    key(box(3), 'Home');
+    key(box(3), 'ArrowUp');
+    ui.updateAll();
+    expect(s.comp.octave.rates[2]).toEqual([before[2][0], 8, before[2][2], 2]);
+    expect(box(1).textContent).toBe('8');
+    expect(s.comp.octave.rates.filter((_, p) => p !== 2)).toEqual(before.filter((_, p) => p !== 2));
+    key(box(1), 'End');
+    expect(s.comp.octave.rates[2][1]).toBe(16);
+    key(box(1), '5');
+    key(box(1), 'Enter');
+    expect([1, 2, 3, 4, 8, 16]).toContain(s.comp.octave.rates[2][1]); // typed values snap to the menu
+    s.history.commit();
+    s.undo();
+    expect(s.comp.octave.rates).toEqual(before);
+    expect(ed('rhythm').querySelector('.octrate')).toBeNull();
+  });
+
   it('Rhythm, Legato and Accent keep their editing (new steps at level 1, ranges, value tables)', () => {
     for (const v of ['rhythm', 'legato', 'accent'] as const) {
       ui.openEditor('cyclic', { variable: v, position: 5 });

@@ -603,6 +603,12 @@ export class Session {
           : (this.comp[variable] as { positions: unknown[] }).positions;
     if (copy) list[to] = structuredClone(list[from]);
     else [list[from], list[to]] = [list[to], list[from]];
+    // emmm Octave: each Voice cycle's Note Rate goes with it
+    if (variable === 'octave') {
+      const r = this.comp.octave.rates;
+      if (copy) r[to] = [...r[from]];
+      else [r[from], r[to]] = [r[to], r[from]];
+    }
     this.changed(variable);
   }
 

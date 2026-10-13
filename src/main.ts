@@ -135,10 +135,11 @@ const editors: Record<string, VarEditor> = {
 };
 /** one edit window per Cyclic Variable (any of them may be open at once) */
 const cyclicEds: Record<CycVar, CyclicVarEditor> = {
-  rhythm: new CyclicVarEditor(ctx, desktop, 'rhythm', 120, 40),
-  legato: new CyclicVarEditor(ctx, desktop, 'legato', 140, 60),
-  accent: new CyclicVarEditor(ctx, desktop, 'accent', 160, 80),
-  octave: new CyclicVarEditor(ctx, desktop, 'octave', 420, 40),
+  rhythm: new CyclicVarEditor(ctx, desktop, 'rhythm', 80, 40),
+  legato: new CyclicVarEditor(ctx, desktop, 'legato', 100, 60),
+  accent: new CyclicVarEditor(ctx, desktop, 'accent', 120, 80),
+  // wider than the others (its Note Rate column): side by side with Rhythm, inside the screen
+  octave: new CyclicVarEditor(ctx, desktop, 'octave', 380, 40),
 };
 /** the Cyclic Variable last edited (⌥Y reopens its window) */
 let lastCyclic: CycVar = 'rhythm';

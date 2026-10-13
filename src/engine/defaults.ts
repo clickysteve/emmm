@@ -132,7 +132,8 @@ export function defaultComposition(seed = 38291): Composition {
       same(cyc(4, 1, 2, 1, 3, 1, 2, 1, 4, 1, 2, 0, 3, 1, [1, 4], [0, 4])),
     ]),
     // emmm Octave: every Position neutral (level 2 = no shift) until the user edits it
-    octave: variable([same(cyc(2)), same(cyc(2)), same(cyc(2)), same(cyc(2)), same(cyc(2)), same(cyc(2))]),
+    // … and every Note Rate 1 (advance every note, like the other Cyclic Variables)
+    octave: { ...variable([same(cyc(2)), same(cyc(2)), same(cyc(2)), same(cyc(2)), same(cyc(2)), same(cyc(2))]), rates: Array.from({ length: NUM_POSITIONS }, () => same(1)) },
     legato: variable([
       same(cyc(2)),
       same(cyc(4)),

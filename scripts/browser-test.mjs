@@ -697,6 +697,12 @@ try {
   const octUi = JSON.parse(await evaluate(`JSON.stringify(emmm.comp.octave.positions[${octPos}].map((c) => c.map((x) => (x.lo === x.hi ? x.lo - 2 : 'range'))))`));
   check('Octave Editor: four independent four-step cycles programmed through the grids', JSON.stringify(octUi) === JSON.stringify(want), JSON.stringify(octUi));
   check('Octave Editor: editing changed nothing that plays', (await evaluate(`emmm.comp.octave.active`)) === octActive);
+  // Note Rate (emmm): real clicks on the upper half of Voice 2's RATE box (1 → 2 → 3 → 4) and Voice 4's (1 → 2)
+  const rateBox = (v) => `${OE}.querySelector('.num.octrate[data-voice="${v}"]')`;
+  for (let i = 0; i < 3; i++) await click(rateBox(1), { dy: -3 });
+  await click(rateBox(3), { dy: -3 });
+  const octRates = await evaluate(`JSON.stringify(emmm.comp.octave.rates[${octPos}])`);
+  check('Octave Editor: the RATE boxes set each Voice’s Note Rate for the edited Position', octRates === '[1,4,1,2]' && (await evaluate(`${rateBox(1)}.textContent`)) === '4', octRates);
   await click(`[...document.querySelectorAll('#menubar .menu')].find((m) => m.firstChild?.textContent === 'Variables')`);
   await click(`[...document.querySelectorAll('.dropdown .item')].find((i) => i.firstElementChild.textContent === 'Rhythm…')`, { wait: 150 });
   await shot('13-rhythm-and-octave-editors');
@@ -729,7 +735,7 @@ try {
     fileF = readdirSync(DOWNLOADS).find((f) => f.endsWith('.emmm.json') && statSync(join(DOWNLOADS, f)).mtimeMs > t0F && /"groups"/.test(readFileSync(join(DOWNLOADS, f), 'utf8')));
   }
   const savedF = fileF ? JSON.parse(readFileSync(join(DOWNLOADS, fileF), 'utf8')) : null;
-  check('F. saved: the Octave cycles programmed in the Octave Editor', !!savedF && JSON.stringify(savedF.composition.octave.positions[octPos].map((c) => c.map((x) => x.lo - 2))) === JSON.stringify(want));
+  check('F. saved: the Octave cycles and Note Rates programmed in the Octave Editor', !!savedF && JSON.stringify(savedF.composition.octave.positions[octPos].map((c) => c.map((x) => x.lo - 2))) === JSON.stringify(want) && JSON.stringify(savedF.composition.octave.rates[octPos]) === '[1,4,1,2]');
   check('F. saved: format still 5, with every Pattern’s scale and every Robot’s Allowed Groups', !!savedF && savedF.version === 5 && JSON.stringify(savedF.composition.extended.robots.map((r) => r.groups)) === JSON.stringify([[true, true, false, false, false, false], [true, true, true, true, true, true], [true, false, true, false, false, false], [true, true, true, true, true, true]]) && savedF.composition.patternGroups[2].patterns[2].scale.root === 4, fileF ?? 'nothing downloaded');
   await evaluate(`emmm.changed('conductors')`);
   await sleep(1700);
