@@ -106,7 +106,7 @@ export const KEYS: KeyDef[] = [
  * the Keyboard Shortcuts window. */
 export const PERFORMANCE_KEYS: [string, string][] = [
   ['⌫', 'Hold/Do (⇧⌫ quantized)'],
-  ['A – Z', 'Recall Snapshot (store it while holding); ⇧ = with Sync'],
+  ['A – Z', 'Recall Snapshot (store it while holding); ⇧ = with Sync; hold an empty letter: capture all into it'],
   ['1 – 9', 'Play Slideshow (⌥: record)'],
   ['0 · \\ · ⌥\\', 'Stop Slideshow · loop point · remove loop'],
   ['Caps Lock + move the mouse', 'Mouse Advance'],
@@ -123,7 +123,7 @@ export const PATTERN_EDITOR_KEYS: [string, string][] = [
 ];
 
 export const NUMBER_KEYS: [string, string][] = [
-  ['click a number, then type', 'type the value you want; Return keeps it, Escape cancels'],
+  ['click a number, then type', 'a click only selects it; type the value you want, Return keeps it, Escape cancels'],
   ['(3 seconds)', 'a clicked number lets go of the keyboard after 3 s without a key'],
   ['Return', 'edit the selected number (its value is shown highlighted)'],
   ['↑ ↓', 'one step up / down (⇧: ten steps)'],

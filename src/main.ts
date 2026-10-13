@@ -35,6 +35,7 @@ import { RobotsWindow } from './ui/robotsWindow';
 import { GenerateWindow } from './ui/generateWindow';
 import { lastVariable } from './ui/choice';
 import { NoteDensityEditor, NoteOrderEditor, OrchestrationEditor, TimeDistortionEditor, TranspositionEditor, VarEditor, VelocityRangeEditor } from './ui/varEditors';
+import { SnapshotKeyHold } from './ui/snapshotHold';
 
 const W = 720;
 const H = 470;
@@ -715,7 +716,12 @@ document.addEventListener('fullscreenchange', () => {
 
 // ------------------------------------------------------------------ keyboard (S1 Appendix A)
 let capsLock = false;
+// hold an empty Snapshot letter to Capture All into it (ui/snapshotHold.ts)
+const snapHold = new SnapshotKeyHold((i) => session.captureAllInto(i));
+window.addEventListener('blur', () => snapHold.cancel());
+document.addEventListener('visibilitychange', () => document.hidden && snapHold.cancel());
 window.addEventListener('keydown', (e) => {
+  if (!e.repeat) snapHold.other(e.code);
   // Keys first go to whatever owns typing (a number being typed, a pop-up, a dialog, a text
   // field: those handle and stop them); then emmm's commands (ui/keys.ts); then the Pattern
   // Editor's keys when it is the front window; then M's performance keys.
@@ -764,8 +770,9 @@ window.addEventListener('keydown', (e) => {
     default: {
       if (/^[a-zA-Z]$/.test(e.key) && !e.altKey) {
         const i = e.key.toUpperCase().charCodeAt(0) - 65;
+        // an empty letter: a tap recalls nothing; held, it captures everything into the slot
+        if (!session.comp.snapshots[i] && !session.hold) return snapHold.press(e.code, i);
         session.clickSnapshot(i, { shift: e.key === e.key.toUpperCase() && e.shiftKey });
-        if (!session.comp.snapshots[i] && !session.hold) return;
       } else if (/^Digit[0-9]$/.test(e.code)) {
         const n = Number(e.code.slice(5));
         if (n === 0) session.stopSlideshow();
@@ -776,6 +783,7 @@ window.addEventListener('keydown', (e) => {
   e.preventDefault();
 });
 window.addEventListener('keyup', (e) => {
+  snapHold.release(e.code);
   capsLock = e.getModifierState?.('CapsLock') ?? capsLock;
 });
 
