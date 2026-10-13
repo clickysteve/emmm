@@ -896,7 +896,7 @@ describe('Home and Return', () => {
     const s = mk();
     s.captureHome();
     const h = s.comp.extended.home;
-    expect(Object.keys(h.positions!).length).toBe(11);
+    expect(Object.keys(h.positions!).length).toBe(12);
     expect(h.baton).toEqual(s.comp.conducting.baton);
     expect(s.conductor.distance()).toBe(0);
     s.clickPosition('patternGroup', 1); // not included by default
@@ -988,7 +988,7 @@ describe('Home and Return', () => {
     expect(first - done).toBe(2 * 96);
     const h = s.comp.extended.home.positions!.noteDensity!;
     expect(logOf(s).find((l) => l.startsWith(`${first} Robot 2`))).toBe(`${first} Robot 2 ${h + 1} → ${((h + 1) % 6) + 1} · Dens`);
-    expect(logOf(s)).toContain(`${first} Rest over: Dens Vel Ord Trn TDis Rhy Leg Acc Orch free again`);
+    expect(logOf(s)).toContain(`${first} Rest over: Dens Vel Ord Trn TDis Rhy Leg Acc Oct Orch free again`);
   });
   it('a hand during Return is taken into account; the Return still finishes at its end', () => {
     const c = demoComposition(4);
