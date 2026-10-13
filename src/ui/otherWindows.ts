@@ -538,7 +538,8 @@ Time Distort (swing / rubato maps).<br>
 <b>Cyclic Variables</b> — Rhythm (time to the next note, × the Time Base), Legato (note length as %
 of that time), Accent (level 1–4 within Vel Range; 0 = rest). Cycles are 1–16 steps; a step can be
 a range of levels, picked at random each time. <b>Octave</b> (emmm) shifts each event's notes by
-−2…+2 octaves (level 2 = none), on top of Transposition. The pictures show what each step does
+−2…+2 octaves (level 2 = none), on top of Transposition; each of its Voice cycles has a Note Rate
+(RATE: each step lasts 1, 2, 3, 4, 8 or 16 notes). The pictures show what each step does
 (dithered = a range); the shaded step is the one playing.<br>
 <b>Midi</b> — Orchestration sends each voice to any of 16 output channels; Sound Choice sends
 program changes.<br><br>

@@ -39,6 +39,8 @@ export function capturePerfState(c: Composition): PerfStateData {
  */
 export function recallPerfState(c: Composition, s: PerfStateData, setTimeBaseDen: (group: number, voice: number, den: number) => void): { patternGroup: number } {
   for (const k of VARIABLE_KEYS) if (s[k] && (k !== 'octave' || c.extended.enabled)) assignDeep(c[k], s[k]);
+  // a state from before Octave Note Rates was taken with every rate 1
+  if (s.octave && c.extended.enabled && !Array.isArray((s.octave as { rates?: unknown }).rates)) c.octave.rates = c.octave.positions.map((p) => p.map(() => 1));
   if (Array.isArray(s.rhythmValues)) assignDeep(c.rhythmValues, s.rhythmValues);
   if (Array.isArray(s.legatoValues)) assignDeep(c.legatoValues, s.legatoValues);
   if (s.tempo) assignDeep(c.tempo, s.tempo);

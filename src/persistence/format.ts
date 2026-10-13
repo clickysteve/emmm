@@ -32,7 +32,7 @@
  * Not in the document at all: colour palettes, tooltips, Performance Feedback, MIDI Learn
  * (see app/prefs.ts, ui/palette.ts).
  */
-import { NUM_CHANNELS, NUM_POSITIONS, NUM_VOICES } from '../engine/constants';
+import { NUM_CHANNELS, NUM_POSITIONS, NUM_VOICES, OCTAVE_RATES } from '../engine/constants';
 import { defaultComposition } from '../engine/defaults';
 import type { Composition } from '../engine/types';
 import { cleanChoice } from '../app/scales';
@@ -239,6 +239,8 @@ export function validate(c: Composition): void {
         cy.forEach((s) => ((s.lo = clamp(s.lo, 0, 4)), (s.hi = clamp(s.hi, 0, 4))));
       }),
     );
+  // emmm Octave Note Rate: absent (older files) = 1, anything not on the menu = 1
+  c.octave.rates.forEach((p) => p.forEach((r, v) => (p[v] = OCTAVE_RATES.includes(r) ? r : 1)));
   c.patternGroups.forEach((g) =>
     g.patterns.forEach((p) => {
       p.tbNum = clamp(p.tbNum, 1, 99);

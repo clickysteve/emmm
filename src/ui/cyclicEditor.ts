@@ -4,9 +4,10 @@
  * Variable edit windows: the six-box Position selector in the title bar (click = choose which
  * Position to edit, Alt-click = also make it active, pull down = mark), four editing grids (one
  * per Voice) of 16 steps × levels 0–4 with M's gestures, and the Variable's own value scale on
- * the right. Octave (emmm, levels 0–4 = −2…+2 octaves) is not available in Classic Mode.
+ * the right. Octave (emmm, levels 0–4 = −2…+2 octaves) is not available in Classic Mode; its
+ * Voices each have a Note Rate too (each step lasts that many notes), beside their grids.
  */
-import { MAX_CYCLE_STEPS, NUM_VOICES } from '../engine/constants';
+import { MAX_CYCLE_STEPS, NUM_VOICES, OCTAVE_RATES } from '../engine/constants';
 import type { Cycle } from '../engine/types';
 import type { UiContext } from './context';
 import { clamp, el, label, localPoint, svgEl, setSvg, trackDrag } from './dom';
@@ -27,7 +28,7 @@ const OY = 4; // level 4, inside a grid's svg
 const GW = OX + SX * 15 + 8; // grid svg width
 const BLOCK = 48; // one Voice
 const GX = 12; // grid svg left (Voice number to its left)
-const PX = GX + GW + 6; // right-hand value panel
+const RW = 40; // Octave: the Note Rate column, between the grids and the value panel
 
 export class CyclicVarEditor {
   win: MWindow;
@@ -37,6 +38,8 @@ export class CyclicVarEditor {
   private parts: { update(): void }[] = [];
   /** where the pointer is: a step of a Voice's grid, or (len) its step-number row */
   private hover: { v: number; step: number; len: boolean } | null = null;
+  /** left of the value panel (Octave's is past its Note Rate column) */
+  private px: number;
 
   constructor(
     private ctx: UiContext,
@@ -46,6 +49,7 @@ export class CyclicVarEditor {
     y: number,
   ) {
     const s = ctx.s;
+    const PX = (this.px = GX + GW + 6 + (which === 'octave' ? RW : 0));
     this.win = new MWindow(parent, {
       id: 'edit-' + which,
       title: TITLE[which],
@@ -88,10 +92,36 @@ export class CyclicVarEditor {
       });
       area.addEventListener('pointerleave', () => (this.hover = null));
     }
+    if (which === 'octave') this.rateColumn();
     this.status = label(b, 4, 2 + NUM_VOICES * BLOCK + 1, '', 'small');
     Object.assign(this.status.style, { width: PX + 66 + 'px', whiteSpace: 'nowrap', overflow: 'hidden' });
     this.valuePanel();
     this.parts.push({ update: () => this.drawAll() });
+  }
+
+  /** Octave: each Voice's Note Rate, beside its grid — how many notes each step lasts. */
+  private rateColumn(): void {
+    const s = this.ctx.s;
+    const b = this.win.body;
+    const x = GX + GW + 4;
+    for (let v = 0; v < NUM_VOICES; v++) {
+      const y0 = 2 + v * BLOCK;
+      label(b, x, y0 + OY, 'RATE', 'tiny');
+      const n = new Numerical(b, x, y0 + OY + 9, 26, 13, {
+        get: () => s.comp.octave.rates[this.editPos][v],
+        set: (r) => {
+          if (this.locked) return;
+          s.comp.octave.rates[this.editPos][v] = r;
+          s.changed('octave');
+        },
+        values: OCTAVE_RATES,
+        cls: 'octrate',
+        title: `Voice ${v + 1} Note Rate: each Octave step lasts this many notes (1 = advance every note)`,
+      });
+      n.el.dataset.voice = String(v);
+      this.parts.push(n);
+      label(b, x, y0 + OY + 24, 'notes', 'tiny');
+    }
   }
 
   /** The value scale on the right: Rhythm and Legato tables (global), Accent's Velocity Range
@@ -100,6 +130,7 @@ export class CyclicVarEditor {
     const s = this.ctx.s;
     const b = this.win.body;
     const cv = this.which;
+    const PX = this.px;
     label(b, PX, 3, { rhythm: '× Time Base', legato: '% of the gap', accent: 'in Vel Range', octave: 'octaves' }[cv], 'small');
     if (cv === 'rhythm' || cv === 'legato') {
       for (let lv = 4; lv >= 0; lv--) {
@@ -166,7 +197,8 @@ export class CyclicVarEditor {
       return `${pos}${act === this.editPos ? ' (playing)' : ` · Position ${act + 1} is playing`}${this.locked ? ' · locked' : ''}`;
     }
     const cyc = this.cycles()[h.v];
-    const vs = `${pos} · Voice ${h.v + 1}`;
+    const rate = this.which === 'octave' ? s.comp.octave.rates[this.editPos][h.v] : 1;
+    const vs = `${pos} · Voice ${h.v + 1}${rate > 1 ? ` · Rate ${rate}` : ''}`;
     if (h.len) return `${vs} · click: cycle of ${h.step + 1} step${h.step ? 's' : ''}`;
     if (h.step >= cyc.length) return `${vs} · step ${h.step + 1}: past the ${cyc.length}-step cycle`;
     const c = cyc[h.step];
@@ -217,7 +249,7 @@ export class CyclicVarEditor {
     const cycles = this.cycles();
     const flashNow = this.ctx.now();
     const h = this.hover;
-    const key = [s.rev, this.editPos, s.engine.state, h?.v, h?.step, h?.len, ...s.engine.voices.map((v) => v.cycle[w]), ...this.ctx.flash.cycle[w].map((t) => t > flashNow)].join('|');
+    const key = [s.rev, this.editPos, s.engine.state, h?.v, h?.step, h?.len, ...s.engine.voices.map((v) => v.cycle[w] + '/' + v.octHeld), ...this.ctx.flash.cycle[w].map((t) => t > flashNow)].join('|');
     if (key === this.drawnKey) return;
     this.drawnKey = key;
     const isActive = s.comp[w].active === this.editPos;
@@ -248,7 +280,8 @@ export class CyclicVarEditor {
       // where the cycle is now (emmm visual aid): the step just played
       const vr = s.engine.voices[v];
       if (isActive && s.engine.state !== 'stopped' && cyc.length > 0) {
-        const cur = (vr.cycle[w] - 1 + cyc.length) % cyc.length;
+        // Octave with a Note Rate: the step being held until its notes are used up
+        const cur = w === 'octave' && vr.octHeld > 0 ? vr.cycle[w] % cyc.length : (vr.cycle[w] - 1 + cyc.length) % cyc.length;
         inner += `<rect x="${OX + cur * SX - 3.5}" y="${OY + GH + 13}" width="7" height="2" fill="var(--activity)"/>`;
       }
       if (this.ctx.flash.cycle[w][v] > flashNow && isActive) inner += `<rect x="${OX - 16}" y="0" width="2" height="${GH + 6}" fill="var(--activity)"/>`;
