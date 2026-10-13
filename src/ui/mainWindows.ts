@@ -655,7 +655,13 @@ export class CyclicWindow implements Updatable {
     const step = modern ? 74 : 99;
     vars.forEach((v, i) => {
       const x = 3 + i * step;
-      label(b, x + 2, 4, VAR_LABEL[v]);
+      // the name opens the Variable's edit window (a double-click on a Position opens it there)
+      const name = label(b, x + 2, 4, VAR_LABEL[v], 'cname');
+      name.title = `Open the ${VAR_LABEL[v]} Editor (or double-click a Position)`;
+      name.addEventListener('pointerdown', (ev) => {
+        ev.preventDefault();
+        ctx.openEditor('cyclic', { variable: v, from: name });
+      });
       this.arrows.push(arrowFor(ctx, b, x + step - 27, v === 'legato' ? 0 : 1, v, v === 'legato' ? 17 : 13));
       this.choices.push(new VariableChoice(ctx, b, v, x, 19, step - 3, 31, true));
     });

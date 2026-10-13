@@ -40,7 +40,7 @@ export const ROLE_INFO: Record<Role, { label: string; help: string }> = {
   dim: { label: 'Dim', help: 'guide lines, tiny labels, disabled items' },
   patterns: { label: 'Patterns', help: 'Patterns window and Pattern Editor' },
   variables: { label: 'Variables', help: 'Variables window and its edit windows' },
-  cyclic: { label: 'Cyclic', help: 'Cyclic Variables window and Cyclic Editor' },
+  cyclic: { label: 'Cyclic', help: 'Cyclic Variables window and the Rhythm, Legato, Accent and Octave editors' },
   conducting: { label: 'Conducting', help: 'transport, tempo and Conducting Grid' },
   midi: { label: 'Midi', help: 'Orchestration, Sound Choice, MIDI Settings, Monitor' },
   snapshots: { label: 'Snapshots', help: 'Snapshot window' },

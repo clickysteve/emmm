@@ -674,6 +674,50 @@ try {
   await shot('12-generate');
   await click(`document.querySelector('#gen-cancel')`);
   await click(`${PE}.querySelector('.close')`);
+  // the dedicated Cyclic editors (emmm): a four-step Octave cycle per Voice, by real clicks
+  const OE = `document.querySelector('[data-win="edit-octave"]')`;
+  const octActive = await evaluate(`emmm.comp.octave.active`);
+  await click(`[...document.querySelectorAll('[data-win="cyclic"] .label.cname')].find((l) => l.textContent === 'Octave')`, { wait: 150 });
+  const octPos = await evaluate(`[...${OE}.querySelectorAll('.possel .p')].findIndex((c) => c.classList.contains('edit'))`);
+  check('Octave Editor: opens from its name in the Cyclic Variables window, on the playing Position', (await evaluate(`!${OE}.classList.contains('hidden')`)) && octPos === octActive);
+  /** a real click on a grid: step 1–16 at an octave (−2…+2), or on its number (len) */
+  async function octClick(voice, step, oct) {
+    const g = `${OE}.querySelector('.cgrid[data-voice="${voice}"]')`;
+    const c = await centre(g);
+    const k = c.w / 206;
+    const y = oct === 'len' ? 42 : 4 + 7 * (2 - oct);
+    await click(g, { dx: (18 + 12 * (step - 1) - 103) * k, dy: (y - 24) * k });
+  }
+  const want = [[0, 1, 0, -1], [0, 0, 2, 0], [-1, 0, 1, 0], [0, 0, 0, 0]];
+  for (let v = 0; v < 4; v++) {
+    await octClick(v, 1, 'len'); // back to one step, then four
+    await octClick(v, 4, 'len');
+    for (let st = 0; st < 4; st++) await octClick(v, st + 1, want[v][st]);
+  }
+  const octUi = JSON.parse(await evaluate(`JSON.stringify(emmm.comp.octave.positions[${octPos}].map((c) => c.map((x) => (x.lo === x.hi ? x.lo - 2 : 'range'))))`));
+  check('Octave Editor: four independent four-step cycles programmed through the grids', JSON.stringify(octUi) === JSON.stringify(want), JSON.stringify(octUi));
+  check('Octave Editor: editing changed nothing that plays', (await evaluate(`emmm.comp.octave.active`)) === octActive);
+  await click(`[...document.querySelectorAll('#menubar .menu')].find((m) => m.firstChild?.textContent === 'Variables')`);
+  await click(`[...document.querySelectorAll('.dropdown .item')].find((i) => i.firstElementChild.textContent === 'Rhythm…')`, { wait: 150 });
+  await shot('13-rhythm-and-octave-editors');
+  await click(`${OE}.querySelector('.close')`);
+  await click(`[...document.querySelectorAll('#menubar .menu')].find((m) => m.firstChild?.textContent === 'Variables')`);
+  await click(`[...document.querySelectorAll('.dropdown .item')].find((i) => i.firstElementChild.textContent === 'Octave…')`, { wait: 150 });
+  check('Octave Editor: closed and reopened, the cycles are intact and drawn', JSON.stringify(JSON.parse(await evaluate(`JSON.stringify(emmm.comp.octave.positions[${octPos}].map((c) => c.map((x) => x.lo - 2)))`))) === JSON.stringify(want) && (await evaluate(`${OE}.querySelector('.cgrid[data-voice="0"] svg').innerHTML.match(/width="5" height="5"/g).length`)) === 4);
+  for (const item of ['Legato…', 'Accent…']) {
+    await click(`[...document.querySelectorAll('#menubar .menu')].find((m) => m.firstChild?.textContent === 'Variables')`);
+    await click(`[...document.querySelectorAll('.dropdown .item')].find((i) => i.firstElementChild.textContent === '${item}')`, { wait: 100 });
+  }
+  check('Rhythm, Legato, Accent and Octave editors all open at once', await evaluate(`['rhythm', 'legato', 'accent', 'octave'].every((v) => !document.querySelector('[data-win="edit-' + v + '"]').classList.contains('hidden'))`));
+  await shot('14-legato-accent-editors');
+  await click(`[...document.querySelectorAll('#menubar .menu')].find((m) => m.firstChild?.textContent === 'Options')`);
+  await click(`[...document.querySelectorAll('.dropdown .item')].find((i) => i.firstElementChild.textContent === 'Enable Classic Mode')`, { wait: 150 });
+  check('Classic Mode: the Octave Editor closes, the other three stay', await evaluate(`${OE}.classList.contains('hidden') && ['rhythm', 'legato', 'accent'].every((v) => !document.querySelector('[data-win="edit-' + v + '"]').classList.contains('hidden'))`));
+  await shot('15-classic-cyclic-editors');
+  await click(`[...document.querySelectorAll('#menubar .menu')].find((m) => m.firstChild?.textContent === 'Options')`);
+  await click(`[...document.querySelectorAll('.dropdown .item')].find((i) => i.firstElementChild.textContent === 'Enable Classic Mode')`, { wait: 150 });
+  await click(`[...document.querySelectorAll('#menubar .menu')].find((m) => m.firstChild?.textContent === 'Windows')`);
+  await click(`[...document.querySelectorAll('.dropdown .item')].find((i) => i.firstElementChild.textContent === 'Close Edit Windows')`);
   // F: save, reload (autosave), open the saved file
   const confF = await evaluate(`JSON.stringify({ g: emmm.comp.patternGroups, r: emmm.comp.extended.robots })`);
   // (the same name as the earlier save: Chrome may overwrite it, so look for a fresh file)
@@ -685,6 +729,7 @@ try {
     fileF = readdirSync(DOWNLOADS).find((f) => f.endsWith('.emmm.json') && statSync(join(DOWNLOADS, f)).mtimeMs > t0F && /"groups"/.test(readFileSync(join(DOWNLOADS, f), 'utf8')));
   }
   const savedF = fileF ? JSON.parse(readFileSync(join(DOWNLOADS, fileF), 'utf8')) : null;
+  check('F. saved: the Octave cycles programmed in the Octave Editor', !!savedF && JSON.stringify(savedF.composition.octave.positions[octPos].map((c) => c.map((x) => x.lo - 2))) === JSON.stringify(want));
   check('F. saved: format still 5, with every Pattern’s scale and every Robot’s Allowed Groups', !!savedF && savedF.version === 5 && JSON.stringify(savedF.composition.extended.robots.map((r) => r.groups)) === JSON.stringify([[true, true, false, false, false, false], [true, true, true, true, true, true], [true, false, true, false, false, false], [true, true, true, true, true, true]]) && savedF.composition.patternGroups[2].patterns[2].scale.root === 4, fileF ?? 'nothing downloaded');
   await evaluate(`emmm.changed('conductors')`);
   await sleep(1700);

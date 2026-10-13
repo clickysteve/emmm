@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 /**
  * The Cyclic Variables window (four columns, Octave, informative pictures; three Classic
- * columns in Classic Mode), the Cyclic Editor's Octave, and Pattern ▸ Generate Pattern….
+ * columns in Classic Mode), the Octave Editor, and Pattern ▸ Generate Pattern….
  */
 import { beforeAll, describe, expect, it } from 'vitest';
 import type { Session } from '../src/app/session';
@@ -70,20 +70,20 @@ describe('Cyclic Variables window', () => {
     s.stop();
     s.clickPosition('octave', 0);
   });
-  it('double-click an Octave Position: the Cyclic Editor edits Octave; clicking the grid sets a level', () => {
+  it('double-click an Octave Position: the Octave Editor opens on it; clicking the grid sets a level', () => {
     const c = cells('octave')[4];
     pd(c);
     pu(c);
     pd(c);
     ui.updateAll();
-    const ed = document.querySelector('[data-win="edit-cyclic"]')!;
+    const ed = document.querySelector('[data-win="edit-octave"]')!;
     expect(ed.classList.contains('hidden')).toBe(false);
-    expect([...ed.querySelectorAll('.btn.on')].map((b) => b.textContent)).toContain('Octave');
+    expect(ed.querySelector('.possel .p.edit')).toBe(ed.querySelectorAll('.possel .p')[4]);
     s.comp.octave.positions[4][0] = cyc(2);
     // the first voice grid: step 1, level 4 (top line)
-    const grid = [...ed.querySelectorAll<HTMLDivElement>('div')].find((d) => d.querySelector('svg') && d.style.position === 'absolute')!;
+    const grid = ed.querySelector<HTMLDivElement>('.cgrid[data-voice="0"]')!;
     const r = grid.getBoundingClientRect();
-    pd(grid, { clientX: r.left + 8, clientY: r.top + 3 });
+    pd(grid, { clientX: r.left + 18, clientY: r.top + 4 });
     pu(grid);
     expect(s.comp.octave.positions[4][0][0]).toEqual({ lo: 4, hi: 4 });
   });

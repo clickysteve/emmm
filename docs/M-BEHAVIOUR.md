@@ -325,7 +325,7 @@ the Sequence keeps running silently [DOC]. A Snapshot can include the Sequence e
   list changes as edit windows open and close. Cmd-Number brings a main window forward and
   Cmd-Option-Number sends it back [DOC] — not implemented in emmm, because browsers reserve
   Cmd-1…9 for switching tabs. emmm additions: the brought-forward window's title flashes (so
-  the command is visible when nothing covered it), and the Cyclic Editor, Pattern Editor and
+  the command is visible when nothing covered it), and the Rhythm, Legato, Accent and Octave Editors (each its own window; Octave not in Classic Mode), Pattern Editor and
   Monitor are always listed, opening them if closed.
 * **Blinking** [DOC]: Hold/Do pending items blink; the first step of a restarting cycle blinks
   in the active miniature (not one-step cycles; *No Cyclic Blinking*); Pattern Group bricks flash

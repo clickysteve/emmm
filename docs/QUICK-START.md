@@ -346,7 +346,7 @@ flat they spread out. **Clear** removes Voice 1's map.
 
 ### 10. Rhythm
 
-Click the second **Rhythm** box: *long–short–short*. Now open the **Cyclic Editor** by
+Click the second **Rhythm** box: *long–short–short*. Now open the **Rhythm Editor** by
 double-clicking the first Rhythm box (this also makes Position 1 active again) (see "Cyclic Variables" below for how its grids work).
 In Voice 1's grid (the top one), click step number **3** below the grid to make a 3-step
 cycle, then click **step 3 at level 0**. Level 0 is "half a pulse", level 1 a whole pulse:
@@ -355,9 +355,10 @@ rhythm realign only every twelve notes.
 
 ### 11. Legato and Accent
 
-In the Cyclic Editor click the **Legato** button. Make Voice 1's cycle 4 steps long and set
-levels **1, 1, 1, 4**: three short notes and a long one (level 1 = 25% of the time to the
-next note, level 4 = 100%). Then click **Accent**, set a 4-step cycle **4, 1, 2, 1**: with the
+Open the **Legato Editor** (click the word **Legato** in the Cyclic Variables window). Make
+Voice 1's cycle 4 steps long and set levels **1, 1, 1, 4**: three short notes and a long one
+(level 1 = 25% of the time to the next note, level 4 = 100%). Then open the **Accent Editor**
+the same way and set a 4-step cycle **4, 1, 2, 1**: with the
 30–110 Velocity Range you set, you get 110, 30, 57, 30.
 
 > Now the four notes have *phrasing*: short, short, short, long — loud, soft, medium, soft —
@@ -437,22 +438,28 @@ Pattern's Time Base and Phase too; **Edit ▸ Paste Notes** copies only the note
 These three give a Voice its rhythm, phrasing and dynamics. Each Voice has its own **cycle**
 for each of them.
 
-![Cyclic Editor (Accent): Voice 1 has a 4-step cycle; step 4 is a range 0–4](images/qs-cyclic-editor.png)
+![Accent cycles: Voice 1 has a 4-step cycle; step 4 is a range 0–4](images/qs-cyclic-editor.png)
 
-Reading the Cyclic Editor (open it by double-clicking any Rhythm, Legato or Accent Position):
+Each Cyclic Variable has its own edit window — the **Rhythm**, **Legato**, **Accent** and (outside
+Classic Mode) **Octave Editor**. Open one by clicking the Variable's name in the Cyclic Variables
+window, by double-clicking one of its Positions (it opens on that Position), or from the
+Variables menu. Several can be open at once. Reading one:
 
 - **Four grids**, Voices 1–4 from the top.
 - **Steps** are the vertical lines, numbered 1–16 underneath. The boxed number marks the
   **end of the cycle**: **click a number to set the cycle length**. New steps start at
-  level 1.
+  level 1 (Octave: at 0, no shift).
 - **Levels** are the horizontal lines, 0 to 4.
 - **Click** where a step and a level cross to give that step one level. **Drag vertically**
   on a step to give it a **range** (drawn as a bar): each time the step comes round, emmm
   picks one level from the range at random. **Drag horizontally** to set several steps to
   the same level.
-- On the right: the **Rhythm**, **Legato** and **Accent** buttons choose what you are
-  editing; the column of six small boxes under each chooses the Position (black = editing;
-  Option-click = also make it active).
+- The six boxes in the title bar choose the **Position** you are editing (black = editing;
+  the underlined one is playing; Option-click = also make it active; pull down = mark), as in
+  the other Variable edit windows. Choosing one to edit does not change the music.
+- The line at the bottom names the Position, Voice, step and value under the pointer.
+- On the right: the Variable's values. **Octave** levels are labelled −2 … +2 octaves, with
+  the 0 line drawn solid.
 
 What the levels mean:
 
@@ -466,7 +473,7 @@ What the levels mean:
 | level 4 | ×4 | 100 % (values above 100 % make notes overlap) | top of the Velocity Range |
 
 The Rhythm and Legato values are a **global table** (the number boxes `4 =`, `3 =` … on the
-right of the Cyclic Editor) shared by every cycle; you can change them. Setting Legato level 4
+right of the Rhythm and Legato Editors) shared by every cycle; you can change them. Setting Legato level 4
 to `400` gives notes four times as long as the gap — overlapping clouds. Setting Rhythm values
 so that several levels are equal "weights" the randomness.
 
@@ -647,7 +654,7 @@ with one job, decide when a Voice plays its next note.
    advance) means the Voice moves only when you play into it.
 3. **Rhythm** (a Cyclic Variable) — multiplies each step by the value of the level it picks:
    with the standard table level 1 = ×1, level 2 = ×2 (twice as long), level 0 = ×½. The
-   Rhythm values are set at the bottom of the Cyclic Editor.
+   Rhythm values are set on the right of the Rhythm Editor.
 4. **Time Distortion** — then bends the timing within a span (swing, rubato).
 
 **Phase** delays a Voice's start after Start or Sync by 0–199 ticks (96 = one quarter note),

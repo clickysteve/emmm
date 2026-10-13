@@ -821,3 +821,6 @@ body.dragging * {
   outline: 2px solid var(--activity);
   outline-offset: -1px;
 }
+.label.cname {
+  cursor: pointer;
+}

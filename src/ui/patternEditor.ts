@@ -237,7 +237,7 @@ export class PatternEditor {
     const words = el('div', 'label tiny', b, [RX, 156, 94, 16]);
     words.style.whiteSpace = 'pre';
     words.style.lineHeight = '8px';
-    words.title = 'How fast this Voice moves: Tempo sets the beat for all Voices; the Time Base sets this Voice’s step; Rhythm multiplies each step (level values in the Cyclic Editor); Time Distortion then bends the timing.';
+    words.title = 'How fast this Voice moves: Tempo sets the beat for all Voices; the Time Base sets this Voice’s step; Rhythm multiplies each step (level values in the Rhythm Editor); Time Distortion then bends the timing.';
     this.parts.push({
       update: () => {
         const t = timeBaseWords(this.pattern, s.comp.tempo.value).replace(' · ', '\n');
