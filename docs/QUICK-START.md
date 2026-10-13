@@ -137,10 +137,11 @@ a bass line and a sparse high line, with every Variable on Position 1 (a "neutra
    disappear (click again to bring them back). A multitimbral synth or several synths on
    channels 1–4 will play all four Voices.
 
-7. **Change something simple and hear it immediately.** Press the mouse in the **top half**
-   of the **Tempo** box (the number `120` in the Conducting window): the tempo rises by one,
-   and keeps rising while you hold. The bottom half lowers it. Or press in the box and drag
-   the mouse up or down *outside* it — the cursor hides and the number slides. This is
+7. **Change something simple and hear it immediately.** Click the **Tempo** box (the number
+   `120` in the Conducting window): the click only selects it (outlined). Press **↑** and the
+   tempo rises by one; **↓** lowers it. Or type `132` and press Return (Escape cancels). Or
+   press in the box and drag the mouse up or down *outside* it — the cursor hides and the
+   number slides. This is
    M's **numerical**, and every number box in emmm works this way.
 
 8. **Change Pattern Group.** In the Variables window, top row (**Pattern Group**), click the
@@ -246,7 +247,7 @@ the Patterns window).
 
 Press **Space**. Voice 1 plays C E G B♭ in even quarter notes, forever. The Patterns window
 shows **Output Length 4** and **Time Base 1 | 4**. Change the right-hand Time Base number
-from 4 to **8** (press the top half of that box four times: 5, 6, 7, 8): twice as fast. Set
+from 4 to **8** (click that box and type `8`, Return — or press ↑ four times: 5, 6, 7, 8): twice as fast. Set
 it back to 4. (The Pattern Editor's **T Base** boxes are the same setting.)
 
 > A Pattern always loops, because it is not a timeline — it is a *pool of material* that the
@@ -310,8 +311,8 @@ until the first number reads about 70: mostly the arpeggio, with occasional surp
 
 Double-click the **sixth** Transposition box: it becomes active (all Voices +2, so you hear
 the arpeggio on D) and its edit window opens. Each Voice has a **Note** box and an **Octave**
-box; C3 means "no transposition". Press the top half of Voice 1's Note box until it reads
-**G** (octave 3): the arpeggio moves up a fifth as you click. Now alternate between the first
+box; C3 means "no transposition". Click Voice 1's Note box and press ↑ until it reads
+**G** (octave 3): the arpeggio moves up a fifth as you go. Now alternate between the first
 and sixth Transposition boxes in the main window: instant modulation, played *in time*.
 
 **Scale Lock** (emmm — not in M) is the switch at the bottom of the Transposition window (also
@@ -549,7 +550,7 @@ Variable's Position by hand.
 above); it turns black. Under **JUMP**, click or drag in the horizontal bar to set how far the
 Baton may jump sideways (full bar = anywhere); the tall thin bar at the far right sets the
 vertical jump (near the top = big jumps, bottom = none). **RATE** (the note-value box) sets how
-often it may jump — press its top half to go from whole notes towards eighth notes. While the
+often it may jump — click it, then ↑ goes from whole notes towards eighth notes (↓ back; or type 1, 2, 4 or 8). While the
 music plays, the Baton wanders on its own, changing everything you enabled for conducting.
 You can still conduct over it.
 
@@ -582,7 +583,7 @@ Workflow:
    restart of all Voices with the change. The sun with a black dot marks the current Snapshot.
    **Restore** (the second icon at the bottom right of the Snap window) undoes the last
    Snapshot.
-6. **Quantize.** Press the top half of the box with the wavy line (2): it becomes a whole
+6. **Quantize.** Click the box with the wavy line (2) and press ↑: it becomes a whole
    note. Now Snapshots (and Sync, and Shift-clicked Positions) wait for the next whole-note
    boundary counted from Start. Hit **B** slightly *before* the bar line and it lands exactly on
    it.
@@ -593,7 +594,7 @@ Workflow:
    back: emmm performs your structure while you conduct on top. **0** stops a Slideshow.
 
 Also useful: the **globe** (Blink Everything) collects *every* storable control at once — a
-"snapshot of everything" (quicker still: **double-click an empty letter** to store everything
+"snapshot of everything" (quicker still: **double-click an empty letter**, or **hold its key** for a moment, to store everything
 there at once, while the music and the Robots carry on; your blinking selection is left alone) —
 and the **pencil** (Edit Snapshot) re-opens the current Snapshot's
 contents as blinking items so you can add or remove some before storing again.
@@ -1130,7 +1131,7 @@ how timed) → Cyclic Variables (rhythm, length, accent per note) → Orchestrat
 | double-click a Position | edit it |
 | drag a Position onto another / Option-drag | swap / copy |
 | Shift-click a Position | change at the next quantization point |
-| number box: top half / bottom half / drag outside | up / down / slide |
+| number or note-picture box: click, then ↑ / ↓ · type + Return · Escape · drag outside | select (the click changes nothing), then up / down · set · cancel · slide |
 | Shift-click a number box | copy the last value you set in any number box |
 | range bar: drag / click | draw a range / one value |
 | arrow box: click / hold / drag around | enable / rotate / point |

@@ -846,7 +846,7 @@ export class SnapshotWindow implements Updatable {
     const L = SNAPSHOT_LETTERS[i];
     const snap = s.comp.snapshots[i];
     if (s.hold) return snap ? `Click (or type ${L}) to store the blinking controls here, replacing Snapshot ${L}.` : `Click (or type ${L}) to store the blinking controls here as Snapshot ${L}.`;
-    if (!snap) return `Snapshot ${L}: empty. Double-click empty slot to capture all (everything a Snapshot can hold, as it is now). To store a selection: press Hold/Do (⌫), click the Positions and controls to include (they blink), then click here (or type ${L}). Blink Everything (globe) selects them all.`;
+    if (!snap) return `Snapshot ${L}: empty. Double-click empty slot to capture all (everything a Snapshot can hold, as it is now) — or hold the ${L} key. To store a selection: press Hold/Do (⌫), click the Positions and controls to include (they blink), then click here (or type ${L}). Blink Everything (globe) selects them all.`;
     const items = describeSnapshot(snap);
     const shown = items.slice(0, 8).join(' · ') + (items.length > 8 ? ` · and ${items.length - 8} more` : '');
     return `Snapshot ${L}: ${shown}. Click or type ${L} to recall (⇧ / capital ${L}: also Sync). It moves Variables to these Positions — it does not store what is in them (notes, values).${s.comp.quantization ? ' Waits for the Snapshot quantization.' : ''}`;

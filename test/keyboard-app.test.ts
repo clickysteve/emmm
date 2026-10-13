@@ -40,7 +40,7 @@ const blur = () => (document.activeElement as HTMLElement)?.blur?.();
 describe('direct entry in the real controls', () => {
   it('Tempo 137', () => {
     const t = box('[data-win="conducting"]', /^Tempo/);
-    pd(t); // a click selects it (and steps it, as in M)
+    pd(t); // a click only selects it
     type('137');
     key('Enter');
     expect(s.comp.tempo.value).toBe(137);

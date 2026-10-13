@@ -836,6 +836,67 @@ try {
     await shot('capture-all');
     if (robotsWin) await key('w', { code: 'KeyW', mods: 1 });
   }
+  // I: hold an empty Snapshot letter (real key down … 500 ms … up) while the Robots play; then recall it
+  {
+    const robotsWin = await evaluate(`!${W}.classList.contains('hidden')`);
+    if (robotsWin) await key('w', { code: 'KeyW', mods: 1 });
+    const VARS = `['patternGroup','noteDensity','velocityRange','noteOrder','transposition','timeDistortion','accent','legato','rhythm','octave','orchestration','soundChoice']`;
+    const slotI = (i) => `[...document.querySelectorAll('[data-win="snapshot"] .num')].filter((d) => /^Snapshot [A-Z]:/.test(d.dataset.tip || ''))[${i}]`;
+    const iI = await evaluate(`emmm.comp.snapshots.findIndex((x, i) => !x && i >= 4)`);
+    const L = 'abcdefghijklmnopqrstuvwxyz'[iI];
+    const kd = (type, extra = {}) => send('Input.dispatchKeyEvent', { type, key: L, code: `Key${L.toUpperCase()}`, windowsVirtualKeyCode: L.toUpperCase().charCodeAt(0), ...(type === 'keyDown' ? { text: L, unmodifiedText: L } : {}), ...extra });
+    await evaluate(`(() => { const o = emmm.captureAllInto.bind(emmm); window.__capN = 0; emmm.captureAllInto = (i) => { window.__capN++; window.__capAt = ${VARS}.map((v) => emmm.comp[v].active); window.__capTick = emmm.engine.tick; return o(i); }; })()`);
+    await key(' ');
+    await sleep(1200);
+    await key(L); // a quick tap on the empty letter
+    await sleep(600);
+    check('I. a quick tap on an empty letter does nothing', (await evaluate(`emmm.comp.snapshots[${iI}] === null && window.__capN === 0`)) && (await evaluate(`emmm.engine.state`)) === 'playing');
+    await kd('keyDown');
+    for (let n = 0; n < 4; n++) (await sleep(130), await kd('keyDown', { autoRepeat: true })); // the OS repeats a held key
+    await shot('snapshot-hold-captured');
+    const heldStored = await evaluate(`!!emmm.comp.snapshots[${iI}]`);
+    await kd('keyUp');
+    await sleep(150);
+    check('I. holding the empty letter captured a complete Snapshot once, while the key was still down', heldStored && (await evaluate(`window.__capN === 1 && Object.keys(emmm.comp.snapshots[${iI}].positions).length === 12 && emmm.comp.snapshots[${iI}].voices.every((v) => Object.keys(v).length === 8) && JSON.stringify(${VARS}.map((v) => emmm.comp.snapshots[${iI}].positions[v])) === JSON.stringify(window.__capAt)`)));
+    check('I. shown as saved and current; playback and the Robots carried on', await evaluate(`${slotI(iI)}.querySelector('svg text').textContent === ${JSON.stringify(L.toUpperCase())} && ${slotI(iI)}.querySelector('circle').getAttribute('fill') === 'var(--ink)' && emmm.engine.state === 'playing' && emmm.engine.tick > window.__capTick && emmm.hold === null`));
+    await evaluate(`delete emmm.captureAllInto`);
+    await key(' ');
+    await evaluate(`emmm.clickPosition('accent', (emmm.comp.snapshots[${iI}].positions.accent + 1) % 6)`);
+    const capI = await evaluate(`JSON.stringify(emmm.comp.snapshots[${iI}])`);
+    await kd('keyDown');
+    await sleep(600); // held on an occupied letter: recall at once, never overwrite
+    await kd('keyUp');
+    check('I. the held-captured Snapshot recalls with its letter (and holding it does not overwrite it)', (await evaluate(`JSON.stringify(${VARS}.map((v) => emmm.comp[v].active)) === JSON.stringify(window.__capAt)`)) && (await evaluate(`JSON.stringify(emmm.comp.snapshots[${iI}])`)) === capI);
+    if (robotsWin) await key('w', { code: 'KeyW', mods: 1 });
+  }
+  // J: number and note-picture cells: a click only selects (outlined); ↑ ↓ step; typing sets
+  {
+    const C = `document.querySelector('[data-win="conducting"]')`;
+    const cellJ = (re) => `[...${C}.querySelectorAll('.num[role="spinbutton"]')].find((e) => ${re}.test(e.title || e.dataset.tip || ''))`;
+    await evaluate(`emmm.comp.syncRatio = 4; emmmUi.updateAll()`);
+    const t0 = await evaluate(`emmm.comp.tempo.value`);
+    await click(cellJ('/^Tempo/'), { dy: -4 });
+    await click(cellJ('/^Tempo/'), { dy: 4 });
+    const t1 = await evaluate(`emmm.comp.tempo.value`);
+    const outlined = await evaluate(`getComputedStyle(document.activeElement).outlineStyle === 'solid' && document.activeElement === ${cellJ('/^Tempo/')}`);
+    await key('ArrowUp');
+    await key('ArrowUp');
+    const t2 = await evaluate(`emmm.comp.tempo.value`);
+    await typeText('13');
+    await shot('cell-typing');
+    await key('Escape');
+    const t3 = await evaluate(`emmm.comp.tempo.value`);
+    await typeText('133');
+    await key('Enter');
+    check('J. Tempo: clicks select without changing it (outlined); ↑ steps; Escape cancels typing; Return commits', t1 === t0 && outlined && t2 === t0 + 2 && t3 === t2 && (await evaluate(`emmm.comp.tempo.value`)) === 133, `${t0} ${t1} ${t2} ${t3} ${outlined}`);
+    await click(cellJ('/^Sync \\/ Metronome ratio/'), { dy: -4 });
+    const r1 = await evaluate(`emmm.comp.syncRatio`);
+    await key('ArrowUp');
+    await key('ArrowUp');
+    await shot('note-picture-cell-selected');
+    check('J. the note-picture ratio beside Tempo: a click keeps it; ↑ steps through note values; still drawn as a note', r1 === 4 && (await evaluate(`emmm.comp.syncRatio`)) === 8 && (await evaluate(`!!${cellJ('/^Sync \\/ Metronome ratio/')}.querySelector('svg')`)));
+    await key('Escape');
+  }
 
   check('no console errors', consoleErrors.length === 0, consoleErrors.slice(0, 3).join(' | '));
 } catch (e) {

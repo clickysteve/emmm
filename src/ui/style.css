@@ -721,10 +721,10 @@ body.dragging * {
 }
 
 /* ------------------------------------------------------------ direct numerical entry */
-/* a selected number box / range bar (click it, then type) */
+/* a selected number box / range bar (click it, then type or ↑ ↓): clearly outlined */
 .num:focus,
 .range:focus {
-  outline: 1px dotted var(--ink);
+  outline: 2px solid var(--selection);
   outline-offset: 1px;
 }
 .num.editing {

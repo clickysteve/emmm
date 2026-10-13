@@ -122,7 +122,7 @@ export class Numerical {
     private o: NumericalOpts,
   ) {
     this.el = el('div', 'num ' + (o.cls ?? ''), parent, [x, y, w, h]);
-    if (o.title) this.el.title = o.title + ' — click, then type a number';
+    if (o.title) this.el.title = o.title + (o.values ? ' — click, then ↑ ↓ (or type the value)' : ' — click, then type a number or ↑ ↓');
     this.el.addEventListener('pointerdown', (ev) => this.down(ev));
     // keyboard: click to select, then type a number (Enter = edit the current one);
     // ↑ ↓ step, Shift = bigger steps, Home / End = minimum / maximum
@@ -265,6 +265,12 @@ export class Numerical {
     return clamp(v + n, o.min ?? -Infinity, o.max ?? Infinity);
   }
 
+  /**
+   * A click only selects the box — it never changes the value (M's "top half up, bottom half
+   * down" press is gone): then type a value (Return), or ↑ ↓ through the legal values.
+   * Shift-click still pastes the last value (S1 Appendix A), and dragging up / down beyond the
+   * box is still the slider gesture.
+   */
   private down(ev: PointerEvent): void {
     ev.stopPropagation();
     ev.preventDefault();
@@ -292,28 +298,17 @@ export class Numerical {
       return;
     }
     const p = localPoint(this.el, ev);
-    const dir = p.y < p.h / 2 ? 1 : -1;
     const start = this.o.get();
-    let cur = this.stepFrom(start, dir);
-    commit(cur, false);
+    let cur = start;
     let slider = false;
-    let timer: ReturnType<typeof setTimeout> | null = setTimeout(function rep(this: unknown) {
-      cur = self.stepFrom(cur, dir);
-      commit(cur, false);
-      timer = setTimeout(rep, 70);
-    }, 380);
-    const self = this;
-    this.el.classList.add('inv');
     trackDrag(
       ev,
       this.el,
       ({ dy }) => {
-        const outside = Math.abs(dy) > p.h / 2 + 2;
-        if (outside && !slider) {
+        if (!slider && Math.abs(dy) > p.h / 2 + 2) {
           slider = true;
-          if (timer) clearTimeout(timer);
-          timer = null;
           document.body.classList.add('dragging');
+          this.el.classList.add('inv');
         }
         if (slider) {
           const ppu = this.o.pxPerUnit ?? (this.o.values ? 6 : 3);
@@ -326,7 +321,7 @@ export class Numerical {
         }
       },
       () => {
-        if (timer) clearTimeout(timer);
+        if (!slider) return; // a plain click: selected, nothing changed
         document.body.classList.remove('dragging');
         this.el.classList.remove('inv');
         commit(this.temp ?? cur, true);
