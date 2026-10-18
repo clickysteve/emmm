@@ -34,6 +34,12 @@ Open <http://localhost:5199> in Chrome, Edge, Opera or Firefox and allow MIDI ac
 asked. Safari has no Web MIDI; emmm still runs there, playing through its small internal
 monitor sound.
 
+**Options ▸ Monitor Output…** puts a chain of [Slop Factory Core](https://github.com/clickysteve/slopfactory-core)
+output engines on that monitor sound (the Good Bits Output Stage characters, Drive, Crunch,
+Tone: the same engines as The Good Bits, The Breakery and DOWNBEAT). It only colours the
+internal monitor: MIDI to your devices is never processed, nor the metronome click. It is saved
+in the browser as a preference, not in compositions.
+
 Other commands:
 
 ```bash

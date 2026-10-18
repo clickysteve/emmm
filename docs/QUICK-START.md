@@ -99,7 +99,8 @@ a bass line and a sparse high line, with every Variable on Position 1 (a "neutra
 3. **Hear and see what it is generating.** Look at the top-right corner of the menu bar:
    `→ monitor` means emmm is playing through its small built-in sound (used when no MIDI
    device is chosen or available); `→` followed by a device name means it is going to that
-   MIDI port. To *see* the notes, choose **emmm ▸ Monitor**: a window lists each Voice's
+   MIDI port. To colour the built-in sound, **Options ▸ Monitor Output…** adds engines such as
+   the Cassette or Vinyl output stage (MIDI is never affected). To *see* the notes, choose **emmm ▸ Monitor**: a window lists each Voice's
    current step, pitches and velocity, and every outgoing note. The **Pattern Group** box
    with an inverted "a" also flashes a little brick each time a Voice's Pattern starts over.
 
