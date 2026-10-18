@@ -2,11 +2,25 @@
  * A deliberately modest internal "monitor" so emmm can be heard without MIDI hardware, and
  * the metronome click (M clicked the computer's speaker). emmm is a MIDI instrument; this is
  * a test aid, not the centre of the application.
+ *
+ * The monitor's notes pass through an output chain of Slop Factory Core engines (Options ▸
+ * Monitor Output…) before the speakers: voices -> volume -> chain -> speakers. The metronome
+ * click and MIDI output never do. The chain's AudioWorklet loads with the audio context; until
+ * it has (or where the browser cannot run it) the monitor plays unprocessed.
  */
+import { createChainNode, emptyChain, loadOutputChain, type ChainConfig, type ChainNode } from '@slopfactory/core/engines';
 
 export class Monitor {
   private ctx: AudioContext | null = null;
   private master: GainNode | null = null;
+  private chain: ChainNode | null = null;
+  private config: ChainConfig = emptyChain();
+  /** the output chain is running (false until its worklet loads, or without AudioWorklet) */
+  chainProcessing = false;
+  /** called when chainProcessing changes */
+  onChainState: () => void = () => {};
+  /** URL of Core's chain worklet (null: no chain) */
+  chainUrl: string | null = null;
   private voices = new Map<string, { osc: OscillatorNode; gain: GainNode }>();
   volume = 0.18;
 
@@ -17,9 +31,27 @@ export class Monitor {
       this.master = this.ctx.createGain();
       this.master.gain.value = this.volume;
       this.master.connect(this.ctx.destination);
+      if (this.chainUrl) void this.attachChain(this.ctx, this.chainUrl);
     }
     if (this.ctx.state === 'suspended') void this.ctx.resume();
     return this.ctx;
+  }
+
+  /** Insert the output chain between the volume and the speakers once its worklet is loaded. */
+  private async attachChain(ctx: AudioContext, url: string): Promise<void> {
+    const ok = await loadOutputChain(ctx, url);
+    if (!ok || ctx !== this.ctx || !this.master || this.chain) return;
+    this.chain = createChainNode(ctx, this.config, { available: true, seed: 1 });
+    this.master.disconnect();
+    this.master.connect(this.chain.node).connect(ctx.destination);
+    this.chainProcessing = true;
+    this.onChainState();
+  }
+
+  /** Change the output chain (heard at once; crossfaded, no click). */
+  setChain(config: ChainConfig): void {
+    this.config = config;
+    this.chain?.set(config);
   }
 
   /** Call from a user gesture so audio can start. */

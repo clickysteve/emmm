@@ -2,7 +2,7 @@
   "name": "emmm",
   "version": "0.1.0",
   "private": true,
-  "description": "emmm \u2014 a modern recreation and continuation of Intelligent Music's M",
+  "description": "emmm — a modern recreation and continuation of Intelligent Music's M",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -24,6 +24,7 @@
   },
   "dependencies": {
     "@fontsource/silkscreen": "^5.3.0",
-    "@fontsource/tiny5": "^5.3.0"
+    "@fontsource/tiny5": "^5.3.0",
+    "@slopfactory/core": "github:clickysteve/slopfactory-core#3cda1c2694d124747efc81343e46a752bea82be8"
   }
 }

@@ -898,6 +898,36 @@ try {
     await key('Escape');
   }
 
+  // K: Monitor Output — Slop Factory Core engines on the internal monitor sound only
+  {
+    await evaluate(`emmmMonitorOutput.win.show()`);
+    const r = await evaluate(`(async () => {
+      const m = emmm.monitor;
+      m.unlock();
+      for (let i = 0; i < 60 && !m.chainProcessing; i++) await new Promise((r) => setTimeout(r, 50));
+      const an = m.ctx.createAnalyser(); an.fftSize = 2048;
+      m.chain.node.connect(an);
+      const peak = async () => { await new Promise((r) => setTimeout(r, 250)); const d = new Float32Array(2048); an.getFloatTimeDomainData(d); return d.reduce((p, v) => Math.max(p, Math.abs(v)), 0); };
+      const w = emmmMonitorOutput;
+      w.chain.clear();
+      const before = window.__midiOut.length;
+      m.noteOn(1, 57, 127, performance.now());
+      const dry = await peak();
+      const id = w.chain.add('goodbits.crunch');
+      w.chain.setParam(id, 'bits', 1);
+      const crushed = await peak();
+      w.chain.setBypass(true);
+      const bypassed = await peak();
+      m.allOff();
+      w.chain.clear();
+      w.chain.setBypass(false);
+      return { processing: m.chainProcessing, dry, crushed, bypassed, midiSent: window.__midiOut.length - before };
+    })()`);
+    await shot('monitor-output');
+    check('K. Monitor Output: the chain worklet runs on the monitor; 1-bit crunch silences the quiet monitor, Bypass All restores it; no MIDI is sent by it', r.processing && r.dry > 0.01 && r.crushed === 0 && r.bypassed > 0.01 && r.midiSent === 0, JSON.stringify(r));
+    await evaluate(`emmmMonitorOutput.win.close()`);
+  }
+
   check('no console errors', consoleErrors.length === 0, consoleErrors.slice(0, 3).join(' | '));
 } catch (e) {
   check('the run completed', false, String(e?.stack ?? e));

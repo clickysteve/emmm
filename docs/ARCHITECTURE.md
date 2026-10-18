@@ -83,7 +83,14 @@ only its window.
 * `smf.ts` — Standard MIDI File writer (Movies, 96 ppq + tempo map) and reader (import into
   Patterns with M's chord/rest/quantize options).
 * `src/audio/monitor.ts` — a small internal WebAudio "monitor" and the metronome click. It is a
-  test aid: M Output Channels can be routed to it in MIDI Settings.
+  test aid: M Output Channels can be routed to it in MIDI Settings. Its notes pass through an
+  output chain of Slop Factory Core engines (`src/audio/output.ts`, the registry and the chain
+  worklet URL; `@slopfactory/core/engines` does the DSP in an AudioWorklet) before the speakers:
+  voices → volume → chain → speakers. The click and MIDI output bypass it. The chain is an app
+  preference (`Prefs.monitorOutput`, key `emmm.monitorOutput`), edited in
+  `src/ui/outputWindow.ts` (Options ▸ Monitor Output…), whose controls are built from the
+  engines' parameter descriptions. emmm's output is MIDI first: no audio engine can apply to
+  it, and Core has no MIDI engines yet, so MIDI passes through no chain.
 
 ### Session (`src/app/session.ts`)
 The performance controller: everything a gesture can do. Holds Hold/Do state, the current

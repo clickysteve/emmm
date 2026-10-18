@@ -21,6 +21,8 @@ import { CcCyclesWindow, ExtendedWindow, LearnWindow } from './ui/extendedWindow
 import { PatternEditor } from './ui/patternEditor';
 import { applyPalette, PaletteLibrary } from './ui/palette';
 import { PaletteWindow } from './ui/paletteWindow';
+import { OutputWindow } from './ui/outputWindow';
+import { CHAIN_WORKLET_URL } from './audio/output';
 import { Prefs } from './app/prefs';
 import { cleanLearnMappings } from './extended/extended';
 import { onLegacyLearn } from './persistence/format';
@@ -162,6 +164,10 @@ feedbackWin.win.o.onClose = () => {
   prefs.saveApp();
 };
 const paletteWin = new PaletteWindow(palettes, desktop);
+// the internal monitor's output chain (Slop Factory Core engines); MIDI is never processed
+session.monitor.chainUrl = CHAIN_WORKLET_URL;
+const outputWin = new OutputWindow(prefs, session.monitor, desktop);
+(window as unknown as { emmmMonitorOutput: unknown }).emmmMonitorOutput = outputWin; // for automation
 const shortcutsWin = new ShortcutsWindow(desktop);
 const trajectoryWin = new TrajectoryWindow(ctx, desktop);
 extendedWin.openTrajectory = () => bringForward(trajectoryWin.win);
@@ -183,7 +189,7 @@ session.onChange(() => {
 });
 // a window that appears is drawn at once (not only at the next change)
 windowEvents.shown = () => (session.dirty = true);
-const floating = [...Object.values(editors), ...Object.values(cyclicEds), patternEditor, midiAssign, monitorWin, about, importWin, library, extendedWin, helpWin, ccWin, paletteWin, learnWin, feedbackWin, shortcutsWin, trajectoryWin, robotsWin, generateWin];
+const floating = [...Object.values(editors), ...Object.values(cyclicEds), patternEditor, midiAssign, monitorWin, about, importWin, library, extendedWin, helpWin, ccWin, paletteWin, outputWin, learnWin, feedbackWin, shortcutsWin, trajectoryWin, robotsWin, generateWin];
 floating.forEach((f) => f.win.el.classList.add('hidden'));
 if (prefs.app.feedback) feedbackWin.win.show();
 
@@ -600,6 +606,7 @@ const MENUS: { title: string; cls?: string; items: MenuItem[] | (() => MenuItem[
       opt('noZoomRects', 'No Zoom Rects'),
       { sep: true, label: '' },
       { label: 'Palette…', action: () => paletteWin.show() },
+      { label: 'Monitor Output…', action: () => bringForward(outputWin.win) },
       { label: 'Transposition Scale Lock  (emmm)', checked: () => session.comp.scaleLock, action: () => session.setScaleLock(!session.comp.scaleLock) },
       {
         label: 'Show Tips',
